@@ -1,4 +1,4 @@
-//! # Common macros for Rust.
+//! # Common macros.
 //!
 
 //! A collection of common macros for Rust.

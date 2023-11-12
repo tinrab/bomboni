@@ -5,3 +5,6 @@
 
 #[cfg(feature = "macros")]
 pub mod macros;
+
+#[cfg(feature = "request")]
+pub mod request;
