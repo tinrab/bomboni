@@ -1,0 +1,23 @@
+[package]
+name = "bomboni"
+version = "0.1.1"
+authors = ["Tin Rabzelj <tin@flinect.com>"]
+description = "Common utilities for Rust"
+repository = "https://github.com/tinrab/bomboni"
+homepage = "https://github.com/tinrab/bomboni"
+license-file = "../LICENSE"
+readme = "../README.md"
+edition = "2021"
+
+exclude = [".github", ".editorconfig", "develop.sh"]
+
+[lib]
+name = "bomboni"
+path = "src/lib.rs"
+
+[features]
+default = ["macros"]
+macros = ["dep:regex"]
+
+[dependencies]
+regex = { version = "1.10.2", optional = true }
