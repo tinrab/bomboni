@@ -1,0 +1,24 @@
+[package]
+name = "bomboni_prost"
+version = "0.1.0"
+authors = ["Tin Rabzelj <tin@flinect.com>"]
+description = "Utilities for working with prost. Part of Bomboni library"
+repository = "https://github.com/tinrab/bomboni"
+homepage = "https://github.com/tinrab/bomboni"
+license-file = "../LICENSE"
+readme = "../README.md"
+edition = "2021"
+
+[lib]
+name = "bomboni_prost"
+path = "src/lib.rs"
+
+[dependencies]
+itertools = "0.11.0"
+convert_case = "0.6.0"
+prost = "0.12.1"
+prost-types = "0.12.1"
+proc-macro2 = "1.0.69"
+syn = { version = "2.0.39", features = ["full"] }
+quote = "1.0.33"
+prettyplease = "0.2.15"

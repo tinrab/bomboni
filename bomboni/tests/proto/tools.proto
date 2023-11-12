@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package tools;
+
+import "command/command.proto";
+
+service ToolsService {
+  rpc ExecuteCommand(CommandRequest) returns (CommandResponse) {}
+}
+
+message CommandRequest { command.Command command = 1; }
+
+message CommandResponse { string result = 1; }
+
+enum ServingStatus {
+  UNKNOWN = 0;
+  SERVING = 1;
+  NOT_SERVING = 2;
+}

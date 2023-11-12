@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package tools.command;
+
+import "perms/perms.proto";
+
+message Command {
+  message Status {
+    oneof kind {
+      bool ok = 1;
+      string error = 2;
+    }
+  }
+
+  string user = 1;
+
+  oneof kind {
+    Status status = 2;
+    string print = 4;
+    perms.Perms apply_perms = 5;
+  }
+}

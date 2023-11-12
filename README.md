@@ -1,1 +1,1 @@
-# Bomboni: Common Utilities Library for Rust
+# Bomboni: Utility Library for Rust
