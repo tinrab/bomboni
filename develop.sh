@@ -18,8 +18,8 @@ function lint() {
 		-D trivial_numeric_casts \
 		-D unused_extern_crates \
 		-D unused_import_braces \
-		-D unused_qualifications \
-		-D missing_docs
+		-D unused_qualifications
+		# -D missing_docs
 }
 
 function test() {

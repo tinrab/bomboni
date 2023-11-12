@@ -16,11 +16,17 @@ path = "src/lib.rs"
 [features]
 default = ["macros", "request"]
 macros = ["dep:bomboni_derive", "dep:regex"]
-request = []
+request = ["dep:pest", "dep:pest_derive"]
+testing = []
 
 [dependencies]
+itertools = "0.11.0"
+chrono = "0.4.31"
+thiserror = "1.0.50"
 bomboni_derive = { version = "*", path = "../bomboni_derive", optional = true }
 regex = { version = "1.10.2", optional = true }
+pest = { version = "2.7.5", optional = true }
+pest_derive = { version = "2.7.5", optional = true }
 
 [dev-dependencies]
 bomboni_derive = { path = "../bomboni_derive" }

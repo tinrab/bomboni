@@ -1,0 +1,21 @@
+{
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    },
+    "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
+    "rust-analyzer.runnables.extraEnv": {
+        "RUSTFLAGS": "-Awarnings"
+    },
+    "rust-analyzer.cargo.extraEnv": {
+        "RUSTFLAGS": "-Awarnings"
+    },
+    "rust-analyzer.server.extraEnv": {
+        "RUSTFLAGS": "-Awarnings"
+    },
+    "rust-analyzer.check.extraEnv": {
+        "RUSTFLAGS": "-Awarnings"
+    },
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.check.features": "all"
+}

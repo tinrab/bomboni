@@ -46,6 +46,31 @@ macro_rules! btree_map {
     }};
 }
 
+/// A macro that creates a new `BTreeMap` instance with the given key-value pairs.
+/// The same as `btree_map!`, but converts keys and values to the target type.
+///
+/// # Examples
+///
+/// Create a map of key-value pairs.
+///
+/// ```
+/// # use std::collections::BTreeMap;
+/// use bomboni::btree_map_into;
+///
+/// let map: BTreeMap<i32, String> = btree_map_into! {
+///     1 => "first",
+///     2 => "second",
+/// };
+/// assert_eq!(map.get(&1), Some(&"first".to_string()));
+/// assert_eq!(map.get(&2), Some(&"second".to_string()));
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! btree_map_into {
+    ($($key:expr => $value:expr),* $(,)?) => {
+        btree_map!($($key.into() => $value.into()),*)
+    };
+}
+
 /// A macro that creates a new `HashMap` instance with the given key-value pairs.
 ///
 /// # Examples
@@ -87,6 +112,30 @@ macro_rules! hash_map {
         _map
     }};
 }
+/// A macro that creates a new `HashMap` instance with the given key-value pairs.
+/// The same as `hash_map!`, but converts keys and values to the target type.
+///
+/// # Examples
+///
+/// Create a map of key-value pairs.
+///
+/// ```
+/// # use std::collections::HashMap;
+/// use bomboni::hash_map_into;
+///
+/// let map: HashMap<i32, String> = hash_map_into! {
+///     1 => "first",
+///     2 => "second",
+/// };
+/// assert_eq!(map.get(&1), Some(&"first".to_string()));
+/// assert_eq!(map.get(&2), Some(&"second".to_string()));
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! hash_map_into {
+    ($($key:expr => $value:expr),* $(,)?) => {
+        hash_map!($($key.into() => $value.into()),*)
+    };
+}
 
 /// A macro that creates a new `BTreeSet` and inserts the given values into it.
 ///
@@ -112,6 +161,27 @@ macro_rules! btree_set {
         )*
         _set
     }};
+}
+
+/// A macro that creates a new `BTreeSet` and inserts the given values into it.
+/// The same as `btree_set!`, but converts values to the target type.
+///
+/// # Examples
+///
+/// ```
+/// # use std::collections::BTreeSet;
+/// use bomboni::btree_set_into;
+///
+/// let set: BTreeSet<i32> = btree_set_into![1, 2, 3];
+/// assert!(set.contains(&1));
+/// assert!(set.contains(&2));
+/// assert_eq!(set.len(), 3);
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! btree_set_into {
+    ($($value:expr),* $(,)?) => {
+        btree_set!($($value.into()),*)
+    };
 }
 
 /// A macro that creates a new `HashSet` and inserts the given values into it.
@@ -140,6 +210,27 @@ macro_rules! hash_set {
     }};
 }
 
+/// A macro that creates a new `HashSet` and inserts the given values into it.
+/// The same as `hash_set!`, but converts values to the target type.
+///
+/// # Examples
+///
+/// ```
+/// # use std::collections::HashSet;
+/// use bomboni::hash_set_into;
+///
+/// let set: HashSet<i32> = hash_set_into![1, 2, 3];
+/// assert!(set.contains(&1));
+/// assert!(set.contains(&2));
+/// assert_eq!(set.len(), 3);
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! hash_set_into {
+    ($($value:expr),* $(,)?) => {
+        hash_set!($($value.into()),*)
+    };
+}
+
 /// A macro that creates a new `VecDeque` instance with the given values.
 ///
 /// # Examples
@@ -162,4 +253,23 @@ macro_rules! vec_deque {
             $($value),*
         ])
     }};
+}
+
+/// A macro that creates a new `VecDeque` instance with the given values.
+/// The same as `vec_deque!`, but converts values to the target type.
+///
+/// # Examples
+///
+/// ```
+/// # use std::collections::VecDeque;
+/// use bomboni::vec_deque_into;
+///
+/// let deque: VecDeque<i32> = vec_deque_into![1, 2, 3];
+/// assert_eq!(deque, VecDeque::from(vec![1, 2, 3]));
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! vec_deque_into {
+    ($($value:expr),* $(,)?) => {
+        vec_deque!($($value.into()),*)
+    };
 }
