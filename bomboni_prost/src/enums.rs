@@ -121,10 +121,10 @@ fn write_enum_serde(context: &Context, s: &mut TokenStream, enum_type: &EnumDesc
         }
     });
 
-    // Utility for working with i32s in message fields.
-    // Usable with #[serde(with = "...")]
     let mod_ident = format_ident!("{}_serde", enum_type.name().to_case(Case::Snake));
     s.extend(quote! {
+        /// Utility for working with i32s in message fields.
+        /// Usable with #[serde(with = "...")]
         pub mod #mod_ident {
             use super::*;
             use ::serde::{Serialize, Deserialize};

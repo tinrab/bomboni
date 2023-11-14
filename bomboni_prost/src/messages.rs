@@ -42,9 +42,15 @@ fn write_message_name(context: &Context, s: &mut TokenStream, message: &Descript
     let package_proto_name = Literal::string(&context.package_name);
 
     let type_url = if let Some(domain) = context.config.domain.as_ref() {
-        Literal::string(&format!("{}/{}", domain, message_proto_name))
+        Literal::string(&format!(
+            "{}/{}.{}",
+            domain, &context.package_name, message_proto_name
+        ))
     } else {
-        Literal::string(&format!("/{}", message_proto_name))
+        Literal::string(&format!(
+            "/{}.{}",
+            &context.package_name, message_proto_name
+        ))
     };
 
     let comment = format_comment!("Implement [`prost::Name`] for `{}`.", message_proto_name);
