@@ -1,7 +1,5 @@
+use crate::google::protobuf::Any;
 use prost::{DecodeError, EncodeError, Message, Name};
-
-use super::Any;
-
 impl Any {
     pub fn new(type_url: String, value: Vec<u8>) -> Self {
         Any { type_url, value }

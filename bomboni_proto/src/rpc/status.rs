@@ -1,6 +1,6 @@
 use crate::google::protobuf::Any;
 
-use super::{Code, Status};
+use crate::google::rpc::{Code, Status};
 
 impl Status {
     pub fn new(code: Code, message: String, details: Vec<Any>) -> Self {

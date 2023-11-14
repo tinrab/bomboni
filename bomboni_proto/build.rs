@@ -6,19 +6,18 @@ use bomboni_prost::{
 };
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
+    let fd_path = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("fd.pb");
+
     #[cfg(feature = "testing")]
     {
         let mut config = prost_build::Config::new();
         config
-            .file_descriptor_set_path("./tests/proto/fd.pb")
-            .out_dir("./tests/proto")
+            .file_descriptor_set_path(fd_path.clone())
             .protoc_arg("--experimental_allow_proto3_optional")
             .btree_map(["."])
             .compile_protos(&["./tests/proto/tools.proto"], &["./tests/proto/"])?;
 
         compile(CompileConfig {
-            file_descriptor_set_path: "./tests/proto/fd.pb".into(),
-            output_path: "./tests/proto".into(),
             ..Default::default()
         })?;
     }
@@ -44,8 +43,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     let mut config = prost_build::Config::new();
     config
-        .out_dir("./src")
-        .file_descriptor_set_path("./src/fd.pb")
+        .file_descriptor_set_path(fd_path)
         .compile_well_known_types()
         .protoc_arg("--experimental_allow_proto3_optional")
         .btree_map(["."]);
@@ -83,8 +81,6 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     config.compile_protos(&proto_paths, &["./proto"])?;
     compile(CompileConfig {
-        file_descriptor_set_path: "./src/fd.pb".into(),
-        output_path: "./src".into(),
         api: ApiConfig {
             domain: Some("type.googleapis.com".into()),
             ..Default::default()

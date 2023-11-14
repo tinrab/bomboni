@@ -17,8 +17,9 @@ pub struct ApiConfig {
 impl Default for CompileConfig {
     fn default() -> Self {
         Self {
-            file_descriptor_set_path: Default::default(),
-            output_path: Default::default(),
+            file_descriptor_set_path: PathBuf::from(std::env::var("OUT_DIR").unwrap())
+                .join("fd.pb"),
+            output_path: std::env::var("OUT_DIR").unwrap().into(),
             format: true,
             api: Default::default(),
         }

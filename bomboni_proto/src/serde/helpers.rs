@@ -3,7 +3,6 @@ use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
-
 use std::str::FromStr;
 
 pub fn is_default<T>(value: &T) -> bool

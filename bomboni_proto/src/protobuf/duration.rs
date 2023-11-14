@@ -9,7 +9,7 @@ use std::{
 };
 use thiserror::Error;
 
-use super::Duration;
+use crate::google::protobuf::Duration;
 
 #[derive(Error, Debug)]
 pub enum DurationError {

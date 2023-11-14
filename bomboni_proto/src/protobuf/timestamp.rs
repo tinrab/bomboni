@@ -9,7 +9,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use thiserror::Error;
 
-use super::Timestamp;
+use crate::google::protobuf::Timestamp;
 
 #[derive(Error, Debug)]
 pub enum TimestampError {

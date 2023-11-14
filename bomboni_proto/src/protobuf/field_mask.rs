@@ -1,7 +1,7 @@
 use crate::serde::helpers as serde_helpers;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::FieldMask;
+use crate::google::protobuf::FieldMask;
 
 impl FieldMask {
     pub fn new(paths: Vec<String>) -> Self {

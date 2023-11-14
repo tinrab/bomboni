@@ -1,7 +1,5 @@
+use crate::google::protobuf::Empty;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use super::Empty;
-
 impl Empty {
     pub fn new() -> Self {
         Empty {}

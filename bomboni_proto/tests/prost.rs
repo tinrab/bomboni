@@ -10,19 +10,23 @@ use crate::tools::{
     },
     CommandRequest, ServingStatus,
 };
+use bomboni_proto::include_proto;
 
-#[allow(clippy::module_inception)]
+#[allow(unused_qualifications, clippy::module_inception)]
 pub mod tools {
+    use super::*;
+    include_proto!("tools");
+    include_proto!("tools.plus");
     pub mod command {
-        include!("./proto/tools.command.rs");
-        include!("./proto/tools.command.plus.rs");
+        use super::*;
+        include_proto!("tools.command");
+        include_proto!("tools.command.plus");
     }
     pub mod perms {
-        include!("./proto/tools.perms.rs");
-        include!("./proto/tools.perms.plus.rs");
+        use super::*;
+        include_proto!("tools.perms");
+        include_proto!("tools.perms.plus");
     }
-    include!("./proto/tools.rs");
-    include!("./proto/tools.plus.rs");
 }
 
 #[test]
