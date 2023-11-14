@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, io::Write, path::PathBuf};
 
 use bomboni_prost::{
     compile,
@@ -6,7 +6,8 @@ use bomboni_prost::{
 };
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
-    let fd_path = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("fd.pb");
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let fd_path = out_dir.join("fd.pb");
 
     #[cfg(feature = "testing")]
     {
@@ -80,11 +81,15 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     );
 
     config.compile_protos(&proto_paths, &["./proto"])?;
+
+    std::io::stdout().flush().unwrap();
+
     compile(CompileConfig {
         api: ApiConfig {
             domain: Some("type.googleapis.com".into()),
             ..Default::default()
         },
+        file_descriptor_set_path: out_dir.join("fd.pb"),
         ..Default::default()
     })?;
 

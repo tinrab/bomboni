@@ -21,17 +21,24 @@ mod utility;
 
 pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
     let mut buf = Vec::new();
-    File::open(&config.file_descriptor_set_path)?.read_to_end(&mut buf)?;
+    File::open(&config.file_descriptor_set_path)
+        .map_err(|err| {
+            format!(
+                "failed to open file descriptor set at `{}`: {}",
+                config.file_descriptor_set_path.display(),
+                err
+            )
+        })?
+        .read_to_end(&mut buf)?;
     let descriptor = FileDescriptorSet::decode(buf.as_slice())?;
 
-    let flush = |package: &str, content: TokenStream| {
-        let output_path = config.output_path.join(format!("{}.plus.rs", package));
+    let flush = |package: &str, content: TokenStream| -> Result<(), Box<dyn Error>> {
+        let output_path = config.output_path.join(format!("./{}.plus.rs", package));
         println!(
             "writing package `{}` to file `{}`",
             package,
             output_path.display()
         );
-        // let mut output_file = File::create(output_path)?;
         let mut output_file = OpenOptions::new()
             .write(true)
             .append(true)
@@ -45,7 +52,7 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
         } else {
             output_file.write_all(content.to_string().as_bytes())?;
         }
-        Result::<(), Box<dyn Error>>::Ok(())
+        Ok(())
     };
 
     // Clear files

@@ -27,6 +27,24 @@ function test() {
 	cargo test --doc --all-features -- --nocapture
 }
 
+function publish() {
+	if [[ $2 =~ ^(--actually-do-it)$ ]]; then
+		cargo publish -p bomboni_common
+		cargo publish -p bomboni_prost
+		cargo publish -p bomboni_proto
+		cargo publish -p bomboni_derive
+		cargo publish -p bomboni_request
+		cargo publish -p bomboni
+	else
+		cargo publish -p bomboni_common --dry-run --allow-dirty
+		cargo publish -p bomboni_prost --dry-run --allow-dirty
+		cargo publish -p bomboni_proto --dry-run --allow-dirty
+		cargo publish -p bomboni_derive --dry-run --allow-dirty
+		cargo publish -p bomboni_request --dry-run --allow-dirty
+		cargo publish -p bomboni --dry-run --allow-dirty
+	fi
+}
+
 function help() {
 	echo "Usage: $(basename "$0") [OPTIONS]
 
@@ -37,7 +55,7 @@ Commands:
 "
 }
 
-if [[ $1 =~ ^(format|lint|test|help)$ ]]; then
+if [[ $1 =~ ^(format|lint|test|publish|help)$ ]]; then
 	"$@"
 else
 	help
