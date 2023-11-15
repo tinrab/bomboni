@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -17,10 +17,15 @@ path = "src/lib.rs"
 testing = []
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.4" }
-bomboni_derive = { path = "../bomboni_derive", version = "0.1.4" }
+bomboni_common = { path = "../bomboni_common", version = "0.1.5" }
+bomboni_derive = { path = "../bomboni_derive", version = "0.1.5" }
 thiserror = "1.0.50"
-itertools = "0.11.0"
+itertools = "0.12.0"
 chrono = "0.4.31"
 pest = "2.7.5"
 pest_derive = "2.7.5"
+base64ct = { version = "1.6.0", features = ["alloc"] }
+aes-gcm = { version = "0.10.3", features = ["alloc"] }
+blake2 = "0.10.6"
+rsa = "0.9.3"
+rand = "0.8.5"

@@ -5,7 +5,7 @@ use crate::schema::ValueType;
 
 use super::parser::Rule;
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum FilterError {
     #[error("failed to parse filter from `{start}` to `{end}`")]
     Parse { start: usize, end: usize },

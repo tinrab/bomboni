@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use crate::google::protobuf::Duration;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum DurationError {
     #[error("duration is out of range")]
     OutOfRange,

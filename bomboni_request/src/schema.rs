@@ -50,28 +50,6 @@ pub trait SchemaMapped {
 }
 
 impl Schema {
-    pub fn is_ordered(&self, field: &str) -> bool {
-        if let Some(member) = self.get_member(field) {
-            match member {
-                MemberSchema::Resource(_) => false,
-                MemberSchema::Field(field) => field.ordered,
-            }
-        } else {
-            false
-        }
-    }
-
-    pub fn is_repeated(&self, field: &str) -> bool {
-        if let Some(member) = self.get_member(field) {
-            match member {
-                MemberSchema::Resource(_) => false,
-                MemberSchema::Field(field) => field.repeated,
-            }
-        } else {
-            false
-        }
-    }
-
     pub fn get_member(&self, name: &str) -> Option<&MemberSchema> {
         let mut member: Option<&MemberSchema> = None;
         for step in name.split('.') {
@@ -92,6 +70,14 @@ impl Schema {
             }
         }
         member
+    }
+
+    pub fn get_field(&self, name: &str) -> Option<&FieldMemberSchema> {
+        if let Some(MemberSchema::Field(field)) = self.get_member(name) {
+            Some(field)
+        } else {
+            None
+        }
     }
 }
 
@@ -156,7 +142,7 @@ mod tests {
             schema.get_member("task.deleted"),
             Some(MemberSchema::Field(field)) if field.value_type == ValueType::Boolean
         ));
-        assert!(schema.is_ordered("user.id"));
-        assert!(schema.is_repeated("task.tags"));
+        assert!(schema.get_field("user.id").unwrap().ordered);
+        assert!(schema.get_field("task.tags").unwrap().repeated);
     }
 }

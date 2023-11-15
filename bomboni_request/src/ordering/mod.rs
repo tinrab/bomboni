@@ -6,13 +6,15 @@ use std::{
 
 use itertools::Itertools;
 
+use crate::schema::Schema;
+
 use self::error::{OrderingError, OrderingResult};
 
 use super::schema::SchemaMapped;
 
 pub mod error;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Ordering {
     pub terms: Vec<OrderingTerm>,
 }
@@ -90,6 +92,19 @@ impl Ordering {
             }
         }
         Some(cmp::Ordering::Equal)
+    }
+
+    pub fn is_valid(&self, schema: &Schema) -> bool {
+        for term in self.terms.iter() {
+            if let Some(field) = schema.get_field(&term.name) {
+                if !field.ordered {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        true
     }
 }
 

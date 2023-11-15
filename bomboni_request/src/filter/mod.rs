@@ -1,3 +1,9 @@
+//! # Filter
+//!
+//! Utility for specifying filters on queries, as described in Google AIP standard [1].
+//!
+//! [1]: https://google.aip.dev/160
+
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
 use std::ops::Deref;
@@ -381,6 +387,17 @@ impl Filter {
             Filter::Value(value) => value.value_type(),
         }
     }
+
+    pub fn is_valid(&self, schema: &Schema) -> bool {
+        // TODO: verify if this is fine
+        self.get_result_value_type(schema).is_some()
+    }
+}
+
+impl Default for Filter {
+    fn default() -> Self {
+        Filter::Conjunction(Vec::new())
+    }
 }
 
 impl Display for Filter {
@@ -442,6 +459,29 @@ mod tests {
     use crate::testing::schema::{RequestItem, TaskItem, UserItem};
 
     use super::*;
+
+    #[test]
+    fn validate_schema() {
+        let schema = UserItem::get_schema();
+        macro_rules! check {
+            (@valid $filter:expr) => {
+                assert!(check!($filter));
+            };
+            (@invalid $filter:expr) => {
+                assert!(!check!($filter));
+            };
+            ($filter:expr) => {
+                Filter::parse($filter).unwrap().is_valid(&schema)
+            };
+        }
+
+        check!(@valid "42");
+        check!(@valid "false");
+
+        check!(@invalid "a");
+        check!(@invalid "a.b");
+        check!(@invalid "f()");
+    }
 
     #[test]
     fn it_works() {

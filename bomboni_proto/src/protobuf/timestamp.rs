@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use crate::google::protobuf::Timestamp;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum TimestampError {
     #[error("invalid nanoseconds")]
     InvalidNanoseconds,

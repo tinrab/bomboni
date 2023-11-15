@@ -23,8 +23,8 @@ function lint() {
 }
 
 function test() {
-	cargo test --all-targets --all-features -- --nocapture
-	cargo test --doc --all-features -- --nocapture
+	cargo test --workspace --all-targets --all-features -- --nocapture
+	cargo test --workspace --doc --all-features -- --nocapture
 }
 
 function publish() {
