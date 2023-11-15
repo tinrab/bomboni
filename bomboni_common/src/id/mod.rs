@@ -1,0 +1,154 @@
+//! # Id
+//!
+//! Semi-globally unique and sortable identifiers.
+use std::{
+    fmt::{self, Display, Formatter},
+    num::ParseIntError,
+    str::FromStr,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+#[cfg(feature = "serde")]
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
+
+pub mod generator;
+#[cfg(feature = "mysql")]
+mod mysql;
+
+const TIMESTAMP_BITS: i64 = 64;
+const WORKER_BITS: i64 = 16;
+const SEQUENCE_BITS: i64 = 16;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id(u128);
+
+impl Id {
+    pub const fn new(id: u128) -> Self {
+        Id(id)
+    }
+
+    /// Encodes the Id from parts.
+    pub fn from_parts(time: SystemTime, worker: u16, sequence: u16) -> Self {
+        let timestamp = time.duration_since(UNIX_EPOCH).unwrap().as_secs() as u128;
+        let worker = worker as u128;
+        let sequence = sequence as u128;
+
+        assert!(timestamp < (1 << TIMESTAMP_BITS));
+        assert!(worker < (1 << WORKER_BITS));
+        assert!(sequence < (1 << SEQUENCE_BITS));
+
+        Id(
+            (timestamp & ((1 << TIMESTAMP_BITS) - 1)) << (WORKER_BITS + SEQUENCE_BITS)
+                | ((worker & ((1 << WORKER_BITS) - 1)) << SEQUENCE_BITS)
+                | (sequence & ((1 << SEQUENCE_BITS) - 1)),
+        )
+    }
+
+    /// Decodes Id's parts.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// # use std::time::{SystemTime, Duration};
+    /// use bomboni_common::id::Id;
+    ///
+    /// let time = SystemTime::UNIX_EPOCH + Duration::from_secs(1337);
+    /// let id = Id::from_parts(time, 42, 1);
+    /// let (timestamp, worker, sequence) = id.decode();
+    /// assert_eq!(timestamp, time);
+    /// assert_eq!(worker, 42);
+    /// assert_eq!(sequence, 1);
+    /// ```
+    pub fn decode(self) -> (SystemTime, u16, u16) {
+        let timestamp = SystemTime::UNIX_EPOCH
+            + Duration::from_secs((self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as u64);
+        let worker = ((self.0 >> SEQUENCE_BITS) & ((1 << WORKER_BITS) - 1)) as u16;
+        let sequence = (self.0 & ((1 << SEQUENCE_BITS) - 1)) as u16;
+        (timestamp, worker, sequence)
+    }
+}
+
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:x}", self.0)
+    }
+}
+
+impl FromStr for Id {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let value = u128::from_str_radix(s, 16)?;
+        Ok(Id::new(value))
+    }
+}
+
+macro_rules! impl_from {
+    ( $( $source:ty ),* $(,)? ) => {
+        $(impl From<$source> for Id {
+            fn from(x: $source) -> Self {
+                Id::new(x as u128)
+            }
+        })*
+    };
+}
+impl_from!(i8, i16, i32, i64, i128, u8, u16, u32, u64);
+
+#[cfg(feature = "serde")]
+impl Serialize for Id {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Id {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let value = String::deserialize(deserializer)?;
+        value.parse::<Id>().map_err(|_| {
+            <D as Deserializer<'de>>::Error::invalid_value(Unexpected::Str(value.as_str()), &"Id")
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        assert_eq!(
+            Id::from_parts(SystemTime::UNIX_EPOCH + Duration::from_secs(10), 1, 1),
+            Id(0b101000000000000000010000000000000001)
+        );
+        let max_time = SystemTime::UNIX_EPOCH + Duration::from_secs(Duration::MAX.as_secs() / 2);
+        let id = Id::from_parts(max_time, 1, 1);
+        assert_eq!(
+            id,
+            Id(0b11111111111111111111111111111111111111111111111111111111111111100000000000000010000000000000001)
+        );
+        let (timestamp, worker, sequence) = id.decode();
+        assert_eq!(timestamp, max_time);
+        assert_eq!(worker, 1);
+        assert_eq!(sequence, 1);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialize() {
+        let id = Id::from_parts(SystemTime::UNIX_EPOCH + Duration::from_secs(2 << 20), 1, 1);
+        assert_eq!(serde_json::to_string(&id).unwrap(), r#""20000000010001""#);
+    }
+}

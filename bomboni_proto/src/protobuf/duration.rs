@@ -24,7 +24,7 @@ pub enum DurationError {
 // pub type ProtoResult<T> = Result<T, ProtoError>;
 
 impl Duration {
-    pub fn new(seconds: i64, nanos: i32) -> Self {
+    pub const fn new(seconds: i64, nanos: i32) -> Self {
         Self { seconds, nanos }
     }
 

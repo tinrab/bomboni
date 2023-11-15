@@ -12,6 +12,31 @@ impl Status {
     }
 }
 
+#[cfg(feature = "tonic")]
+impl From<tonic::Status> for Status {
+    fn from(status: tonic::Status) -> Self {
+        use prost::Message;
+        let details = Status::decode(status.details()).unwrap();
+        Status {
+            code: status.code() as i32,
+            message: status.message().into(),
+            details: details.details,
+        }
+    }
+}
+
+#[cfg(feature = "tonic")]
+impl From<Status> for tonic::Status {
+    fn from(status: Status) -> Self {
+        use prost::Message;
+        let code = tonic::Code::from(status.code);
+        let message = status.message.clone();
+        let mut encoded_details = Vec::new();
+        status.encode(&mut encoded_details).unwrap();
+        tonic::Status::with_details(code, message, encoded_details.into())
+    }
+}
+
 pub mod details_serde {
     use super::*;
     use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};

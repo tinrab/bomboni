@@ -24,7 +24,7 @@ pub enum TimestampError {
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 
 impl Timestamp {
-    pub fn new(seconds: i64, nanos: i32) -> Self {
+    pub const fn new(seconds: i64, nanos: i32) -> Self {
         Timestamp { seconds, nanos }
     }
 
