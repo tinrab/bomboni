@@ -65,7 +65,7 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
             .create(true)
             .open(output_path)
             .unwrap();
-        output_file.write_all("".as_bytes())?;
+        output_file.write_all(b"")?;
     }
 
     let mut current_package: Option<String> = None;

@@ -21,7 +21,7 @@ bomboni_common = { path = "../bomboni_common", version = "0.1.5" }
 bomboni_derive = { path = "../bomboni_derive", version = "0.1.5" }
 thiserror = "1.0.50"
 itertools = "0.12.0"
-chrono = "0.4.31"
+time = { version = "0.3.30", features = ["formatting", "parsing"] }
 pest = "2.7.5"
 pest_derive = "2.7.5"
 base64ct = { version = "1.6.0", features = ["alloc"] }
@@ -29,3 +29,6 @@ aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
 rsa = "0.9.3"
 rand = "0.8.5"
+
+[lints]
+workspace = true

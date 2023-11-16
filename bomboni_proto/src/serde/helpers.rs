@@ -5,6 +5,9 @@ use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::str::FromStr;
 
+#[cfg(feature = "json")]
+use serde_json::Value as JsonValue;
+
 pub fn is_default<T>(value: &T) -> bool
 where
     T: Default + PartialEq<T>,
@@ -96,24 +99,42 @@ pub mod string_list {
     }
 }
 
-// Credit: `handlebars = "4.3.1"`
-// pub fn is_truthy(value: &Value, include_zero: bool) -> bool {
-//     match value {
-//         Value::Bool(ref i) => *i,
-//         Value::Number(ref n) => {
-//             if include_zero {
-//                 n.as_f64().map(|f| !f.is_nan()).unwrap_or(false)
-//             } else {
-//                 // there is no inifity in json/serde_json
-//                 n.as_f64().map(|f| f.is_normal()).unwrap_or(false)
-//             }
-//         }
-//         Value::Null => false,
-//         Value::String(ref i) => !i.is_empty(),
-//         Value::Array(ref i) => !i.is_empty(),
-//         Value::Object(ref i) => !i.is_empty(),
-//     }
-// }
+// Credit: https://github.com/sunng87/handlebars-rust/blob/v4.5.0/src/json/value.rs#L113
+#[cfg(feature = "json")]
+pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
+    match value {
+        JsonValue::Bool(ref i) => *i,
+        JsonValue::Number(ref n) => {
+            if include_zero {
+                n.as_f64().map(|f| !f.is_nan()).unwrap_or(false)
+            } else {
+                // there is no inifity in json/serde_json
+                n.as_f64().map(|f| f.is_normal()).unwrap_or(false)
+            }
+        }
+        JsonValue::Null => false,
+        JsonValue::String(ref i) => !i.is_empty(),
+        JsonValue::Array(ref i) => !i.is_empty(),
+        JsonValue::Object(ref i) => !i.is_empty(),
+    }
+}
+
+#[cfg(feature = "json")]
+pub fn merge_json(a: &mut JsonValue, b: JsonValue) {
+    if let JsonValue::Object(a) = a {
+        if let JsonValue::Object(b) = b {
+            for (k, v) in b {
+                if v.is_null() {
+                    a.remove(&k);
+                } else {
+                    merge_json(a.entry(k).or_insert(JsonValue::Null), v);
+                }
+            }
+            return;
+        }
+    }
+    *a = b;
+}
 
 pub mod duration {
     use super::*;
@@ -160,7 +181,6 @@ pub mod duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration as ChronoDuration;
 
     #[test]
     fn duration() {
@@ -195,8 +215,11 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "chrono")]
     #[test]
     fn chrono_duration() {
+        use chrono::Duration as ChronoDuration;
+
         #[derive(Serialize, Deserialize)]
         struct TestDuration {
             #[serde(with = "duration")]

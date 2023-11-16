@@ -1,4 +1,3 @@
-#[cfg(feature = "tonic")]
 use crate::google::rpc::Code;
 #[cfg(feature = "tonic")]
 use http::StatusCode;

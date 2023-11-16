@@ -9,11 +9,7 @@ use syn::TypePath;
 
 use crate::context::Context;
 
-pub(crate) fn write_message_oneofs(
-    context: &Context,
-    s: &mut TokenStream,
-    message: &DescriptorProto,
-) {
+pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if message.oneof_decl.is_empty() {
         return;
     }

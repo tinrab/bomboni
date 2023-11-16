@@ -21,6 +21,7 @@ members = [
   "bomboni_prost",
   "bomboni_proto",
   "bomboni_request",
+  "bomboni_template",
 ]
 
 [features]
@@ -28,6 +29,7 @@ default = ["prost", "proto", "request"]
 prost = ["dep:bomboni_prost"]
 proto = ["prost", "dep:bomboni_proto"]
 request = ["dep:bomboni_request"]
+template = ["dep:bomboni_template"]
 
 [dependencies]
 bomboni_common = { path = "bomboni_common", version = "0.1.5" }
@@ -36,3 +38,37 @@ bomboni_derive = { path = "bomboni_derive", version = "0.1.5" }
 bomboni_prost = { path = "bomboni_prost", version = "0.1.5", optional = true }
 bomboni_proto = { path = "bomboni_proto", version = "0.1.5", optional = true }
 bomboni_request = { path = "bomboni_request", version = "0.1.5", optional = true }
+bomboni_template = { path = "bomboni_template", version = "0.1.5", optional = true }
+
+[workspace.lints.rust]
+warnings = "deny"
+unsafe_code = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unused_import_braces = "deny"
+unused_qualifications = "deny"
+# unused_results = "deny"
+# TODO: Enable these
+# missing_docs = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+correctness = "deny"
+suspicious = "deny"
+complexity = "deny"
+perf = "deny"
+style = "deny"
+pedantic = "deny"
+
+module_name_repetitions = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+must_use_candidate = "allow"
+cast_sign_loss = "allow"
+too_many_lines = "allow"
+needless_pass_by_value = "allow"
+
+# TODO: Enable these
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# nursery = "deny"

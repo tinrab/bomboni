@@ -3,9 +3,9 @@ use std::{
     fmt::{self, Display, Formatter, Write},
 };
 
-use chrono::NaiveDateTime;
 use itertools::Itertools;
 use pest::iterators::Pair;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::filter::parser::Rule;
 
@@ -20,7 +20,7 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     String(String),
-    Timestamp(NaiveDateTime),
+    Timestamp(OffsetDateTime),
     Repeated(Vec<Value>),
     Any,
 }
@@ -42,7 +42,7 @@ impl Value {
         match pair.as_rule() {
             Rule::string => {
                 let value = pair.as_str();
-                if let Ok(value) = value.parse::<NaiveDateTime>() {
+                if let Ok(value) = OffsetDateTime::parse(value, &Rfc3339) {
                     Ok(value.into())
                 } else {
                     let lexeme = pair.as_str();
@@ -78,7 +78,7 @@ impl Display for Value {
             }
             Value::Timestamp(value) => {
                 f.write_char('"')?;
-                value.fmt(f)?;
+                value.format(&Rfc3339).unwrap().fmt(f)?;
                 f.write_char('"')
             }
             Value::Repeated(values) => {
@@ -174,8 +174,8 @@ impl From<f64> for Value {
     }
 }
 
-impl From<NaiveDateTime> for Value {
-    fn from(value: NaiveDateTime) -> Self {
+impl From<OffsetDateTime> for Value {
+    fn from(value: OffsetDateTime) -> Self {
         Value::Timestamp(value)
     }
 }
@@ -194,8 +194,8 @@ mod tests {
     fn display() {
         assert_eq!(Value::String("foo".into()).to_string(), "\"foo\"");
         assert_eq!(
-            Value::Timestamp(NaiveDateTime::UNIX_EPOCH).to_string(),
-            "\"1970-01-01 00:00:00\""
+            Value::Timestamp(OffsetDateTime::UNIX_EPOCH).to_string(),
+            "\"1970-01-01T00:00:00Z\""
         );
         assert_eq!(
             Value::Repeated(vec![Value::Integer(1), 2.into(), 3.into()]).to_string(),

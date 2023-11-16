@@ -20,3 +20,8 @@ pub mod proto {
 pub mod request {
     pub use bomboni_request::*;
 }
+
+#[cfg(feature = "template")]
+pub mod template {
+    pub use bomboni_template::*;
+}

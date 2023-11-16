@@ -19,3 +19,6 @@ proc-macro2 = { version = "1.0.69", features = ["proc-macro"] }
 syn = "2.0.39"
 quote = "1.0.33"
 darling = "0.20.3"
+
+[lints]
+workspace = true

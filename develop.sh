@@ -10,16 +10,7 @@ function format() {
 
 function lint() {
 	cargo fmt --all -- --check
-	cargo clippy --workspace --all-targets --all-features -- \
-		-D clippy::all \
-		-D warnings \
-		-D unsafe_code \
-		-D trivial_casts \
-		-D trivial_numeric_casts \
-		-D unused_extern_crates \
-		-D unused_import_braces \
-		-D unused_qualifications
-		# -D missing_docs
+	cargo clippy --workspace --all-targets --all-features
 }
 
 function test() {

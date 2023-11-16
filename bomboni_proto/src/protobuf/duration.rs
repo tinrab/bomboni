@@ -1,6 +1,7 @@
 use crate::serde::helpers as serde_helpers;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+#[cfg(feature = "chrono")]
 use chrono::Duration as ChronoDuration;
 use std::{
     fmt::{self, Display, Formatter},
@@ -8,6 +9,7 @@ use std::{
     time::Duration as StdDuration,
 };
 use thiserror::Error;
+use time::Duration as TimeDuration;
 
 use crate::google::protobuf::Duration;
 
@@ -20,8 +22,6 @@ pub enum DurationError {
     #[error("invalid duration string format `{0}`")]
     InvalidFormat(String),
 }
-
-// pub type ProtoResult<T> = Result<T, ProtoError>;
 
 impl Duration {
     pub const fn new(seconds: i64, nanos: i32) -> Self {
@@ -109,6 +109,27 @@ impl TryFrom<Duration> for StdDuration {
     }
 }
 
+impl TryFrom<TimeDuration> for Duration {
+    type Error = DurationError;
+
+    fn try_from(duration: TimeDuration) -> Result<Duration, DurationError> {
+        StdDuration::try_from(duration)
+            .map_err(|_| DurationError::OutOfRange)?
+            .try_into()
+            .map_err(|_| DurationError::OutOfRange)
+    }
+}
+
+impl TryFrom<Duration> for TimeDuration {
+    type Error = DurationError;
+
+    fn try_from(duration: Duration) -> Result<TimeDuration, DurationError> {
+        TimeDuration::try_from(StdDuration::try_from(duration)?)
+            .map_err(|_| DurationError::OutOfRange)
+    }
+}
+
+#[cfg(feature = "chrono")]
 impl TryFrom<ChronoDuration> for Duration {
     type Error = DurationError;
 
@@ -120,6 +141,7 @@ impl TryFrom<ChronoDuration> for Duration {
     }
 }
 
+#[cfg(feature = "chrono")]
 impl TryFrom<Duration> for ChronoDuration {
     type Error = DurationError;
 
