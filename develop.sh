@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -eo pipefail
 current_path="$(realpath $0)"
 current_dir="$(dirname $current_path)"
 
@@ -51,12 +51,13 @@ function test() {
 }
 
 function publish() {
-	if [[ $2 =~ ^(--actually-do-it)$ ]]; then
+	if [[ "$2" =~ ^(--actually-do-it)$ ]]; then
 		cargo publish -p bomboni_common
 		cargo publish -p bomboni_prost
 		cargo publish -p bomboni_proto
 		cargo publish -p bomboni_derive
 		cargo publish -p bomboni_request
+		cargo publish -p bomboni_template
 		cargo publish -p bomboni
 	else
 		cargo publish -p bomboni_common --dry-run --allow-dirty
@@ -64,6 +65,7 @@ function publish() {
 		cargo publish -p bomboni_proto --dry-run --allow-dirty
 		cargo publish -p bomboni_derive --dry-run --allow-dirty
 		cargo publish -p bomboni_request --dry-run --allow-dirty
+		cargo publish -p bomboni_template --dry-run --allow-dirty
 		cargo publish -p bomboni --dry-run --allow-dirty
 	fi
 }
