@@ -14,7 +14,7 @@ pub struct Context<'a> {
 impl<'a> Context<'a> {
     pub fn get_type_ident(&self, name: &str) -> ExprPath {
         let mut ident = String::new();
-        for parent in self.path.iter() {
+        for parent in &self.path {
             ident.push_str(&parent.to_case(Case::Snake));
             ident.push_str("::");
         }
@@ -35,7 +35,7 @@ impl<'a> Context<'a> {
         oneof: &OneofDescriptorProto,
     ) -> ExprPath {
         let mut ident = String::new();
-        for parent in self.path.iter() {
+        for parent in &self.path {
             ident.push_str(&parent.to_case(Case::Snake));
             ident.push_str("::");
         }

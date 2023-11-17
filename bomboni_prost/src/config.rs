@@ -10,8 +10,12 @@ pub struct CompileConfig {
 
 #[derive(Debug, Clone)]
 pub struct ApiConfig {
+    pub names: bool,
+    pub field_names: bool,
+    pub type_url: bool,
+    pub oneof_utility: bool,
     pub domain: Option<String>,
-    pub enable_field_names: bool,
+    pub serde: bool,
 }
 
 impl Default for CompileConfig {
@@ -21,7 +25,7 @@ impl Default for CompileConfig {
                 .join("fd.pb"),
             output_path: std::env::var_os("OUT_DIR").unwrap().into(),
             format: true,
-            api: Default::default(),
+            api: ApiConfig::default(),
         }
     }
 }
@@ -29,8 +33,12 @@ impl Default for CompileConfig {
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
+            names: true,
+            field_names: true,
+            type_url: true,
+            oneof_utility: true,
             domain: None,
-            enable_field_names: true,
+            serde: true,
         }
     }
 }

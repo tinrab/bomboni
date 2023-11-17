@@ -33,7 +33,7 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
     let descriptor = FileDescriptorSet::decode(buf.as_slice())?;
 
     let flush = |package: &str, content: TokenStream| -> Result<(), Box<dyn Error>> {
-        let output_path = config.output_path.join(format!("./{}.plus.rs", package));
+        let output_path = config.output_path.join(format!("./{package}.plus.rs"));
         println!(
             "writing package `{}` to file `{}`",
             package,
@@ -56,9 +56,9 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
     };
 
     // Clear files
-    for file in descriptor.file.iter() {
+    for file in &descriptor.file {
         let package_name = file.package.clone().unwrap();
-        let output_path = config.output_path.join(format!("{}.plus.rs", package_name));
+        let output_path = config.output_path.join(format!("{package_name}.plus.rs"));
         let mut output_file = OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -91,13 +91,13 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
             config: &config.api,
             descriptor: &descriptor,
             package_name,
-            path: Default::default(),
+            path: Vec::default(),
         };
 
-        for message in file.message_type.iter() {
+        for message in &file.message_type {
             write_message(&context, &mut current_content, message);
         }
-        for enum_type in file.enum_type.iter() {
+        for enum_type in &file.enum_type {
             write_enum(&context, &mut current_content, enum_type);
         }
     }

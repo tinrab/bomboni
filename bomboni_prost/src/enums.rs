@@ -6,40 +6,47 @@ use quote::{format_ident, quote};
 use crate::context::Context;
 
 pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
+    if context.config.names {
+        write_name(context, s, enum_type);
+    }
+    if context.config.field_names {
+        write_value_names(context, s, enum_type);
+    }
+    if context.config.serde {
+        write_serde(context, s, enum_type);
+    }
+}
+
+fn write_name(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
     let enum_ident = context.get_type_ident(enum_type.name());
     let enum_proto_name = context.get_proto_type_name(enum_type.name());
     let package_proto_name = Literal::string(&context.package_name);
 
-    // Enum name
     s.extend(quote! {
     impl #enum_ident {
         pub const NAME: &'static str = #enum_proto_name;
         pub const PACKAGE: &'static str = #package_proto_name;
     }});
+}
+
+fn write_value_names(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
+    let enum_ident = context.get_type_ident(enum_type.name());
 
     let mut value_names = TokenStream::new();
     let mut value_names_array = TokenStream::new();
 
-    for value in enum_type.value.iter() {
+    for value in &enum_type.value {
         let value_name_ident =
             format_ident!("{}_VALUE_NAME", value.name().to_case(Case::ScreamingSnake));
         let value_name = Literal::string(value.name());
-        // let variant_ident = format_ident!("{}", value.name().to_case(Case::Pascal));
 
         value_names.extend(quote! {
             pub const #value_name_ident: &'static str = #value_name;
         });
 
-        // if config.add_enum_value_names {
         value_names_array.extend(quote! {
             Self::#value_name_ident,
         });
-        // } else {
-        //     let value_name = Literal::string(value.name());
-        //     values.extend(quote! {
-        //         #value_name,
-        //     });
-        // }
     }
 
     s.extend(quote! {
@@ -49,11 +56,9 @@ pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescri
             pub const VALUE_NAMES: &'static [&'static str] = &[#value_names_array];
         }
     });
-
-    write_enum_serde(context, s, enum_type);
 }
 
-fn write_enum_serde(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
+fn write_serde(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
     let enum_ident = context.get_type_ident(enum_type.name());
 
     // Serialize as string

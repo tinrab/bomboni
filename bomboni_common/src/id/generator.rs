@@ -16,7 +16,7 @@ pub struct Generator {
 const SLEEP_DURATION: Duration = Duration::from_secs(1);
 
 #[cfg(feature = "tokio")]
-pub type IdGeneratorArc = std::sync::Arc<tokio::sync::Mutex<Generator>>;
+pub type GeneratorArc = std::sync::Arc<tokio::sync::Mutex<Generator>>;
 
 impl Generator {
     #[must_use]
@@ -31,9 +31,9 @@ impl Generator {
     /// Basic usage:
     ///
     /// ```
-    /// use bomboni_common::id::generator::IdGenerator;
+    /// use bomboni_common::id::generator::Generator;
     ///
-    /// let mut g = IdGenerator::new(1);
+    /// let mut g = Generator::new(1);
     /// assert_ne!(g.generate(), g.generate());
     /// ```
     pub fn generate(&mut self) -> Id {
@@ -73,9 +73,9 @@ impl Generator {
     ///
     /// ```
     /// # use std::collections::HashSet;
-    /// use bomboni_common::id::generator::IdGenerator;
+    /// use bomboni_common::id::generator::Generator;
     ///
-    /// let mut g = IdGenerator::new(1);
+    /// let mut g = Generator::new(1);
     /// let ids = g.generate_multiple(3);
     /// let id_set: HashSet<_> = ids.iter().collect();
     /// assert_eq!(id_set.len(), ids.len());

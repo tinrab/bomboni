@@ -6,13 +6,23 @@ use quote::{format_ident, quote};
 use crate::{context::Context, oneofs::write_message_oneofs, utility::macros::format_comment};
 
 pub fn write_message(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    write_message_name(context, s, message);
-    write_message_field_names(context, s, message);
-    write_message_oneofs(context, s, message);
+    if context.config.names {
+        write_name(context, s, message);
+    }
+    if context.config.field_names {
+        write_field_names(context, s, message);
+    }
+    if context.config.type_url {
+        write_type_url(context, s, message);
+    }
+    if context.config.oneof_utility {
+        write_message_oneofs(context, s, message);
+    }
+
     if !message.nested_type.is_empty() {
         let mut path = context.path.clone();
         path.push(message.name.clone().unwrap());
-        for nested_message in message.nested_type.iter() {
+        for nested_message in &message.nested_type {
             // Skip map entries
             if nested_message
                 .options
@@ -36,10 +46,39 @@ pub fn write_message(context: &Context, s: &mut TokenStream, message: &Descripto
     }
 }
 
-fn write_message_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
+fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     let message_ident = context.get_type_ident(message.name());
     let message_proto_name = context.get_proto_type_name(message.name());
     let package_proto_name = Literal::string(&context.package_name);
+
+    let type_url = if context.config.type_url {
+        quote!(
+            fn type_url() -> String {
+                Self::TYPE_URL.into()
+            }
+        )
+    } else {
+        quote!()
+    };
+
+    let comment = format_comment!("Implement [`prost::Name`] for `{}`.", message_proto_name);
+
+    s.extend(quote! {
+        #comment
+        impl ::prost::Name for #message_ident {
+            const NAME: &'static str = #message_proto_name;
+            const PACKAGE: &'static str = #package_proto_name;
+            fn full_name() -> String {
+                format!("{}.{}", Self::PACKAGE, Self::NAME)
+            }
+            #type_url
+        }
+    });
+}
+
+fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
+    let message_ident = context.get_type_ident(message.name());
+    let message_proto_name = context.get_proto_type_name(message.name());
 
     let type_url = if let Some(domain) = context.config.domain.as_ref() {
         Literal::string(&format!(
@@ -53,34 +92,19 @@ fn write_message_name(context: &Context, s: &mut TokenStream, message: &Descript
         ))
     };
 
-    let comment = format_comment!("Implement [`prost::Name`] for `{}`.", message_proto_name);
-
     s.extend(quote! {
-        #comment
-        impl ::prost::Name for #message_ident {
-            const NAME: &'static str = #message_proto_name;
-            const PACKAGE: &'static str = #package_proto_name;
-
-            fn full_name() -> String {
-                format!("{}.{}", Self::PACKAGE, Self::NAME)
-            }
-
-            fn type_url() -> String {
-                Self::TYPE_URL.into()
-            }
-        }
         impl #message_ident {
             pub const TYPE_URL: &'static str = #type_url;
         }
     });
 }
 
-fn write_message_field_names(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
+fn write_field_names(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if message.field.is_empty() {
         return;
     }
     let mut names = TokenStream::new();
-    for field in message.field.iter() {
+    for field in &message.field {
         let field_name_ident =
             format_ident!("{}_FIELD_NAME", field.name().to_case(Case::ScreamingSnake));
         let field_name = Literal::string(field.name());

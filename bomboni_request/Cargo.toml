@@ -29,6 +29,3 @@ aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
 rsa = "0.9.3"
 rand = "0.8.5"
-
-[lints]
-workspace = true

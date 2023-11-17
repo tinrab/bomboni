@@ -33,6 +33,7 @@ pub mod tools {
 fn names() {
     assert_eq!(CommandRequest::NAME, "CommandRequest");
     assert_eq!(CommandRequest::PACKAGE, "tools");
+    assert_eq!(CommandRequest::TYPE_URL, "tests/tools.CommandRequest");
 
     assert_eq!(Command::NAME, "Command");
     assert_eq!(Command::KIND_ONEOF_NAME, "kind");

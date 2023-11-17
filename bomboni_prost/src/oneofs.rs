@@ -14,17 +14,26 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
         return;
     }
 
-    for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
-        write_oneof_name(context, s, message, oneof);
-        write_oneof_variant_names(context, s, message, oneof, oneof_index);
-        write_oneof_variant_from(context, s, message, oneof, oneof_index);
-        write_oneof_variant_utility(context, s, message, oneof, oneof_index);
+    if context.config.field_names {
+        for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
+            write_name(context, s, message, oneof);
+            write_variant_names(context, s, message, oneof, oneof_index);
+        }
     }
 
-    write_oneof_into_owner(context, s, message);
+    if context.config.oneof_utility {
+        for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
+            write_variant_from(context, s, message, oneof, oneof_index);
+            write_variant_utility(context, s, message, oneof, oneof_index);
+        }
+    }
+
+    if context.config.oneof_utility {
+        write_into_owner(context, s, message);
+    }
 }
 
-fn write_oneof_name(
+fn write_name(
     context: &Context,
     s: &mut TokenStream,
     message: &DescriptorProto,
@@ -41,7 +50,7 @@ fn write_oneof_name(
     });
 }
 
-fn write_oneof_variant_names(
+fn write_variant_names(
     context: &Context,
     s: &mut TokenStream,
     message: &DescriptorProto,
@@ -71,7 +80,7 @@ fn write_oneof_variant_names(
     });
 }
 
-fn write_oneof_variant_from(
+fn write_variant_from(
     context: &Context,
     s: &mut TokenStream,
     message: &DescriptorProto,
@@ -120,16 +129,18 @@ fn write_oneof_variant_from(
             field_descriptor_proto::Type::Bool => quote! { bool },
             field_descriptor_proto::Type::Double => quote! { f64 },
             field_descriptor_proto::Type::Float => quote! { f32 },
-            field_descriptor_proto::Type::Int32 => quote! { i32 },
-            field_descriptor_proto::Type::Int64 => quote! { i64 },
-            field_descriptor_proto::Type::Uint32 => quote! { u32 },
-            field_descriptor_proto::Type::Uint64 => quote! { u64 },
-            field_descriptor_proto::Type::Sint32 => quote! { i32 },
-            field_descriptor_proto::Type::Sint64 => quote! { i64 },
-            field_descriptor_proto::Type::Fixed32 => quote! { u32 },
-            field_descriptor_proto::Type::Fixed64 => quote! { u64 },
-            field_descriptor_proto::Type::Sfixed32 => quote! { i32 },
-            field_descriptor_proto::Type::Sfixed64 => quote! { i64 },
+            field_descriptor_proto::Type::Int32
+            | field_descriptor_proto::Type::Sint32
+            | field_descriptor_proto::Type::Sfixed32 => quote! { i32 },
+            field_descriptor_proto::Type::Int64
+            | field_descriptor_proto::Type::Sint64
+            | field_descriptor_proto::Type::Sfixed64 => quote! { i64 },
+            field_descriptor_proto::Type::Uint32 | field_descriptor_proto::Type::Fixed32 => {
+                quote! { u32 }
+            }
+            field_descriptor_proto::Type::Uint64 | field_descriptor_proto::Type::Fixed64 => {
+                quote! { u64 }
+            }
             field_descriptor_proto::Type::Group => {
                 panic!("groups are not supported")
             }
@@ -142,7 +153,7 @@ fn write_oneof_variant_from(
 
     // Only implement from if there is a single variant for the given type.
     let oneof_ident = context.get_oneof_ident(message, oneof);
-    for (source_type, variant_ident) in from_map.into_iter() {
+    for (source_type, variant_ident) in from_map {
         if variant_ident.len() != 1 {
             continue;
         }
@@ -174,38 +185,12 @@ fn write_oneof_variant_from(
                         }
                     }
                 }
-            })
+            });
         }
     }
 }
 
-fn write_oneof_into_owner(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    if message.oneof_decl.len() != 1
-        || !message
-            .field
-            .iter()
-            .all(|field| field.oneof_index.is_some())
-    {
-        return;
-    }
-    let message_ident = context.get_type_ident(message.name());
-    let oneof = message.oneof_decl.first().unwrap();
-    let oneof_ident = context.get_oneof_ident(message, oneof);
-    let variant_ident = format_ident!("{}", oneof.name().to_case(Case::Snake));
-
-    s.extend(quote! {
-        /// From oneof type to owner message type.
-        impl From<#oneof_ident> for #message_ident {
-            fn from(value: #oneof_ident) -> Self {
-                Self {
-                    #variant_ident: Some(value),
-                }
-            }
-        }
-    })
-}
-
-fn write_oneof_variant_utility(
+fn write_variant_utility(
     context: &Context,
     s: &mut TokenStream,
     message: &DescriptorProto,
@@ -234,6 +219,31 @@ fn write_oneof_variant_utility(
             pub fn get_variant_name(&self) -> &'static str {
                 match self {
                     #variant_cases
+                }
+            }
+        }
+    });
+}
+
+fn write_into_owner(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
+    if message.oneof_decl.len() != 1
+        || !message
+            .field
+            .iter()
+            .all(|field| field.oneof_index.is_some())
+    {
+        return;
+    }
+    let message_ident = context.get_type_ident(message.name());
+    let oneof = message.oneof_decl.first().unwrap();
+    let oneof_ident = context.get_oneof_ident(message, oneof);
+    let variant_ident = format_ident!("{}", oneof.name().to_case(Case::Snake));
+
+    s.extend(quote! {
+        impl From<#oneof_ident> for #message_ident {
+            fn from(value: #oneof_ident) -> Self {
+                Self {
+                    #variant_ident: Some(value),
                 }
             }
         }
