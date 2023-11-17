@@ -3,7 +3,7 @@ mod rpc;
 pub mod serde;
 
 /// Includes generated protobuf code.
-/// Base path is specified with OUT_DIR environment variable.
+/// Base path is specified with `OUT_DIR` environment variable.
 #[macro_export]
 macro_rules! include_proto {
     ($package: tt) => {
@@ -22,7 +22,7 @@ macro_rules! include_file_descriptor_set {
     };
 }
 
-#[allow(unused_qualifications)]
+#[allow(unused_qualifications, clippy::all, clippy::pedantic)]
 pub mod google {
     pub mod protobuf {
         pub use super::super::protobuf::*;

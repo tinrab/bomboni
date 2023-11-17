@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum OrderingError {
     #[error("duplicate ordering field `{0}`")]
     DuplicateField(String),

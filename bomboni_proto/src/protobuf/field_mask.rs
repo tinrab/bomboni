@@ -4,14 +4,17 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::google::protobuf::FieldMask;
 
 impl FieldMask {
+    #[must_use]
     pub fn new(paths: Vec<String>) -> Self {
-        FieldMask { paths }
+        Self { paths }
     }
 
+    #[must_use]
     pub fn contains(&self, path: &str) -> bool {
         self.paths.iter().any(|s| s.as_str() == path)
     }
 
+    #[must_use]
     pub fn masks(&self, field_path: &str) -> bool {
         self.paths.iter().any(|path| {
             let mut field_steps = field_path.split('.');
@@ -31,7 +34,7 @@ where
     P: ToString,
 {
     fn from(paths: T) -> Self {
-        FieldMask {
+        Self {
             paths: paths.into_iter().map(|path| path.to_string()).collect(),
         }
     }
@@ -52,7 +55,7 @@ impl<'de> Deserialize<'de> for FieldMask {
         D: Deserializer<'de>,
     {
         let paths: Vec<String> = serde_helpers::string_list::deserialize(deserializer)?;
-        Ok(FieldMask::new(paths))
+        Ok(Self::new(paths))
     }
 }
 

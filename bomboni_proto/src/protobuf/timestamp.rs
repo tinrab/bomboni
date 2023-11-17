@@ -11,7 +11,7 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::google::protobuf::Timestamp;
 
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum TimestampError {
     #[error("invalid nanoseconds")]
     InvalidNanoseconds,
@@ -24,8 +24,9 @@ pub enum TimestampError {
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 
 impl Timestamp {
+    #[must_use]
     pub const fn new(seconds: i64, nanos: i32) -> Self {
-        Timestamp { seconds, nanos }
+        Self { seconds, nanos }
     }
 
     /// Get Timestamp normalized to a canonical format.
@@ -33,6 +34,7 @@ impl Timestamp {
     ///
     /// [1]: https://github.com/tokio-rs/prost/blob/v0.12.1/prost-types/src/lib.rs#L274
     /// [2]: https://github.com/google/protobuf/blob/v3.3.2/src/google/protobuf/util/time_util.cc#L59-L77
+    #[must_use]
     pub fn normalized(self) -> Self {
         // const TIMESTAMP_MIN_SECONDS: i64 = -62_135_596_800;
         // const TIMESTAMP_MAX_SECONDS: i64 = 253_402_300_799;
@@ -42,7 +44,9 @@ impl Timestamp {
 
         // Make sure nanos is in the range.
         if nanos <= -NANOS_PER_SECOND || nanos >= NANOS_PER_SECOND {
-            if let Some(new_seconds) = seconds.checked_add(nanos as i64 / NANOS_PER_SECOND as i64) {
+            if let Some(new_seconds) =
+                seconds.checked_add(i64::from(nanos) / i64::from(NANOS_PER_SECOND))
+            {
                 seconds = new_seconds;
                 nanos %= NANOS_PER_SECOND;
             } else if nanos < 0 {
@@ -71,7 +75,7 @@ impl Timestamp {
         //     seconds
         // );
 
-        Timestamp { seconds, nanos }
+        Self { seconds, nanos }
     }
 
     // pub fn is_normalized(self) -> bool {
@@ -84,7 +88,7 @@ impl From<OffsetDateTime> for Timestamp {
     fn from(t: OffsetDateTime) -> Self {
         let seconds = t.unix_timestamp();
         let nanos = t.nanosecond();
-        Timestamp {
+        Self {
             seconds,
             nanos: nanos as i32,
         }
@@ -94,7 +98,7 @@ impl From<OffsetDateTime> for Timestamp {
 #[cfg(feature = "chrono")]
 impl From<chrono::NaiveDateTime> for Timestamp {
     fn from(t: chrono::NaiveDateTime) -> Self {
-        Timestamp {
+        Self {
             seconds: t.timestamp(),
             nanos: t.timestamp_subsec_nanos() as i32,
         }
@@ -109,8 +113,8 @@ impl TryFrom<Timestamp> for OffsetDateTime {
             return Err(TimestampError::InvalidNanoseconds);
         }
         // NaiveDateTime::from_timestamp_opt(t.seconds, t.nanos as u32)
-        OffsetDateTime::from_unix_timestamp_nanos(
-            t.seconds as i128 * NANOS_PER_SECOND as i128 + t.nanos as i128,
+        Self::from_unix_timestamp_nanos(
+            i128::from(t.seconds) * i128::from(NANOS_PER_SECOND) + i128::from(t.nanos),
         )
         .map_err(|_| TimestampError::NotUtc)
     }
@@ -124,13 +128,12 @@ impl TryFrom<Timestamp> for chrono::NaiveDateTime {
         if t.nanos < 0 {
             return Err(TimestampError::InvalidNanoseconds);
         }
-        chrono::NaiveDateTime::from_timestamp_opt(t.seconds, t.nanos as u32)
-            .ok_or(TimestampError::NotUtc)
+        Self::from_timestamp_opt(t.seconds, t.nanos as u32).ok_or(TimestampError::NotUtc)
     }
 }
 
 impl From<SystemTime> for Timestamp {
-    fn from(system_time: SystemTime) -> Timestamp {
+    fn from(system_time: SystemTime) -> Self {
         let (seconds, nanos) = match system_time.duration_since(UNIX_EPOCH) {
             Ok(duration) => {
                 let seconds = i64::try_from(duration.as_secs()).unwrap();
@@ -147,7 +150,7 @@ impl From<SystemTime> for Timestamp {
                 }
             }
         };
-        Timestamp { seconds, nanos }
+        Self { seconds, nanos }
     }
 }
 
@@ -190,7 +193,7 @@ impl<'de> Deserialize<'de> for Timestamp {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Timestamp::from_str(&s).map_err(de::Error::custom)
+        Self::from_str(&s).map_err(de::Error::custom)
     }
 }
 
@@ -268,7 +271,7 @@ mod tests {
             (line!(), i64::MAX - 1,    999_999_998,     i64::MAX - 1,    999_999_998),
         ];
 
-        for case in cases.iter() {
+        for case in &cases {
             assert_eq!(
                 Timestamp::new(case.1, case.2).normalized(),
                 Timestamp::new(case.3, case.4),

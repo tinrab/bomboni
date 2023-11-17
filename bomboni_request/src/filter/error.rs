@@ -5,7 +5,7 @@ use crate::schema::ValueType;
 
 use super::parser::Rule;
 
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum FilterError {
     #[error("failed to parse filter from `{start}` to `{end}`")]
     Parse { start: usize, end: usize },
@@ -27,11 +27,11 @@ pub type FilterResult<T> = Result<T, FilterError>;
 impl From<pest::error::Error<Rule>> for FilterError {
     fn from(err: pest::error::Error<Rule>) -> Self {
         match err.location {
-            InputLocation::Pos(pos) => FilterError::Parse {
+            InputLocation::Pos(pos) => Self::Parse {
                 start: pos,
                 end: pos,
             },
-            InputLocation::Span(span) => FilterError::Parse {
+            InputLocation::Span(span) => Self::Parse {
                 start: span.0,
                 end: span.1,
             },

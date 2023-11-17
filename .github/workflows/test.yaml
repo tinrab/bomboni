@@ -30,8 +30,17 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
 
-      - name: Run lints
+      - name: Lint
         run: ./develop.sh lint
 
-      - name: Run tests
-        run: ./develop.sh test
+      - name: Test
+        run: cargo test --workspace --all-targets --all-features
+
+      - name: Test - no default features
+        run: cargo test --workspace --all-targets --no-default-features
+
+      - name: Test doc
+        run: cargo test --workspace --doc --all-features
+
+      - name: Test doc - no default features
+        run: cargo test --workspace --doc --no-default-features

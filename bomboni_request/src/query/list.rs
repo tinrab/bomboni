@@ -29,7 +29,7 @@ pub struct ListQuery<T> {
 /// Config for list query builder.
 ///
 /// `primary_ordering_term` should probably never be `None`.
-/// If the request does not contain an "order_by" field, usage of this function should pre-insert one.
+/// If the request does not contain an `order_by` field, usage of this function should pre-insert one.
 /// The default ordering term can the primary key of the schema item.
 /// If ordering is not specified, then behavior of query's page tokens [`PageToken`] is undefined.
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ pub struct ListQueryBuilder<P: PageTokenBuilder> {
 
 impl Default for ListQueryConfig {
     fn default() -> Self {
-        ListQueryConfig {
+        Self {
             max_page_size: None,
             default_page_size: 20,
             primary_ordering_term: None,
@@ -61,7 +61,7 @@ impl Default for ListQueryConfig {
 
 impl<P: PageTokenBuilder> ListQueryBuilder<P> {
     pub fn new(schema: Schema, options: ListQueryConfig, page_token_builder: P) -> Self {
-        ListQueryBuilder {
+        Self {
             schema,
             options,
             page_token_builder,
@@ -218,16 +218,16 @@ mod tests {
         );
         assert_page_token!(
             None,
-            Some(r#"id desc, age desc"#),
+            Some("id desc, age desc"),
             None,
-            Some(r#"id desc, age desc"#),
+            Some("id desc, age desc"),
             r#"id <= "1337" AND age <= 14000"#,
         );
         assert_page_token!(
             None,
-            Some(r#"id desc, age asc"#),
+            Some("id desc, age asc"),
             None,
-            Some(r#"id desc, age desc"#),
+            Some("id desc, age desc"),
             r#"id <= "1337" AND age >= 14000"#,
         );
     }

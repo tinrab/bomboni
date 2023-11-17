@@ -23,21 +23,23 @@ const SEQUENCE_BITS: i64 = 16;
 pub struct Id(u128);
 
 impl Id {
+    #[must_use]
     pub const fn new(id: u128) -> Self {
-        Id(id)
+        Self(id)
     }
 
     /// Encodes the Id from parts.
+    #[must_use]
     pub fn from_parts(time: SystemTime, worker: u16, sequence: u16) -> Self {
-        let timestamp = time.duration_since(UNIX_EPOCH).unwrap().as_secs() as u128;
-        let worker = worker as u128;
-        let sequence = sequence as u128;
+        let timestamp = u128::from(time.duration_since(UNIX_EPOCH).unwrap().as_secs());
+        let worker = u128::from(worker);
+        let sequence = u128::from(sequence);
 
         assert!(timestamp < (1 << TIMESTAMP_BITS));
         assert!(worker < (1 << WORKER_BITS));
         assert!(sequence < (1 << SEQUENCE_BITS));
 
-        Id(
+        Self(
             (timestamp & ((1 << TIMESTAMP_BITS) - 1)) << (WORKER_BITS + SEQUENCE_BITS)
                 | ((worker & ((1 << WORKER_BITS) - 1)) << SEQUENCE_BITS)
                 | (sequence & ((1 << SEQUENCE_BITS) - 1)),
@@ -61,6 +63,7 @@ impl Id {
     /// assert_eq!(worker, 42);
     /// assert_eq!(sequence, 1);
     /// ```
+    #[must_use]
     pub fn decode(self) -> (SystemTime, u16, u16) {
         let timestamp = SystemTime::UNIX_EPOCH
             + Duration::from_secs((self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as u64);
@@ -81,7 +84,7 @@ impl FromStr for Id {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let value = u128::from_str_radix(s, 16)?;
-        Ok(Id::new(value))
+        Ok(Self::new(value))
     }
 }
 
@@ -114,7 +117,7 @@ impl<'de> Deserialize<'de> for Id {
     {
         use serde::de::Error;
         let value = String::deserialize(deserializer)?;
-        value.parse::<Id>().map_err(|_| {
+        value.parse::<Self>().map_err(|_| {
             <D as Deserializer<'de>>::Error::invalid_value(Unexpected::Str(value.as_str()), &"Id")
         })
     }
@@ -131,13 +134,13 @@ mod tests {
     fn it_works() {
         assert_eq!(
             Id::from_parts(SystemTime::UNIX_EPOCH + Duration::from_secs(10), 1, 1),
-            Id(0b101000000000000000010000000000000001)
+            Id(0b1010_0000_0000_0000_0001_0000_0000_0000_0001)
         );
         let max_time = SystemTime::UNIX_EPOCH + Duration::from_secs(Duration::MAX.as_secs() / 2);
         let id = Id::from_parts(max_time, 1, 1);
         assert_eq!(
             id,
-            Id(0b11111111111111111111111111111111111111111111111111111111111111100000000000000010000000000000001)
+            Id(0b111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_0000_0000_0000_0001_0000_0000_0000_0001)
         );
         let (timestamp, worker, sequence) = id.decode();
         assert_eq!(timestamp, max_time);

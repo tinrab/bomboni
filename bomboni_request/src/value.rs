@@ -28,17 +28,17 @@ pub enum Value {
 impl Value {
     pub fn value_type(&self) -> Option<ValueType> {
         match self {
-            Value::Integer(_) => Some(ValueType::Integer),
-            Value::Float(_) => Some(ValueType::Float),
-            Value::Boolean(_) => Some(ValueType::Boolean),
-            Value::String(_) => Some(ValueType::String),
-            Value::Timestamp(_) => Some(ValueType::Timestamp),
-            Value::Repeated(_) => None,
-            Value::Any => Some(ValueType::Any),
+            Self::Integer(_) => Some(ValueType::Integer),
+            Self::Float(_) => Some(ValueType::Float),
+            Self::Boolean(_) => Some(ValueType::Boolean),
+            Self::String(_) => Some(ValueType::String),
+            Self::Timestamp(_) => Some(ValueType::Timestamp),
+            Self::Repeated(_) => None,
+            Self::Any => Some(ValueType::Any),
         }
     }
 
-    pub fn parse(pair: Pair<'_, Rule>) -> FilterResult<Self> {
+    pub fn parse(pair: &Pair<'_, Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
             Rule::string => {
                 let value = pair.as_str();
@@ -68,60 +68,60 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Integer(value) => value.fmt(f),
-            Value::Float(value) => value.fmt(f),
-            Value::Boolean(value) => value.fmt(f),
-            Value::String(value) => {
+            Self::Integer(value) => value.fmt(f),
+            Self::Float(value) => value.fmt(f),
+            Self::Boolean(value) => value.fmt(f),
+            Self::String(value) => {
                 f.write_char('"')?;
                 value.fmt(f)?;
                 f.write_char('"')
             }
-            Value::Timestamp(value) => {
+            Self::Timestamp(value) => {
                 f.write_char('"')?;
                 value.format(&Rfc3339).unwrap().fmt(f)?;
                 f.write_char('"')
             }
-            Value::Repeated(values) => {
+            Self::Repeated(values) => {
                 write!(f, "[{}]", values.iter().join(", "))
             }
-            Value::Any => f.write_char('*'),
+            Self::Any => f.write_char('*'),
         }
     }
 }
 
-impl PartialOrd<Value> for Value {
-    fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
+impl PartialOrd<Self> for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match self {
-            Value::Integer(lhs) => {
-                if let Value::Integer(rhs) = other {
+            Self::Integer(lhs) => {
+                if let Self::Integer(rhs) = other {
                     lhs.partial_cmp(rhs)
                 } else {
                     None
                 }
             }
-            Value::Float(lhs) => {
-                if let Value::Float(rhs) = other {
+            Self::Float(lhs) => {
+                if let Self::Float(rhs) = other {
                     lhs.partial_cmp(rhs)
                 } else {
                     None
                 }
             }
-            Value::Boolean(lhs) => {
-                if let Value::Boolean(rhs) = other {
+            Self::Boolean(lhs) => {
+                if let Self::Boolean(rhs) = other {
                     lhs.partial_cmp(rhs)
                 } else {
                     None
                 }
             }
-            Value::String(lhs) => {
-                if let Value::String(rhs) = other {
+            Self::String(lhs) => {
+                if let Self::String(rhs) = other {
                     lhs.partial_cmp(rhs)
                 } else {
                     None
                 }
             }
-            Value::Timestamp(lhs) => {
-                if let Value::Timestamp(rhs) = other {
+            Self::Timestamp(lhs) => {
+                if let Self::Timestamp(rhs) = other {
                     lhs.partial_cmp(rhs)
                 } else {
                     None
@@ -134,55 +134,55 @@ impl PartialOrd<Value> for Value {
 
 impl From<String> for Value {
     fn from(value: String) -> Self {
-        Value::String(value)
+        Self::String(value)
     }
 }
 
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
-        Value::String(value.into())
+        Self::String(value.into())
     }
 }
 
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        Value::Boolean(value)
+        Self::Boolean(value)
     }
 }
 
 impl From<i32> for Value {
     fn from(value: i32) -> Self {
-        Value::Integer(value as i64)
+        Self::Integer(i64::from(value))
     }
 }
 
 impl From<i64> for Value {
     fn from(value: i64) -> Self {
-        Value::Integer(value)
+        Self::Integer(value)
     }
 }
 
 impl From<f32> for Value {
     fn from(value: f32) -> Self {
-        Value::Float(value as f64)
+        Self::Float(f64::from(value))
     }
 }
 
 impl From<f64> for Value {
     fn from(value: f64) -> Self {
-        Value::Float(value)
+        Self::Float(value)
     }
 }
 
 impl From<OffsetDateTime> for Value {
     fn from(value: OffsetDateTime) -> Self {
-        Value::Timestamp(value)
+        Self::Timestamp(value)
     }
 }
 
-impl From<Vec<Value>> for Value {
-    fn from(values: Vec<Value>) -> Self {
-        Value::Repeated(values)
+impl From<Vec<Self>> for Value {
+    fn from(values: Vec<Self>) -> Self {
+        Self::Repeated(values)
     }
 }
 

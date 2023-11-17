@@ -1,27 +1,32 @@
 use std::{error::Error, io::Write, path::PathBuf};
 
-use bomboni_prost::{
-    compile,
-    config::{ApiConfig, CompileConfig},
-};
+// use bomboni_prost::{
+//     compile,
+//     config::{ApiConfig, CompileConfig},
+// };
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let fd_path = out_dir.join("fd.pb");
 
-    #[cfg(feature = "testing")]
-    {
-        let mut config = prost_build::Config::new();
-        config
-            .file_descriptor_set_path(fd_path.clone())
-            .protoc_arg("--experimental_allow_proto3_optional")
-            .btree_map(["."])
-            .compile_protos(&["./tests/proto/tools.proto"], &["./tests/proto/"])?;
+    // #[cfg(feature = "testing")]
+    // {
+    //     let fd_path = out_dir.join("test.pb");
+    //     let mut config = prost_build::Config::new();
+    //     config
+    //         .file_descriptor_set_path(&fd_path)
+    //         .protoc_arg("--experimental_allow_proto3_optional")
+    //         .btree_map(["."])
+    //         .enable_type_names()
+    //         .type_name_domain(["."], "test.tools")
+    //         .compile_protos(&["./tests/proto/tools.proto"], &["./tests/proto/"])?;
 
-        compile(CompileConfig {
-            ..Default::default()
-        })?;
-    }
+    //     // compile(CompileConfig {
+    //     //     api: ApiConfig::default(),
+    //     //     file_descriptor_set_path: out_dir.join(fd_path),
+    //     //     ..Default::default()
+    //     // })?;
+    // }
 
     let root_path = PathBuf::from("./proto");
     let proto_paths: Vec<_> = [
@@ -38,16 +43,18 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     .map(|proto_path| root_path.join(proto_path))
     .collect();
 
-    for proto_path in proto_paths.iter() {
+    for proto_path in &proto_paths {
         println!("cargo:rerun-if-changed={}", proto_path.display());
     }
 
     let mut config = prost_build::Config::new();
     config
-        .file_descriptor_set_path(fd_path)
+        .file_descriptor_set_path(&fd_path)
         .compile_well_known_types()
         .protoc_arg("--experimental_allow_proto3_optional")
-        .btree_map(["."]);
+        .btree_map(["."])
+        .enable_type_names()
+        .type_name_domain(["."], "type.googleapis.com");
 
     for type_path in get_camel_cased_type_paths() {
         config.type_attribute(
@@ -65,11 +72,11 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         );
     }
     for type_path in get_copy_type_paths() {
-        config.type_attribute(type_path, r#"#[derive(Copy)]"#);
+        config.type_attribute(type_path, r"#[derive(Copy)]");
     }
     config.type_attribute(
         ".google.rpc.Status",
-        r#"#[derive(::serde::Serialize, ::serde::Deserialize)]"#,
+        r"#[derive(::serde::Serialize, ::serde::Deserialize)]",
     );
     config.field_attribute(
         ".google.rpc.Status.details",
@@ -82,16 +89,11 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     config.compile_protos(&proto_paths, &["./proto"])?;
 
-    std::io::stdout().flush().unwrap();
-
-    compile(CompileConfig {
-        api: ApiConfig {
-            domain: Some("type.googleapis.com".into()),
-            ..Default::default()
-        },
-        file_descriptor_set_path: out_dir.join("fd.pb"),
-        ..Default::default()
-    })?;
+    // compile(CompileConfig {
+    //     api: ApiConfig::default(),
+    //     file_descriptor_set_path: out_dir.join(fd_path),
+    //     ..Default::default()
+    // })?;
 
     Ok(())
 }
@@ -110,17 +112,15 @@ fn get_camel_cased_type_paths() -> impl Iterator<Item = String> {
         "LocalizedMessage",
     ]
     .into_iter()
-    .map(|type_name| format!(".google.rpc.{}", type_name))
+    .map(|type_name| format!(".google.rpc.{type_name}"))
 }
 
 fn get_default_type_paths() -> impl Iterator<Item = String> {
-    ["ErrorInfo.metadata"]
-        .into_iter()
-        .map(|type_name| format!(".google.rpc.{}", type_name))
+    std::iter::once("ErrorInfo.metadata").map(|type_name| format!(".google.rpc.{type_name}"))
 }
 
 fn get_copy_type_paths() -> impl Iterator<Item = String> {
     ["Timestamp", "Empty", "Duration"]
         .into_iter()
-        .map(|type_name| format!(".google.protobuf.{}", type_name))
+        .map(|type_name| format!(".google.protobuf.{type_name}"))
 }

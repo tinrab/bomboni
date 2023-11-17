@@ -30,9 +30,10 @@ impl<'q> Encode<'q, MySql> for Id {
 
 impl<'q> Decode<'q, MySql> for Id {
     fn decode(value: MySqlValueRef<'_>) -> Result<Self, BoxDynError> {
+        const MAX_SIZE: usize = std::mem::size_of::<u128>();
+
         let mut bytes = <&[u8] as Decode<MySql>>::decode(value).map(ToOwned::to_owned)?;
 
-        const MAX_SIZE: usize = std::mem::size_of::<u128>();
         assert!(bytes.len() <= MAX_SIZE, "invalid bytes length for `Id`");
         let missing = MAX_SIZE - bytes.len();
         if missing != 0 {
@@ -41,6 +42,6 @@ impl<'q> Decode<'q, MySql> for Id {
             bytes = buf;
         }
 
-        Ok(Id::new(u128::from_be_bytes(bytes.try_into().unwrap())))
+        Ok(Self::new(u128::from_be_bytes(bytes.try_into().unwrap())))
     }
 }

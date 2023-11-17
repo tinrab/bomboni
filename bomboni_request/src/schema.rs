@@ -22,14 +22,14 @@ pub struct ResourceMemberSchema {
     pub fields: BTreeMap<String, MemberSchema>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldMemberSchema {
     pub value_type: ValueType,
     pub repeated: bool,
     pub ordered: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionSchema {
     pub argument_value_types: Vec<ValueType>,
     pub return_value_type: ValueType,
@@ -83,7 +83,7 @@ impl Schema {
 
 impl FieldMemberSchema {
     pub fn new(value_type: ValueType) -> Self {
-        FieldMemberSchema {
+        Self {
             value_type,
             repeated: false,
             ordered: false,
@@ -91,7 +91,7 @@ impl FieldMemberSchema {
     }
 
     pub fn new_ordered(value_type: ValueType) -> Self {
-        FieldMemberSchema {
+        Self {
             value_type,
             repeated: false,
             ordered: true,
@@ -99,7 +99,7 @@ impl FieldMemberSchema {
     }
 
     pub fn new_repeated(value_type: ValueType) -> Self {
-        FieldMemberSchema {
+        Self {
             value_type,
             repeated: true,
             ordered: false,
@@ -109,19 +109,19 @@ impl FieldMemberSchema {
 
 impl From<FieldMemberSchema> for MemberSchema {
     fn from(field: FieldMemberSchema) -> Self {
-        MemberSchema::Field(field)
+        Self::Field(field)
     }
 }
 
 impl From<ResourceMemberSchema> for MemberSchema {
     fn from(resource: ResourceMemberSchema) -> Self {
-        MemberSchema::Resource(resource)
+        Self::Resource(resource)
     }
 }
 
 impl Display for ValueType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

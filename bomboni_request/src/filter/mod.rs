@@ -6,7 +6,6 @@
 
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
-use std::ops::Deref;
 
 use itertools::Itertools;
 use parser::{FilterParser, Rule};
@@ -26,7 +25,7 @@ pub(crate) mod parser {
 
     #[derive(Parser)]
     #[grammar = "./filter/grammar.pest"]
-    pub(crate) struct FilterParser;
+    pub struct FilterParser;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,12 +52,12 @@ pub enum FilterComparator {
 }
 
 impl Filter {
-    pub fn parse(source: &str) -> FilterResult<Filter> {
+    pub fn parse(source: &str) -> FilterResult<Self> {
         let filter = FilterParser::parse(Rule::filter, source)?.next().unwrap();
         Self::parse_tree(filter)
     }
 
-    fn parse_tree(pair: Pair<Rule>) -> FilterResult<Filter> {
+    fn parse_tree(pair: Pair<Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
             Rule::filter | Rule::expression => {
                 match pair
@@ -68,17 +67,17 @@ impl Filter {
                     .exactly_one()
                 {
                     Ok(inner_tree) => inner_tree,
-                    Err(inner_trees) => Ok(Filter::Conjunction(inner_trees.try_collect()?)),
+                    Err(inner_trees) => Ok(Self::Conjunction(inner_trees.try_collect()?)),
                 }
             }
             Rule::factor => match pair.into_inner().map(Self::parse_tree).exactly_one() {
                 Ok(inner_tree) => inner_tree,
-                Err(inner_trees) => Ok(Filter::Disjunction(inner_trees.try_collect()?)),
+                Err(inner_trees) => Ok(Self::Disjunction(inner_trees.try_collect()?)),
             },
             Rule::term => {
                 let lexeme = pair.as_str().trim();
                 if lexeme.starts_with("NOT") || lexeme.starts_with('-') {
-                    Ok(Filter::Negate(Box::new(Self::parse_tree(
+                    Ok(Self::Negate(Box::new(Self::parse_tree(
                         pair.into_inner().next().unwrap(),
                     )?)))
                 } else {
@@ -101,7 +100,7 @@ impl Filter {
                             _ => unreachable!(),
                         };
                         let arg = inner_pairs.next().unwrap();
-                        Ok(Filter::Restriction(
+                        Ok(Self::Restriction(
                             Box::new(Self::parse_tree(comparable)?),
                             comparator,
                             Box::new(Self::parse_tree(arg)?),
@@ -125,18 +124,18 @@ impl Filter {
                         argument_list = true;
                     }
                 }
-                Ok(Filter::Function(name, arguments))
+                Ok(Self::Function(name, arguments))
             }
-            Rule::composite => Ok(Filter::Composite(Box::new(Self::parse_tree(
+            Rule::composite => Ok(Self::Composite(Box::new(Self::parse_tree(
                 pair.into_inner().next().unwrap(),
             )?))),
-            Rule::name => Ok(Filter::Name(
+            Rule::name => Ok(Self::Name(
                 pair.into_inner()
                     .map(|identifier| identifier.as_str())
                     .join("."),
             )),
             Rule::string | Rule::boolean | Rule::number | Rule::any => {
-                Ok(Filter::Value(Value::parse(pair)?))
+                Ok(Self::Value(Value::parse(&pair)?))
             }
             _ => {
                 unreachable!("{:?}", pair);
@@ -146,16 +145,17 @@ impl Filter {
 
     pub fn len(&self) -> usize {
         match self {
-            Filter::Conjunction(parts) => parts.iter().map(|part| part.len()).sum::<usize>(),
-            Filter::Disjunction(parts) => parts.iter().map(|part| part.len()).sum::<usize>(),
-            Filter::Negate(tree) => 1usize + tree.as_ref().len(),
-            Filter::Restriction(comparable, _, arg) => {
+            Self::Conjunction(parts) | Self::Disjunction(parts) => {
+                parts.iter().map(Filter::len).sum::<usize>()
+            }
+            Self::Negate(tree) => 1usize + tree.as_ref().len(),
+            Self::Restriction(comparable, _, arg) => {
                 1usize + comparable.as_ref().len() + arg.as_ref().len()
             }
-            Filter::Function(tree, args) => {
-                1usize + tree.len() + args.iter().map(|arg| arg.len()).sum::<usize>()
+            Self::Function(tree, args) => {
+                1usize + tree.len() + args.iter().map(Filter::len).sum::<usize>()
             }
-            Filter::Composite(composite) => 1usize + composite.as_ref().len(),
+            Self::Composite(composite) => 1usize + composite.as_ref().len(),
             _ => 1usize,
         }
     }
@@ -164,34 +164,35 @@ impl Filter {
         self.len() == 0
     }
 
-    pub fn add_conjunction(&mut self, other: Filter) {
+    pub fn add_conjunction(&mut self, other: Self) {
         match self {
-            Filter::Conjunction(filters) => {
+            Self::Conjunction(filters) => {
                 filters.push(other);
             }
             _ => {
-                *self = Filter::Conjunction(vec![self.clone(), other]);
+                *self = Self::Conjunction(vec![self.clone(), other]);
             }
         }
     }
 
-    pub fn add_disjunction(&mut self, other: Filter) {
+    pub fn add_disjunction(&mut self, other: Self) {
         match self {
-            Filter::Disjunction(filters) => {
+            Self::Disjunction(filters) => {
                 filters.push(other);
             }
             _ => {
-                *self = Filter::Disjunction(vec![self.clone(), other]);
+                *self = Self::Disjunction(vec![self.clone(), other]);
             }
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn evaluate<T>(&self, item: &T) -> Option<Value>
     where
         T: SchemaMapped,
     {
         match self {
-            Filter::Conjunction(parts) => {
+            Self::Conjunction(parts) => {
                 let mut res = true;
                 for part in parts {
                     if let Some(Value::Boolean(part_res)) = part.evaluate(item) {
@@ -205,7 +206,7 @@ impl Filter {
                 }
                 Some(Value::Boolean(res))
             }
-            Filter::Disjunction(parts) => {
+            Self::Disjunction(parts) => {
                 let mut res = false;
                 for part in parts {
                     if let Some(Value::Boolean(part_res)) = part.evaluate(item) {
@@ -219,14 +220,14 @@ impl Filter {
                 }
                 Some(Value::Boolean(res))
             }
-            Filter::Negate(composite) => {
+            Self::Negate(composite) => {
                 if let Value::Boolean(value) = composite.evaluate(item)? {
                     Some(Value::Boolean(!value))
                 } else {
                     None
                 }
             }
-            Filter::Restriction(comparable, comparator, arg) => {
+            Self::Restriction(comparable, comparator, arg) => {
                 let a = comparable.evaluate(item)?;
                 match a {
                     Value::Integer(a) => {
@@ -237,9 +238,8 @@ impl Filter {
                                     FilterComparator::LessOrEqual => a <= b,
                                     FilterComparator::Greater => a > b,
                                     FilterComparator::GreaterOrEqual => a >= b,
-                                    FilterComparator::Equal => a == b,
+                                    FilterComparator::Equal | FilterComparator::Has => a == b,
                                     FilterComparator::NotEqual => a != b,
-                                    FilterComparator::Has => a == b,
                                 }
                                 .into(),
                             )
@@ -255,9 +255,10 @@ impl Filter {
                                     FilterComparator::LessOrEqual => a <= b,
                                     FilterComparator::Greater => a > b,
                                     FilterComparator::GreaterOrEqual => a >= b,
-                                    FilterComparator::Equal => (a - b).abs() < f64::EPSILON,
+                                    FilterComparator::Equal | FilterComparator::Has => {
+                                        (a - b).abs() < f64::EPSILON
+                                    }
                                     FilterComparator::NotEqual => (a - b).abs() > f64::EPSILON,
-                                    FilterComparator::Has => (a - b).abs() < f64::EPSILON,
                                 }
                                 .into(),
                             )
@@ -286,9 +287,10 @@ impl Filter {
                     Value::Boolean(a) => {
                         if let Value::Boolean(b) = arg.evaluate(item)? {
                             match comparator {
-                                FilterComparator::Equal => Some((a == b).into()),
+                                FilterComparator::Equal | FilterComparator::Has => {
+                                    Some((a == b).into())
+                                }
                                 FilterComparator::NotEqual => Some((a != b).into()),
-                                FilterComparator::Has => Some((a == b).into()),
                                 _ => None,
                             }
                         } else {
@@ -303,9 +305,8 @@ impl Filter {
                                     FilterComparator::LessOrEqual => a <= b,
                                     FilterComparator::Greater => a > b,
                                     FilterComparator::GreaterOrEqual => a >= b,
-                                    FilterComparator::Equal => a == b,
+                                    FilterComparator::Equal | FilterComparator::Has => a == b,
                                     FilterComparator::NotEqual => a != b,
-                                    FilterComparator::Has => a == b,
                                 }
                                 .into(),
                             )
@@ -331,9 +332,9 @@ impl Filter {
                         FilterComparator::Has => {
                             if let Some(b) = arg.evaluate(item) {
                                 Some(a.contains(&b).into())
-                            } else if let Filter::Composite(composite) = arg.deref() {
+                            } else if let Self::Composite(composite) = &**arg {
                                 match composite.as_ref() {
-                                    Filter::Conjunction(parts) => Some(Value::Boolean(
+                                    Self::Conjunction(parts) => Some(Value::Boolean(
                                         parts.iter().map(|part| part.evaluate(item)).all(|value| {
                                             if let Some(value) = value.as_ref() {
                                                 a.contains(value)
@@ -342,7 +343,7 @@ impl Filter {
                                             }
                                         }),
                                     )),
-                                    Filter::Disjunction(parts) => Some(Value::Boolean(
+                                    Self::Disjunction(parts) => Some(Value::Boolean(
                                         parts.iter().map(|part| part.evaluate(item)).any(|value| {
                                             if let Some(value) = value.as_ref() {
                                                 a.contains(value)
@@ -362,29 +363,29 @@ impl Filter {
                     Value::Any => Some(Value::Boolean(true)),
                 }
             }
-            Filter::Composite(composite) => composite.evaluate(item),
-            Filter::Value(value) => Some(value.clone()),
-            Filter::Name(name) => Some(item.get_field(name)),
-            _ => unimplemented!("evaluate {:?}", self),
+            Self::Composite(composite) => composite.evaluate(item),
+            Self::Value(value) => Some(value.clone()),
+            Self::Name(name) => Some(item.get_field(name)),
+            Self::Function(_, _) => unimplemented!("evaluate {:?}", self),
         }
     }
 
     pub fn get_result_value_type(&self, schema: &Schema) -> Option<ValueType> {
         match self {
-            Filter::Conjunction(_) => Some(ValueType::Boolean),
-            Filter::Disjunction(_) => Some(ValueType::Boolean),
-            Filter::Negate(_) => Some(ValueType::Boolean),
-            Filter::Restriction(_, _, _) => Some(ValueType::Boolean),
-            Filter::Function(name, _) => Some(schema.functions.get(name)?.return_value_type),
-            Filter::Composite(composite) => composite.get_result_value_type(schema),
-            Filter::Name(name) => schema.get_member(name).and_then(|member| {
+            Self::Conjunction(_)
+            | Self::Disjunction(_)
+            | Self::Negate(_)
+            | Self::Restriction(_, _, _) => Some(ValueType::Boolean),
+            Self::Function(name, _) => Some(schema.functions.get(name)?.return_value_type),
+            Self::Composite(composite) => composite.get_result_value_type(schema),
+            Self::Name(name) => schema.get_member(name).and_then(|member| {
                 if let MemberSchema::Field(field) = member {
                     Some(field.value_type)
                 } else {
                     None
                 }
             }),
-            Filter::Value(value) => value.value_type(),
+            Self::Value(value) => value.value_type(),
         }
     }
 
@@ -396,32 +397,30 @@ impl Filter {
 
 impl Default for Filter {
     fn default() -> Self {
-        Filter::Conjunction(Vec::new())
+        Self::Conjunction(Vec::new())
     }
 }
 
 impl Display for Filter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Filter::Conjunction(parts) => {
-                parts.iter().map(ToString::to_string).join(" AND ").fmt(f)
-            }
-            Filter::Disjunction(parts) => parts.iter().map(ToString::to_string).join(" OR ").fmt(f),
-            Filter::Negate(tree) => {
+            Self::Conjunction(parts) => parts.iter().map(ToString::to_string).join(" AND ").fmt(f),
+            Self::Disjunction(parts) => parts.iter().map(ToString::to_string).join(" OR ").fmt(f),
+            Self::Negate(tree) => {
                 f.write_str("NOT ")?;
                 tree.fmt(f)
             }
-            Filter::Restriction(comparable, comparator, arg) => match comparator {
+            Self::Restriction(comparable, comparator, arg) => match comparator {
                 FilterComparator::Has => {
                     comparable.fmt(f)?;
                     f.write_char(':')?;
                     arg.fmt(f)
                 }
                 _ => {
-                    write!(f, "{} {} {}", comparable, comparator, arg)
+                    write!(f, "{comparable} {comparator} {arg}")
                 }
             },
-            Filter::Function(name, args) => {
+            Self::Function(name, args) => {
                 write!(
                     f,
                     "{}({})",
@@ -429,13 +428,13 @@ impl Display for Filter {
                     args.iter().map(ToString::to_string).join(", ")
                 )
             }
-            Filter::Composite(composite) => {
+            Self::Composite(composite) => {
                 f.write_char('(')?;
                 composite.fmt(f)?;
                 f.write_char(')')
             }
-            Filter::Name(name) => name.fmt(f),
-            Filter::Value(value) => value.fmt(f),
+            Self::Name(name) => name.fmt(f),
+            Self::Value(value) => value.fmt(f),
         }
     }
 }
@@ -443,13 +442,13 @@ impl Display for Filter {
 impl Display for FilterComparator {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            FilterComparator::Less => f.write_str("<"),
-            FilterComparator::LessOrEqual => f.write_str("<="),
-            FilterComparator::Greater => f.write_str(">"),
-            FilterComparator::GreaterOrEqual => f.write_str(">="),
-            FilterComparator::Equal => f.write_str("="),
-            FilterComparator::NotEqual => f.write_str("!="),
-            FilterComparator::Has => f.write_str(":"),
+            Self::Less => f.write_str("<"),
+            Self::LessOrEqual => f.write_str("<="),
+            Self::Greater => f.write_str(">"),
+            Self::GreaterOrEqual => f.write_str(">="),
+            Self::Equal => f.write_str("="),
+            Self::NotEqual => f.write_str("!="),
+            Self::Has => f.write_str(":"),
         }
     }
 }
@@ -485,32 +484,32 @@ mod tests {
 
     #[test]
     fn it_works() {
-        Filter::parse(r#"  "#).unwrap();
-        Filter::parse(r#""#).unwrap();
-        Filter::parse(r#"x"#).unwrap();
-        Filter::parse(r#"42"#).unwrap();
-        Filter::parse(r#"x =  42"#).unwrap();
-        Filter::parse(r#"x=42"#).unwrap();
-        Filter::parse(r#"42"#).unwrap();
-        Filter::parse(r#"3.14"#).unwrap();
-        Filter::parse(r#"NOT a"#).unwrap();
-        Filter::parse(r#"NOT    a"#).unwrap();
-        Filter::parse(r#"a b AND c AND d"#).unwrap();
-        Filter::parse(r#"a < 10 OR a >= 100"#).unwrap();
-        Filter::parse(r#"NOT (a OR b)"#).unwrap();
-        Filter::parse(r#"-30"#).unwrap();
-        Filter::parse(r#"x.b:42"#).unwrap();
-        Filter::parse(r#"experiment.rollout <= cohort(request.user)"#).unwrap();
-        Filter::parse(r#"expr.type_map.type"#).unwrap();
-        Filter::parse(r#"expr.type_map.type"#).unwrap();
-        Filter::parse(r#"regex(m.key, a)"#).unwrap();
+        Filter::parse("  ").unwrap();
+        Filter::parse("").unwrap();
+        Filter::parse("x").unwrap();
+        Filter::parse("42").unwrap();
+        Filter::parse("x =  42").unwrap();
+        Filter::parse("x=42").unwrap();
+        Filter::parse("42").unwrap();
+        Filter::parse("3.14").unwrap();
+        Filter::parse("NOT a").unwrap();
+        Filter::parse("NOT    a").unwrap();
+        Filter::parse("a b AND c AND d").unwrap();
+        Filter::parse("a < 10 OR a >= 100").unwrap();
+        Filter::parse("NOT (a OR b)").unwrap();
+        Filter::parse("-30").unwrap();
+        Filter::parse("x.b:42").unwrap();
+        Filter::parse("experiment.rollout <= cohort(request.user)").unwrap();
+        Filter::parse("expr.type_map.type").unwrap();
+        Filter::parse("expr.type_map.type").unwrap();
+        Filter::parse("regex(m.key, a)").unwrap();
         Filter::parse(r#"math.mem("30mb")"#).unwrap();
         Filter::parse(r#"regex(m.key, "^.*prod.*$")"#).unwrap();
         Filter::parse(r#"(msg.endsWith("world") AND retries < 10)"#).unwrap();
-        Filter::parse(r#"x:*"#).unwrap();
+        Filter::parse("x:*").unwrap();
 
-        assert!(Filter::parse(r#"x==42"#).is_err());
-        assert!(Filter::parse(r#"--"#).is_err());
+        assert!(Filter::parse("x==42").is_err());
+        assert!(Filter::parse("--").is_err());
     }
 
     #[test]
@@ -518,7 +517,7 @@ mod tests {
         use Filter::*;
         use FilterComparator::*;
 
-        let tree = Filter::parse(r#"(a.f(42) AND c < 10) OR x AND y:z AND NOT w != true"#).unwrap();
+        let tree = Filter::parse("(a.f(42) AND c < 10) OR x AND y:z AND NOT w != true").unwrap();
         assert_eq!(tree.len(), 17);
         assert_eq!(
             tree,
@@ -542,19 +541,19 @@ mod tests {
 
     #[test]
     fn to_string() {
-        let src = r#"(a.f(42) AND c < 10) OR x AND y:z AND NOT w != true"#;
+        let src = "(a.f(42) AND c < 10) OR x AND y:z AND NOT w != true";
         let tree = Filter::parse(src).unwrap();
         assert_eq!(tree.to_string(), src);
     }
 
     #[test]
     fn modify() {
-        let mut f = Filter::parse(r#"x=42"#).unwrap();
-        f.add_conjunction(Filter::parse(r#"false"#).unwrap());
-        assert_eq!(f.to_string(), r#"x = 42 AND false"#);
-        let mut f = Filter::parse(r#"x=42"#).unwrap();
-        f.add_disjunction(Filter::parse(r#"true"#).unwrap());
-        assert_eq!(f.to_string(), r#"x = 42 OR true"#);
+        let mut f = Filter::parse("x=42").unwrap();
+        f.add_conjunction(Filter::parse("false").unwrap());
+        assert_eq!(f.to_string(), "x = 42 AND false");
+        let mut f = Filter::parse("x=42").unwrap();
+        f.add_disjunction(Filter::parse("true").unwrap());
+        assert_eq!(f.to_string(), "x = 42 OR true");
     }
 
     #[test]

@@ -33,10 +33,10 @@ pub enum OrderingDirection {
 
 impl Ordering {
     pub fn new(terms: Vec<OrderingTerm>) -> Self {
-        Ordering { terms }
+        Self { terms }
     }
 
-    pub fn parse(source: &str) -> OrderingResult<Ordering> {
+    pub fn parse(source: &str) -> OrderingResult<Self> {
         let mut terms = Vec::new();
         let mut term_names = BTreeSet::new();
         for parts in source
@@ -65,14 +65,14 @@ impl Ordering {
 
             terms.push(OrderingTerm { name, direction });
         }
-        Ok(Ordering { terms })
+        Ok(Self { terms })
     }
 
     pub fn evaluate<T>(&self, lhs: &T, rhs: &T) -> Option<cmp::Ordering>
     where
         T: SchemaMapped,
     {
-        for term in self.terms.iter() {
+        for term in &self.terms {
             let a = lhs.get_field(&term.name);
             let b = rhs.get_field(&term.name);
             match a.partial_cmp(&b)? {
@@ -88,14 +88,14 @@ impl Ordering {
                         OrderingDirection::Descending => cmp::Ordering::Less,
                     });
                 }
-                _ => {}
+                cmp::Ordering::Equal => {}
             }
         }
         Some(cmp::Ordering::Equal)
     }
 
     pub fn is_valid(&self, schema: &Schema) -> bool {
-        for term in self.terms.iter() {
+        for term in &self.terms {
             if let Some(field) = schema.get_field(&term.name) {
                 if !field.ordered {
                     return false;
@@ -123,8 +123,8 @@ impl Display for OrderingTerm {
 impl Display for OrderingDirection {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            OrderingDirection::Ascending => f.write_str("asc"),
-            OrderingDirection::Descending => f.write_str("desc"),
+            Self::Ascending => f.write_str("asc"),
+            Self::Descending => f.write_str("desc"),
         }
     }
 }

@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{filter::error::FilterError, ordering::error::OrderingError};
 
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum QueryError {
     #[error("filter error: {0}")]
     FilterError(FilterError),
@@ -30,12 +30,12 @@ pub type QueryResult<T> = Result<T, QueryError>;
 
 impl From<FilterError> for QueryError {
     fn from(err: FilterError) -> Self {
-        QueryError::FilterError(err)
+        Self::FilterError(err)
     }
 }
 
 impl From<OrderingError> for QueryError {
     fn from(err: OrderingError) -> Self {
-        QueryError::OrderingError(err)
+        Self::OrderingError(err)
     }
 }

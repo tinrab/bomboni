@@ -50,7 +50,7 @@ pub fn parse_resource_name(input: TokenStream) -> TokenStream {
 
     let mut parse_segments = quote!();
     let mut had_optional = false;
-    for segment in resource.segments.iter() {
+    for segment in &resource.segments {
         let name = &segment.name;
         let ty = &segment.ty;
         if is_option_type(ty) {
@@ -97,7 +97,7 @@ pub fn parse_resource_name(input: TokenStream) -> TokenStream {
 impl Parse for Resource {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
-        Ok(Resource {
+        Ok(Self {
             _bracket_token: syn::bracketed!(content in input),
             segments: content.parse_terminated(Segment::parse, Token![,])?,
         })
@@ -106,7 +106,7 @@ impl Parse for Resource {
 
 impl Parse for Segment {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Segment {
+        Ok(Self {
             span: input.span(),
             name: input.parse()?,
             _arrow_token: input.parse()?,

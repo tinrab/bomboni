@@ -36,6 +36,6 @@ impl PageTokenBuilder for PlainPageTokenBuilder {
         if page_filter.is_empty() {
             return Err(QueryError::PageTokenFailure);
         }
-        Ok(format!("{}", page_filter))
+        Ok(format!("{page_filter}"))
     }
 }

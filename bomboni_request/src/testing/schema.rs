@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::schema::{
     FieldMemberSchema, FunctionSchema, MemberSchema, ResourceMemberSchema, Schema, SchemaMapped,
     ValueType,
@@ -58,7 +60,7 @@ impl RequestItem {
 impl SchemaMapped for RequestItem {
     fn get_field(&self, name: &str) -> Value {
         let parts: Vec<_> = name.split('.').collect();
-        match parts[0] {
+        match *parts.get(0).unwrap() {
             "user" => self.user.get_field(parts[1]),
             "task" => self.task.get_field(parts[1]),
             _ => unimplemented!("SchemaMapped: SchemaItem::{}", name),
@@ -74,7 +76,7 @@ impl UserItem {
                 "displayName" => FieldMemberSchema::new_ordered(ValueType::String),
                 "age" => FieldMemberSchema::new_ordered(ValueType::Integer),
             ),
-            functions: Default::default(),
+            functions: BTreeMap::default(),
         }
     }
 }

@@ -4,18 +4,19 @@ use http::StatusCode;
 
 impl Code {
     #[cfg(feature = "tonic")]
+    #[must_use]
     pub fn to_status_code(&self) -> StatusCode {
         // https://cloud.google.com/apis/design/errors#generating_errors
         match self {
-            Code::InvalidArgument | Code::FailedPrecondition | Code::OutOfRange => {
+            Self::InvalidArgument | Self::FailedPrecondition | Self::OutOfRange => {
                 StatusCode::BAD_REQUEST
             }
-            Code::Unauthenticated => StatusCode::UNAUTHORIZED,
-            Code::PermissionDenied => StatusCode::FORBIDDEN,
-            Code::NotFound => StatusCode::NOT_FOUND,
-            Code::Aborted | Code::AlreadyExists => StatusCode::CONFLICT,
-            Code::ResourceExhausted => StatusCode::TOO_MANY_REQUESTS,
-            Code::Cancelled => StatusCode::from_u16(499u16).unwrap(),
+            Self::Unauthenticated => StatusCode::UNAUTHORIZED,
+            Self::PermissionDenied => StatusCode::FORBIDDEN,
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::Aborted | Self::AlreadyExists => StatusCode::CONFLICT,
+            Self::ResourceExhausted => StatusCode::TOO_MANY_REQUESTS,
+            Self::Cancelled => StatusCode::from_u16(499u16).unwrap(),
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -25,7 +26,7 @@ impl Code {
 impl From<tonic::Code> for Code {
     fn from(code: tonic::Code) -> Self {
         let value = code as i32;
-        Code::try_from(value).unwrap()
+        Self::try_from(value).unwrap()
     }
 }
 
@@ -33,6 +34,6 @@ impl From<tonic::Code> for Code {
 impl From<Code> for tonic::Code {
     fn from(code: Code) -> Self {
         let value = code as i32;
-        tonic::Code::from(value)
+        Self::from(value)
     }
 }

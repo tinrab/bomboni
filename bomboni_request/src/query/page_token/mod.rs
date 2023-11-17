@@ -35,7 +35,7 @@ pub trait PageTokenBuilder {
     /// Build a page token for the next page of results.
     ///
     /// Note that "last item" is not necessarily the last item of the page, but N+1th one.
-    /// We can fetch page_size+1 items from the database to determine if there are more results.
+    /// We can fetch `page_size+1` items from the database to determine if there are more results.
     /// [`QueryError::PageTokenFailure`] is returned if the page token could not be built.
     fn build_next<T: SchemaMapped>(
         &self,

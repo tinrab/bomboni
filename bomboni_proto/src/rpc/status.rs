@@ -3,8 +3,9 @@ use crate::google::protobuf::Any;
 use crate::google::rpc::{Code, Status};
 
 impl Status {
+    #[must_use]
     pub fn new(code: Code, message: String, details: Vec<Any>) -> Self {
-        Status {
+        Self {
             code: code as i32,
             message,
             details,
@@ -16,8 +17,8 @@ impl Status {
 impl From<tonic::Status> for Status {
     fn from(status: tonic::Status) -> Self {
         use prost::Message;
-        let details = Status::decode(status.details()).unwrap();
-        Status {
+        let details = Self::decode(status.details()).unwrap();
+        Self {
             code: status.code() as i32,
             message: status.message().into(),
             details: details.details,
@@ -33,12 +34,12 @@ impl From<Status> for tonic::Status {
         let message = status.message.clone();
         let mut encoded_details = Vec::new();
         status.encode(&mut encoded_details).unwrap();
-        tonic::Status::with_details(code, message, encoded_details.into())
+        Self::with_details(code, message, encoded_details.into())
     }
 }
 
 pub mod details_serde {
-    use super::*;
+    use super::{detail_serde, Any};
     use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S>(details: &[Any], serializer: S) -> Result<S::Ok, S::Error>
@@ -104,6 +105,8 @@ pub mod detail_serde {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use crate::google::rpc::ErrorInfo;
 
     use super::*;
@@ -116,7 +119,7 @@ mod tests {
             vec![Any::pack_from(&ErrorInfo {
                 reason: "a".to_string(),
                 domain: "b".to_string(),
-                metadata: Default::default(),
+                metadata: BTreeMap::default(),
             })
             .unwrap()],
         );

@@ -18,7 +18,7 @@ pub struct Base64PageTokenBuilder {
 
 impl Base64PageTokenBuilder {
     pub fn new(url_safe: bool) -> Self {
-        Base64PageTokenBuilder { url_safe }
+        Self { url_safe }
     }
 }
 

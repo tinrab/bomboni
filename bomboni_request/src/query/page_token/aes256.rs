@@ -27,7 +27,7 @@ pub struct Aes256PageTokenBuilder {
 
 impl Aes256PageTokenBuilder {
     pub fn new(url_safe: bool) -> Self {
-        Aes256PageTokenBuilder { url_safe }
+        Self { url_safe }
     }
 }
 
@@ -46,7 +46,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
             Base64::decode_vec(page_token).map_err(|_| QueryError::InvalidPageToken)?
         };
 
-        let key = make_page_key::<32>(filter, ordering).ok_or(QueryError::InvalidPageToken)?;
+        let key = make_page_key::<32>(filter, ordering);
         let key: &Key<Aes256Gcm> = (&key).into();
 
         let cipher = Aes256Gcm::new(key);
@@ -83,7 +83,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         }
         let plaintext = page_filter.to_string();
 
-        let key = make_page_key::<32>(filter, ordering).ok_or(QueryError::PageTokenFailure)?;
+        let key = make_page_key::<32>(filter, ordering);
         let key: &Key<Aes256Gcm> = (&key).into();
 
         let cipher = Aes256Gcm::new(key);
@@ -151,7 +151,7 @@ mod tests {
             )
             .unwrap();
         let parsed = b.parse(&filter, &ordering, &page_token).unwrap();
-        assert_eq!(parsed.filter.to_string(), r#"age <= 14000"#);
+        assert_eq!(parsed.filter.to_string(), "age <= 14000");
         assert_eq!(
             b.parse(
                 &Filter::parse("id=2").unwrap(),

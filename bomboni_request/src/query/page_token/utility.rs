@@ -9,12 +9,12 @@ use blake2::Digest;
 use crate::ordering::Ordering;
 
 /// Constructs a filter that selects items greater than `next_item` based on ordering.
-/// For example, if the ordering is "age desc", then the filter will be "age <= {next_item.age}".
+/// For example, if the ordering is "age desc", then the filter will be `age <= next_item.age`.
 /// "Equals" (>=, <=) is used to ensure that the next item is included in the results.
 pub fn get_page_filter<T: SchemaMapped>(ordering: &Ordering, next_item: &T) -> Filter {
     let mut filters = Vec::new();
 
-    for term in ordering.terms.iter() {
+    for term in &ordering.terms {
         let term_argument = match next_item.get_field(&term.name) {
             Value::Integer(value) => Filter::Value(value.into()),
             Value::Float(value) => Filter::Value(value.into()),
@@ -41,7 +41,7 @@ pub fn get_page_filter<T: SchemaMapped>(ordering: &Ordering, next_item: &T) -> F
 
 /// Constructs a page key from a filter and ordering.
 /// The key should be completely different for different filters and orderings.
-pub fn make_page_key<const N: usize>(filter: &Filter, ordering: &Ordering) -> Option<[u8; N]> {
+pub fn make_page_key<const N: usize>(filter: &Filter, ordering: &Ordering) -> [u8; N] {
     let mut hasher = Blake2s256::new();
 
     hasher.update(filter.to_string().as_bytes());
@@ -52,5 +52,5 @@ pub fn make_page_key<const N: usize>(filter: &Filter, ordering: &Ordering) -> Op
     debug_assert_eq!(res.len(), N);
     let key: [u8; N] = res.as_slice().try_into().unwrap();
 
-    Some(key)
+    key
 }

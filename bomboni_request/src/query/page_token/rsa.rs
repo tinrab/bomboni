@@ -22,7 +22,7 @@ pub struct RsaPageTokenBuilder {
 
 impl RsaPageTokenBuilder {
     pub fn new(private_key: RsaPrivateKey, public_key: RsaPublicKey, url_safe: bool) -> Self {
-        RsaPageTokenBuilder {
+        Self {
             private_key,
             public_key,
             url_safe,
@@ -52,8 +52,7 @@ impl PageTokenBuilder for RsaPageTokenBuilder {
 
         // Verify key
         let page_filter_text = plaintext.split_off(PARAMS_KEY_LENGTH);
-        let params_key = make_page_key::<PARAMS_KEY_LENGTH>(filter, ordering)
-            .ok_or(QueryError::InvalidPageToken)?;
+        let params_key = make_page_key::<PARAMS_KEY_LENGTH>(filter, ordering);
         if params_key != plaintext.as_slice() {
             return Err(QueryError::InvalidPageToken);
         }
@@ -80,9 +79,7 @@ impl PageTokenBuilder for RsaPageTokenBuilder {
         }
 
         // Include both filter and ordering into encryption.
-        let mut plaintext = make_page_key::<PARAMS_KEY_LENGTH>(filter, ordering)
-            .ok_or(QueryError::PageTokenFailure)?
-            .to_vec();
+        let mut plaintext = make_page_key::<PARAMS_KEY_LENGTH>(filter, ordering).to_vec();
         plaintext.extend(page_filter.to_string().as_bytes());
 
         let mut rng = rand::thread_rng();
@@ -151,7 +148,7 @@ mod tests {
             )
             .unwrap();
         let parsed = b.parse(&filter, &ordering, &page_token).unwrap();
-        assert_eq!(parsed.filter.to_string(), r#"age <= 14000"#);
+        assert_eq!(parsed.filter.to_string(), "age <= 14000");
         assert_eq!(
             b.parse(
                 &Filter::parse("id=2").unwrap(),

@@ -12,7 +12,7 @@ use crate::tools::{
 };
 use bomboni_proto::include_proto;
 
-#[allow(unused_qualifications, clippy::module_inception)]
+#[allow(unused_qualifications, clippy::all, clippy::pedantic)]
 pub mod tools {
     use super::*;
     include_proto!("tools");

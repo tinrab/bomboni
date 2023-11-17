@@ -13,7 +13,7 @@ use time::Duration as TimeDuration;
 
 use crate::google::protobuf::Duration;
 
-#[derive(Error, Debug, Clone, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum DurationError {
     #[error("duration is out of range")]
     OutOfRange,
@@ -24,6 +24,7 @@ pub enum DurationError {
 }
 
 impl Duration {
+    #[must_use]
     pub const fn new(seconds: i64, nanos: i32) -> Self {
         Self { seconds, nanos }
     }
@@ -33,6 +34,7 @@ impl Duration {
     ///
     /// [1]: https://github.com/tokio-rs/prost/blob/v0.12.1/prost-types/src/lib.rs#L107
     /// [2]: https://github.com/protocolbuffers/protobuf/blob/v3.3.2/src/google/protobuf/util/time_util.cc#L79-L100
+    #[must_use]
     pub fn normalized(self) -> Self {
         const NANOS_PER_SECOND: i64 = 1_000_000_000;
         const NANOS_MAX: i64 = NANOS_PER_SECOND - 1;
@@ -40,7 +42,7 @@ impl Duration {
         // const DURATION_MAX_SECONDS: i64 = 315_576_000_000;
 
         let mut seconds = self.seconds;
-        let mut nanos = self.nanos as i64;
+        let mut nanos = i64::from(self.nanos);
 
         // Make sure nanos is in the range.
         if nanos <= -NANOS_PER_SECOND || nanos >= NANOS_PER_SECOND {
@@ -89,20 +91,20 @@ impl Duration {
 impl TryFrom<StdDuration> for Duration {
     type Error = DurationError;
 
-    fn try_from(duration: StdDuration) -> Result<Duration, DurationError> {
+    fn try_from(duration: StdDuration) -> Result<Self, DurationError> {
         let seconds = i64::try_from(duration.as_secs()).map_err(|_| DurationError::OutOfRange)?;
         let nanos = duration.subsec_nanos() as i32;
-        Ok(Duration { seconds, nanos }.normalized())
+        Ok(Self { seconds, nanos }.normalized())
     }
 }
 
 impl TryFrom<Duration> for StdDuration {
     type Error = DurationError;
 
-    fn try_from(duration: Duration) -> Result<StdDuration, DurationError> {
+    fn try_from(duration: Duration) -> Result<Self, DurationError> {
         let d = duration.normalized();
         if d.seconds >= 0 && d.nanos >= 0 {
-            Ok(StdDuration::new(d.seconds as u64, d.nanos as u32))
+            Ok(Self::new(d.seconds as u64, d.nanos as u32))
         } else {
             Err(DurationError::NegativeDuration)
         }
@@ -112,7 +114,7 @@ impl TryFrom<Duration> for StdDuration {
 impl TryFrom<TimeDuration> for Duration {
     type Error = DurationError;
 
-    fn try_from(duration: TimeDuration) -> Result<Duration, DurationError> {
+    fn try_from(duration: TimeDuration) -> Result<Self, DurationError> {
         StdDuration::try_from(duration)
             .map_err(|_| DurationError::OutOfRange)?
             .try_into()
@@ -123,9 +125,8 @@ impl TryFrom<TimeDuration> for Duration {
 impl TryFrom<Duration> for TimeDuration {
     type Error = DurationError;
 
-    fn try_from(duration: Duration) -> Result<TimeDuration, DurationError> {
-        TimeDuration::try_from(StdDuration::try_from(duration)?)
-            .map_err(|_| DurationError::OutOfRange)
+    fn try_from(duration: Duration) -> Result<Self, DurationError> {
+        Self::try_from(StdDuration::try_from(duration)?).map_err(|_| DurationError::OutOfRange)
     }
 }
 
@@ -133,7 +134,7 @@ impl TryFrom<Duration> for TimeDuration {
 impl TryFrom<ChronoDuration> for Duration {
     type Error = DurationError;
 
-    fn try_from(duration: ChronoDuration) -> Result<Duration, DurationError> {
+    fn try_from(duration: ChronoDuration) -> Result<Self, DurationError> {
         duration
             .to_std()
             .map_err(|_| DurationError::OutOfRange)?
@@ -145,9 +146,8 @@ impl TryFrom<ChronoDuration> for Duration {
 impl TryFrom<Duration> for ChronoDuration {
     type Error = DurationError;
 
-    fn try_from(duration: Duration) -> Result<ChronoDuration, DurationError> {
-        ChronoDuration::from_std(StdDuration::try_from(duration)?)
-            .map_err(|_| DurationError::OutOfRange)
+    fn try_from(duration: Duration) -> Result<Self, DurationError> {
+        Self::from_std(StdDuration::try_from(duration)?).map_err(|_| DurationError::OutOfRange)
     }
 }
 
@@ -156,7 +156,7 @@ impl Display for Duration {
         if self.nanos == 0 {
             write!(f, "{}s", self.seconds)
         } else {
-            let fractional_seconds = (self.nanos as f64 / 1_000_000_000.0).to_string();
+            let fractional_seconds = (f64::from(self.nanos) / 1_000_000_000.0).to_string();
             write!(
                 f,
                 "{}.{}s",
@@ -194,7 +194,7 @@ impl FromStr for Duration {
             0
         };
 
-        Ok(Duration::new(seconds, nanos))
+        Ok(Self::new(seconds, nanos))
     }
 }
 
@@ -285,7 +285,7 @@ mod tests {
             (line!(), i64::MAX - 1,    999_999_998,     i64::MAX - 1,    999_999_998),
         ];
 
-        for case in cases.iter() {
+        for case in &cases {
             assert_eq!(
                 Duration {
                     seconds: case.1,

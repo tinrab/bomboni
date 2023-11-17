@@ -44,7 +44,7 @@ pub struct SearchQueryBuilder<P: PageTokenBuilder> {
 
 impl Default for SearchQueryConfig {
     fn default() -> Self {
-        SearchQueryConfig {
+        Self {
             max_page_size: None,
             default_page_size: 20,
             primary_ordering_term: None,
@@ -57,7 +57,7 @@ impl Default for SearchQueryConfig {
 
 impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
     pub fn new(schema: Schema, options: SearchQueryConfig, page_token_builder: P) -> Self {
-        SearchQueryBuilder {
+        Self {
             schema,
             options,
             page_token_builder,

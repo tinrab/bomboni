@@ -1,8 +1,10 @@
 use crate::google::protobuf::Empty;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 impl Empty {
+    #[must_use]
     pub const fn new() -> Self {
-        Empty {}
+        Self {}
     }
 }
 
@@ -20,6 +22,6 @@ impl<'de> Deserialize<'de> for Empty {
     where
         D: Deserializer<'de>,
     {
-        Ok(Empty {})
+        Ok(Self {})
     }
 }

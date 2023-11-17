@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 impl From<String> for StringValue {
     fn from(value: String) -> Self {
-        StringValue { value }
+        Self { value }
     }
 }
 
@@ -23,7 +23,7 @@ impl From<StringValue> for String {
 
 impl From<&str> for StringValue {
     fn from(value: &str) -> Self {
-        StringValue {
+        Self {
             value: value.into(),
         }
     }
@@ -31,7 +31,7 @@ impl From<&str> for StringValue {
 
 impl From<Vec<u8>> for BytesValue {
     fn from(value: Vec<u8>) -> Self {
-        BytesValue { value }
+        Self { value }
     }
 }
 
@@ -107,7 +107,7 @@ impl FromStr for Int64Value {
 
 impl From<isize> for Int64Value {
     fn from(value: isize) -> Self {
-        Int64Value {
+        Self {
             value: value as i64,
         }
     }
@@ -115,7 +115,7 @@ impl From<isize> for Int64Value {
 
 impl From<&isize> for Int64Value {
     fn from(value: &isize) -> Self {
-        Int64Value {
+        Self {
             value: *value as i64,
         }
     }
@@ -124,7 +124,7 @@ impl From<&isize> for Int64Value {
 impl From<Int64Value> for isize {
     fn from(value: Int64Value) -> Self {
         #![allow(trivial_casts, trivial_numeric_casts)]
-        value.value as isize
+        value.value as Self
     }
 }
 
@@ -138,7 +138,7 @@ impl FromStr for UInt64Value {
 
 impl From<usize> for UInt64Value {
     fn from(value: usize) -> Self {
-        UInt64Value {
+        Self {
             value: value as u64,
         }
     }
@@ -146,7 +146,7 @@ impl From<usize> for UInt64Value {
 
 impl From<&usize> for UInt64Value {
     fn from(value: &usize) -> Self {
-        UInt64Value {
+        Self {
             value: *value as u64,
         }
     }
@@ -155,7 +155,7 @@ impl From<&usize> for UInt64Value {
 impl From<UInt64Value> for usize {
     fn from(value: UInt64Value) -> Self {
         #![allow(trivial_casts, trivial_numeric_casts)]
-        value.value as usize
+        value.value as Self
     }
 }
 

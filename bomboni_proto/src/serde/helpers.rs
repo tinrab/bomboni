@@ -15,12 +15,13 @@ where
     value == &T::default()
 }
 
+#[must_use]
 pub fn default_bool_true() -> bool {
     true
 }
 
 pub mod as_string {
-    use super::*;
+    use super::{de, Deserialize, Deserializer, FromStr, Serializer};
 
     pub fn serialize<T, S>(
         value: &T,
@@ -50,7 +51,9 @@ pub mod as_string {
 pub mod string_list {
     use itertools::Itertools;
 
-    use super::*;
+    use super::{
+        de, fmt, Deserializer, Display, Formatter, FromStr, PhantomData, Serialize, Serializer,
+    };
 
     pub fn serialize<T, S>(
         value: &[T],
@@ -101,15 +104,16 @@ pub mod string_list {
 
 // Credit: https://github.com/sunng87/handlebars-rust/blob/v4.5.0/src/json/value.rs#L113
 #[cfg(feature = "json")]
+#[must_use]
 pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
     match value {
         JsonValue::Bool(ref i) => *i,
         JsonValue::Number(ref n) => {
             if include_zero {
-                n.as_f64().map(|f| !f.is_nan()).unwrap_or(false)
+                n.as_f64().is_some_and(|f| !f.is_nan())
             } else {
                 // there is no inifity in json/serde_json
-                n.as_f64().map(|f| f.is_normal()).unwrap_or(false)
+                n.as_f64().is_some_and(f64::is_normal)
             }
         }
         JsonValue::Null => false,
@@ -137,7 +141,7 @@ pub fn merge_json(a: &mut JsonValue, b: JsonValue) {
 }
 
 pub mod duration {
-    use super::*;
+    use super::{de, ser, Deserialize, Deserializer, Display, Duration, FromStr, Serializer};
 
     pub fn serialize<T, S>(
         value: &T,
@@ -151,7 +155,7 @@ pub mod duration {
     {
         use ser::Error;
         let d: Duration = value.clone().try_into().map_err(|err| {
-            <S as Serializer>::Error::custom(format!("cannot serialize duration: {}", err))
+            <S as Serializer>::Error::custom(format!("cannot serialize duration: {err}"))
         })?;
         serializer.serialize_str(&d.to_string())
     }
@@ -167,13 +171,12 @@ pub mod duration {
         Duration::from_str(&s)
             .map_err(|err| {
                 <D as Deserializer<'de>>::Error::custom(format!(
-                    "cannot deserialize duration: {}",
-                    err
+                    "cannot deserialize duration: {err}"
                 ))
             })?
             .try_into()
             .map_err(|err| {
-                <D as Deserializer<'de>>::Error::custom(format!("cannot convert duration: {}", err))
+                <D as Deserializer<'de>>::Error::custom(format!("cannot convert duration: {err}"))
             })
     }
 }

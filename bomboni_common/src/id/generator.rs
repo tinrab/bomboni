@@ -6,7 +6,7 @@ use std::{
 use super::Id;
 
 #[derive(Debug, Clone, Copy)]
-pub struct IdGenerator {
+pub struct Generator {
     worker: u16,
     next: u16,
 }
@@ -16,11 +16,12 @@ pub struct IdGenerator {
 const SLEEP_DURATION: Duration = Duration::from_secs(1);
 
 #[cfg(feature = "tokio")]
-pub type IdGeneratorArc = std::sync::Arc<tokio::sync::Mutex<IdGenerator>>;
+pub type IdGeneratorArc = std::sync::Arc<tokio::sync::Mutex<Generator>>;
 
-impl IdGenerator {
-    pub fn new(worker: u16) -> Self {
-        IdGenerator { next: 0, worker }
+impl Generator {
+    #[must_use]
+    pub const fn new(worker: u16) -> Self {
+        Self { next: 0, worker }
     }
 
     /// Generates a new random id.
@@ -137,7 +138,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut id_generator = IdGenerator::new(42);
+        let mut id_generator = Generator::new(42);
         let id = id_generator.generate();
         let (_timestamp, worker, sequence) = id.decode();
         assert_eq!(worker, 42);
@@ -148,9 +149,10 @@ mod tests {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn generate_multiple() {
-        let mut g = IdGenerator::new(1);
-
         const N: usize = 10;
+
+        let mut g = Generator::new(1);
+
         let mut ids = HashSet::new();
         ids.extend(g.generate_multiple_async(N / 2).await);
         g.next = u16::MAX - 1;

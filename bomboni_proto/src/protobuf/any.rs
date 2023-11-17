@@ -1,8 +1,9 @@
 use crate::google::protobuf::Any;
 use prost::{DecodeError, EncodeError, Message, Name};
 impl Any {
+    #[must_use]
     pub fn new(type_url: String, value: Vec<u8>) -> Self {
-        Any { type_url, value }
+        Self { type_url, value }
     }
 
     pub fn pack_from<T>(message: &T) -> Result<Self, EncodeError>
@@ -12,7 +13,7 @@ impl Any {
         let type_url = T::type_url();
         let mut value = Vec::new();
         Message::encode(message, &mut value)?;
-        Ok(Any { type_url, value })
+        Ok(Self { type_url, value })
     }
 
     pub fn unpack_into<T>(self) -> Result<T, DecodeError>
@@ -33,7 +34,7 @@ impl Any {
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_serde {
     ([$($message:ty),* $(,)?]) => {
-        /// Serialize different messages determined by TypeURL.
+        /// Serialize different messages determined by Type URL.
         pub fn serialize<S>(
             value: &$crate::google::protobuf::Any,
             serializer: S,
@@ -52,21 +53,21 @@ macro_rules! impl_proto_any_serde {
             }
 
             match value.type_url.as_str() {
-                $(
-                    <$message>::TYPE_URL => {
-                        Proxy {
-                            type_url: <$message>::TYPE_URL.into(),
-                            message: value.clone().unpack_into::<$message>().unwrap(),
-                        }.serialize(serializer)
-                    }
-                )*
+                // $(
+                //     <$message>::TYPE_URL => {
+                //         Proxy {
+                //             type_url: <$message>::TYPE_URL.into(),
+                //             message: value.clone().unpack_into::<$message>().unwrap(),
+                //         }.serialize(serializer)
+                //     }
+                // )*
                 _ => {
                     ::core::unimplemented!("any serialize for type url {}", value.type_url)
                 }
             }
         }
 
-        /// Deserialize different messages based on TypeURL.
+        /// Deserialize different messages based on Type URL.
         /// We deserialize to a proxy Value form `pot` library then convert to the target message type.
         /// Pot is used because it's self-describing and supports all of serde's types.
         pub fn deserialize<'de, D>(
@@ -102,17 +103,17 @@ macro_rules! impl_proto_any_serde {
 
             match type_url.as_str() {
                 $(
-                    <$message>::TYPE_URL => {
-                        let message = Value::Mappings(mappings)
-                        .deserialize_as::<$message>()
-                        .map_err(|err| {
-                            Error::custom(::std::format!("failed to deserialize {}: {}", type_url, err))
-                        })?;
-                        $crate::google::protobuf::Any::pack_from(&message)
-                        .map_err(|err| {
-                            Error::custom(::std::format!("failed to pack {}: {}", type_url, err))
-                        })
-                    }
+                    // <$message>::TYPE_URL => {
+                    //     let message = Value::Mappings(mappings)
+                    //     .deserialize_as::<$message>()
+                    //     .map_err(|err| {
+                    //         Error::custom(::std::format!("failed to deserialize {}: {}", type_url, err))
+                    //     })?;
+                    //     $crate::google::protobuf::Any::pack_from(&message)
+                    //     .map_err(|err| {
+                    //         Error::custom(::std::format!("failed to pack {}: {}", type_url, err))
+                    //     })
+                    // }
                 )*
                 _ => {
                     ::core::unimplemented!("any deserialize for type url {}", type_url)
@@ -124,6 +125,8 @@ macro_rules! impl_proto_any_serde {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use crate::google::rpc::{ErrorInfo, RetryInfo};
     use serde::{Deserialize, Serialize};
 
@@ -134,7 +137,7 @@ mod tests {
         let msg = ErrorInfo {
             reason: "reason".to_string(),
             domain: "domain".to_string(),
-            metadata: Default::default(),
+            metadata: BTreeMap::default(),
         };
         let any = Any::pack_from(&msg).unwrap();
         let decoded: ErrorInfo = any.unpack_into().unwrap();
@@ -164,7 +167,7 @@ mod tests {
             any: Any::pack_from(&ErrorInfo {
                 reason: "reason".to_string(),
                 domain: "domain".to_string(),
-                metadata: Default::default(),
+                metadata: BTreeMap::default(),
             })
             .unwrap(),
         };
