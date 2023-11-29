@@ -12,6 +12,7 @@ use std::{
     io::{Read, Write},
 };
 pub mod config;
+pub mod path_map;
 use quote::quote;
 mod context;
 mod enums;
@@ -88,7 +89,7 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
         }
 
         let context = Context {
-            config: &config.api,
+            config: &config,
             descriptor: &descriptor,
             package_name,
             path: Vec::default(),

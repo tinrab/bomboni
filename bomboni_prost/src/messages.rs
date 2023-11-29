@@ -7,16 +7,16 @@ use quote::{format_ident, quote};
 use crate::{context::Context, oneofs::write_message_oneofs, utility::macros::format_comment};
 
 pub fn write_message(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    if context.config.names {
+    if context.config.api.names {
         write_name(context, s, message);
     }
-    if context.config.field_names {
+    if context.config.api.field_names {
         write_field_names(context, s, message);
     }
-    if context.config.type_url {
+    if context.config.api.type_url {
         write_type_url(context, s, message);
     }
-    if context.config.oneof_utility {
+    if context.config.api.oneof_utility {
         write_message_oneofs(context, s, message);
     }
 
@@ -52,7 +52,7 @@ fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto)
     let message_proto_name = context.get_proto_type_name(message.name());
     let package_proto_name = Literal::string(&context.package_name);
 
-    let type_url = if context.config.type_url {
+    let type_url = if context.config.api.type_url {
         quote!(
             fn type_url() -> String {
                 Self::TYPE_URL.into()
@@ -81,7 +81,7 @@ fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorPr
     let message_ident = context.get_type_ident(message.name());
     let message_proto_name = context.get_proto_type_name(message.name());
 
-    let type_url = if let Some(domain) = context.config.domain.as_ref() {
+    let type_url = if let Some(domain) = context.config.api.domain.as_ref() {
         Literal::string(&format!(
             "{}/{}.{}",
             domain, &context.package_name, message_proto_name

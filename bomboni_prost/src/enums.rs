@@ -7,13 +7,13 @@ use quote::{format_ident, quote};
 use crate::context::Context;
 
 pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
-    if context.config.names {
+    if context.config.api.names {
         write_name(context, s, enum_type);
     }
-    if context.config.field_names {
+    if context.config.api.field_names {
         write_value_names(context, s, enum_type);
     }
-    if context.config.serde {
+    if context.config.api.serde {
         write_serde(context, s, enum_type);
     }
 }

@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use crate::utility::str_to_case;
 use convert_case::Case;
-use itertools::Itertools;
 use proc_macro2::{Ident, Literal, TokenStream};
 use prost_types::{field_descriptor_proto, DescriptorProto, OneofDescriptorProto};
 use quote::{format_ident, quote};
@@ -15,7 +14,7 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
         return;
     }
 
-    if context.config.field_names {
+    if context.config.api.field_names {
         for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
             if message.field.iter().any(|field| {
                 field.oneof_index == Some(oneof_index as i32) && field.proto3_optional()
@@ -28,7 +27,7 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
         }
     }
 
-    if context.config.oneof_utility {
+    if context.config.api.oneof_utility {
         for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
             if message.field.iter().any(|field| {
                 field.oneof_index == Some(oneof_index as i32) && field.proto3_optional()
@@ -41,7 +40,7 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
         }
     }
 
-    if context.config.oneof_utility {
+    if context.config.api.oneof_utility {
         write_into_owner(context, s, message);
     }
 
@@ -104,6 +103,9 @@ fn write_variant_from(
     oneof: &OneofDescriptorProto,
     oneof_index: usize,
 ) {
+    let message_full_type_name = context.get_proto_full_type_name(message.name());
+    let message_type_name_ref = format!(".{message_full_type_name}");
+
     let mut from_map = BTreeMap::<String, Vec<Ident>>::new();
 
     for field in message
@@ -113,29 +115,12 @@ fn write_variant_from(
     {
         let source_type = match field.r#type() {
             field_descriptor_proto::Type::Message => {
-                // Create field type path based on current context's path, package, and field type name.
-                let mut field_type_name = field
-                    .type_name
-                    .as_ref()
-                    .unwrap()
-                    .trim_start_matches('.')
-                    .split('.')
-                    .peekable();
-                let mut field_type_path = String::new();
-                while let Some(part) = field_type_name.next() {
-                    field_type_path.push_str("::");
-                    if field_type_name.peek().is_none() {
-                        field_type_path.push_str(&str_to_case(part, Case::Pascal));
-                        break;
-                    }
-                    field_type_path.push_str(&str_to_case(part, Case::Snake));
+                // Skip if it references itself
+                if field.type_name.as_ref().unwrap() == &message_type_name_ref {
+                    continue;
                 }
-                let field_type_path = format!(
-                    "{}{}",
-                    context.package_name.split('.').map(|_| "super").join("::"),
-                    field_type_path
-                );
-                let field_type_ident = syn::parse_str::<TypePath>(&field_type_path).unwrap();
+                let field_type_ident =
+                    context.get_ident_from_type_name_reference(field.type_name.as_ref().unwrap());
                 quote! { #field_type_ident }
             }
             field_descriptor_proto::Type::Enum => {

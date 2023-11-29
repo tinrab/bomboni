@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_derive"
-version = "0.1.9"
+version = "0.1.10"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Provides derive implementations for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"

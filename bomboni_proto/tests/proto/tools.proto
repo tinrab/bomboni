@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package tools;
 
+import "google/protobuf/timestamp.proto";
 import "command/v1/command.proto";
 
 service ToolsService {
@@ -10,10 +11,28 @@ service ToolsService {
 
 message CommandRequest { command.v1.Command command = 1; }
 
-message CommandResponse { string result = 1; }
+message CommandResponse {
+    string result = 1;
+
+    google.protobuf.Timestamp time = 2;
+}
 
 enum ServingStatus {
   UNKNOWN = 0;
   SERVING = 1;
   NOT_SERVING = 2;
+}
+
+message Value {
+    message ListValue {
+        repeated Value values = 1;
+    }
+
+    oneof container {
+        ListValue list_value = 1;
+        Value optional_value = 2;
+        string string_value = 3;
+        bool bool_value = 4;
+        google.protobuf.Timestamp timestamp_value = 5;
+    }
 }

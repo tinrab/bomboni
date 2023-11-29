@@ -1,11 +1,14 @@
 use std::path::PathBuf;
 
+use crate::path_map::PathMap;
+
 #[derive(Debug, Clone)]
 pub struct CompileConfig {
     pub file_descriptor_set_path: PathBuf,
     pub output_path: PathBuf,
     pub format: bool,
     pub api: ApiConfig,
+    pub external_paths: PathMap,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +29,7 @@ impl Default for CompileConfig {
             output_path: std::env::var_os("OUT_DIR").unwrap().into(),
             format: true,
             api: ApiConfig::default(),
+            external_paths: PathMap::default(),
         }
     }
 }

@@ -15,6 +15,8 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         let mut config = prost_build::Config::new();
         config
             .file_descriptor_set_path(&fd_path)
+            .compile_well_known_types()
+            .extern_path(".google", "::bomboni_proto::google")
             .protoc_arg("--experimental_allow_proto3_optional")
             .btree_map(["."])
             .compile_protos(&["./tests/proto/tools.proto"], &["./tests/proto/"])?;
@@ -25,6 +27,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
                 ..Default::default()
             },
             file_descriptor_set_path: out_dir.join(fd_path),
+            external_paths: [(".google", "::bomboni_proto::google")].into(),
             ..Default::default()
         })?;
     }
