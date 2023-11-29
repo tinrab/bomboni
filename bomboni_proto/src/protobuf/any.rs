@@ -1,7 +1,7 @@
 use crate::google::protobuf::Any;
 use prost::{DecodeError, EncodeError, Message, Name};
+
 impl Any {
-    #[must_use]
     pub fn new(type_url: String, value: Vec<u8>) -> Self {
         Self { type_url, value }
     }
@@ -29,6 +29,29 @@ impl Any {
         }
         T::decode(&*self.value)
     }
+}
+
+#[macro_export(local_inner_macros)]
+macro_rules! impl_proto_any_convert {
+    ($($message:ty),* $(,)?) => {
+    $(
+        impl TryFrom<$message> for $crate::google::protobuf::Any {
+            type Error = ::prost::EncodeError;
+
+            fn try_from(value: $message) -> Result<Self, Self::Error> {
+                $crate::google::protobuf::Any::pack_from(&value)
+            }
+        }
+
+        impl TryFrom<$crate::google::protobuf::Any> for $message {
+            type Error = ::prost::DecodeError;
+
+            fn try_from(value: $crate::google::protobuf::Any) -> Result<Self, Self::Error> {
+                value.unpack_into()
+            }
+        }
+    )*
+    };
 }
 
 #[macro_export(local_inner_macros)]
@@ -119,6 +142,60 @@ macro_rules! impl_proto_any_serde {
                     ::core::unimplemented!("any deserialize for type url {}", type_url)
                 }
             }
+        }
+    };
+}
+
+#[macro_export(local_inner_macros)]
+macro_rules! impl_proto_any_seq_serde {
+    ($any_serde:ident) => {
+        pub fn serialize<S>(
+            details: &[$crate::google::protobuf::Any],
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: ::serde::Serializer,
+        {
+            use ::serde::ser::SerializeSeq;
+
+            struct Proxy<'a>(&'a $crate::google::protobuf::Any);
+
+            impl<'a> ::serde::Serialize for Proxy<'a> {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: ::serde::Serializer,
+                {
+                    $any_serde::serialize(self.0, serializer)
+                }
+            }
+            let mut seq = serializer.serialize_seq(Some(details.len()))?;
+            for detail in details {
+                seq.serialize_element(&Proxy(detail))?;
+            }
+
+            seq.end()
+        }
+
+        pub fn deserialize<'de, D>(
+            deserializer: D,
+        ) -> Result<::std::vec::Vec<$crate::google::protobuf::Any>, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            use ::serde::Deserialize;
+
+            struct Proxy($crate::google::protobuf::Any);
+
+            impl<'de> ::serde::Deserialize<'de> for Proxy {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: ::serde::Deserializer<'de>,
+                {
+                    $any_serde::deserialize(deserializer).map(Proxy)
+                }
+            }
+            let details: Vec<Proxy> = Vec::deserialize(deserializer)?;
+            Ok(details.into_iter().map(|p| p.0).collect())
         }
     };
 }

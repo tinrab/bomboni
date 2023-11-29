@@ -62,7 +62,6 @@ pub fn register_value_helpers_with_name_map(
 struct ValueHelper;
 
 impl HelperDef for ValueHelper {
-    #[allow(clippy::too_many_lines)]
     fn call_inner<'reg: 'rc, 'rc>(
         &self,
         h: &Helper<'reg, 'rc>,

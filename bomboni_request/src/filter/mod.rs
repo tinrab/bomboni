@@ -186,7 +186,6 @@ impl Filter {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
     pub fn evaluate<T>(&self, item: &T) -> Option<Value>
     where
         T: SchemaMapped,

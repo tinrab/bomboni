@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let fd_path = out_dir.join("fd.pb");
 
-    #[cfg(feature = "testing")]
+    #[cfg(any(feature = "testing", debug_assertions))]
     {
         let fd_path = out_dir.join("test.pb");
         let mut config = prost_build::Config::new();

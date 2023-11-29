@@ -134,7 +134,6 @@ impl Generator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn it_works() {
@@ -149,6 +148,7 @@ mod tests {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn generate_multiple() {
+        use std::collections::HashSet;
         const N: usize = 10;
 
         let mut g = Generator::new(1);

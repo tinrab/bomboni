@@ -1,6 +1,10 @@
 use crate::google::protobuf::Any;
 
-use crate::google::rpc::{Code, Status};
+use crate::google::rpc::{
+    BadRequest, Code, DebugInfo, ErrorInfo, Help, LocalizedMessage, PreconditionFailure,
+    QuotaFailure, RequestInfo, ResourceInfo, RetryInfo, Status,
+};
+use crate::impl_proto_any_convert;
 
 impl Status {
     #[must_use]
@@ -38,56 +42,12 @@ impl From<Status> for tonic::Status {
     }
 }
 
-pub mod details_serde {
-    use super::{detail_serde, Any};
-    use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S>(details: &[Any], serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        struct Proxy<'a>(&'a Any);
-        impl<'a> Serialize for Proxy<'a> {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                detail_serde::serialize(self.0, serializer)
-            }
-        }
-        let mut seq = serializer.serialize_seq(Some(details.len()))?;
-        for detail in details {
-            seq.serialize_element(&Proxy(detail))?;
-        }
-        seq.end()
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Any>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct Proxy(Any);
-        impl<'de> Deserialize<'de> for Proxy {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                detail_serde::deserialize(deserializer).map(Proxy)
-            }
-        }
-        let details: Vec<Proxy> = Vec::deserialize(deserializer)?;
-        Ok(details.into_iter().map(|p| p.0).collect())
-    }
-}
-
 pub mod detail_serde {
-    use crate::{
-        google::rpc::{
-            BadRequest, DebugInfo, ErrorInfo, Help, LocalizedMessage, PreconditionFailure,
-            QuotaFailure, RequestInfo, ResourceInfo, RetryInfo,
-        },
-        impl_proto_any_serde,
+    use super::{
+        BadRequest, DebugInfo, ErrorInfo, Help, LocalizedMessage, PreconditionFailure,
+        QuotaFailure, RequestInfo, ResourceInfo, RetryInfo,
     };
+    use crate::impl_proto_any_serde;
 
     impl_proto_any_serde!([
         BadRequest,
@@ -102,6 +62,26 @@ pub mod detail_serde {
         RetryInfo,
     ]);
 }
+
+pub mod details_serde {
+    use super::detail_serde;
+    use crate::impl_proto_any_seq_serde;
+
+    impl_proto_any_seq_serde!(detail_serde);
+}
+
+impl_proto_any_convert![
+    BadRequest,
+    DebugInfo,
+    ErrorInfo,
+    Help,
+    LocalizedMessage,
+    PreconditionFailure,
+    QuotaFailure,
+    RequestInfo,
+    ResourceInfo,
+    RetryInfo,
+];
 
 #[cfg(test)]
 mod tests {

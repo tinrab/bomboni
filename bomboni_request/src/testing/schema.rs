@@ -60,7 +60,7 @@ impl RequestItem {
 impl SchemaMapped for RequestItem {
     fn get_field(&self, name: &str) -> Value {
         let parts: Vec<_> = name.split('.').collect();
-        match *parts.get(0).unwrap() {
+        match *parts.first().unwrap() {
             "user" => self.user.get_field(parts[1]),
             "task" => self.task.get_field(parts[1]),
             _ => unimplemented!("SchemaMapped: SchemaItem::{}", name),
