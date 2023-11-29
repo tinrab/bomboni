@@ -3,18 +3,21 @@ syntax = "proto3";
 package tools;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 import "command/v1/command.proto";
 
 service ToolsService {
   rpc ExecuteCommand(CommandRequest) returns (CommandResponse) {}
 }
 
-message CommandRequest { command.v1.Command command = 1; }
+message CommandRequest {
+  command.v1.Command command = 1;
+}
 
 message CommandResponse {
-    string result = 1;
+  string result = 1;
 
-    google.protobuf.Timestamp time = 2;
+  google.protobuf.Timestamp time = 2;
 }
 
 enum ServingStatus {
@@ -24,15 +27,31 @@ enum ServingStatus {
 }
 
 message Value {
-    message ListValue {
-        repeated Value values = 1;
-    }
+  message ListValue {
+    repeated Value values = 1;
+  }
 
-    oneof container {
-        ListValue list_value = 1;
-        Value optional_value = 2;
-        string string_value = 3;
-        bool bool_value = 4;
-        google.protobuf.Timestamp timestamp_value = 5;
-    }
+  oneof container {
+    ListValue list_value = 1;
+    Value optional_value = 2;
+    string string_value = 3;
+    bool bool_value = 4;
+    google.protobuf.Timestamp timestamp_value = 5;
+  }
+}
+
+message ValueType {
+  oneof kind {
+    InnerValueType inner = 1;
+
+    google.protobuf.Empty unit = 2;
+  }
+}
+
+message InnerValueType {
+  bool optional = 1;
+
+  bool reference = 2;
+
+  ValueType value_type = 3;
 }

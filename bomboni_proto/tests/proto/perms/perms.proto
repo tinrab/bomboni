@@ -2,4 +2,6 @@ syntax = "proto3";
 
 package tools.perms;
 
-message Perms { uint32 code = 1; }
+message Perms {
+  uint32 code = 1;
+}

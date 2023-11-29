@@ -164,7 +164,7 @@ fn write_variant_from(
         s.extend(quote! {
             impl From<#source_type> for #oneof_ident {
                 fn from(value: #source_type) -> Self {
-                    Self::#variant_ident(value)
+                    Self::#variant_ident(value.into())
                 }
             }
         });

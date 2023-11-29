@@ -6,6 +6,7 @@ current_dir="$(dirname $current_path)"
 
 function format() {
 	cargo fmt
+	find ./ -iname *.proto | xargs clang-format -style=Google -i
 }
 
 function lint() {
