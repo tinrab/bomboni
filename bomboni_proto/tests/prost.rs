@@ -37,6 +37,7 @@ fn names() {
 
     assert_eq!(Command::NAME, "Command");
     assert_eq!(Command::KIND_ONEOF_NAME, "kind");
+    assert_eq!(Command::ETAG_FIELD_NAME, "etag");
     assert_eq!(CommandKind::STATUS_VARIANT_NAME, "status");
 
     assert_eq!(Status::NAME, "Command.Status");

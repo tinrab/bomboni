@@ -14,8 +14,10 @@ message Command {
 
   string user = 1;
 
+  optional string etag = 2;
+
   oneof kind {
-    Status status = 2;
+    Status status = 3;
     string print = 4;
     perms.Perms apply_perms = 5;
   }

@@ -16,6 +16,12 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
 
     if context.config.field_names {
         for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
+            if message.field.iter().any(|field| {
+                field.oneof_index == Some(oneof_index as i32) && field.proto3_optional()
+            }) {
+                continue;
+            }
+
             write_name(context, s, message, oneof);
             write_variant_names(context, s, message, oneof, oneof_index);
         }
@@ -23,6 +29,12 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
 
     if context.config.oneof_utility {
         for (oneof_index, oneof) in message.oneof_decl.iter().enumerate() {
+            if message.field.iter().any(|field| {
+                field.oneof_index == Some(oneof_index as i32) && field.proto3_optional()
+            }) {
+                continue;
+            }
+
             write_variant_from(context, s, message, oneof, oneof_index);
             write_variant_utility(context, s, message, oneof, oneof_index);
         }
@@ -31,6 +43,8 @@ pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &De
     if context.config.oneof_utility {
         write_into_owner(context, s, message);
     }
+
+    // panic!();
 }
 
 fn write_name(
@@ -213,16 +227,18 @@ fn write_variant_utility(
         });
     }
 
-    let oneof_ident = context.get_oneof_ident(message, oneof);
-    s.extend(quote! {
-        impl #oneof_ident {
-            pub fn get_variant_name(&self) -> &'static str {
-                match self {
-                    #variant_cases
+    if !variant_cases.is_empty() {
+        let oneof_ident = context.get_oneof_ident(message, oneof);
+        s.extend(quote! {
+            impl #oneof_ident {
+                pub fn get_variant_name(&self) -> &'static str {
+                    match self {
+                        #variant_cases
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 }
 
 fn write_into_owner(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
@@ -230,7 +246,7 @@ fn write_into_owner(context: &Context, s: &mut TokenStream, message: &Descriptor
         || !message
             .field
             .iter()
-            .all(|field| field.oneof_index.is_some())
+            .all(|field| field.oneof_index.is_some() && !field.proto3_optional())
     {
         return;
     }
