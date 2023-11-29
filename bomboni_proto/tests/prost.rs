@@ -3,27 +3,28 @@ use prost::Name;
 use serde::{Deserialize, Serialize};
 
 use crate::tools::{
-    command::command::Kind as CommandKind,
-    command::{
+    command::v1::{
+        command::Kind as CommandKind,
         command::{status::Kind as StatusKind, Status},
         Command,
     },
     CommandRequest, ServingStatus,
 };
-use bomboni_proto::include_proto;
 
 #[allow(unused_qualifications, clippy::all, clippy::pedantic)]
 pub mod tools {
-    use super::*;
+    use bomboni_proto::include_proto;
     include_proto!("tools");
     include_proto!("tools.plus");
     pub mod command {
-        use super::*;
-        include_proto!("tools.command");
-        include_proto!("tools.command.plus");
+        pub mod v1 {
+            use bomboni_proto::include_proto;
+            include_proto!("tools.command.v1");
+            include_proto!("tools.command.v1.plus");
+        }
     }
     pub mod perms {
-        use super::*;
+        use bomboni_proto::include_proto;
         include_proto!("tools.perms");
         include_proto!("tools.perms.plus");
     }
@@ -41,7 +42,7 @@ fn names() {
     assert_eq!(CommandKind::STATUS_VARIANT_NAME, "status");
 
     assert_eq!(Status::NAME, "Command.Status");
-    assert_eq!(Status::PACKAGE, "tools.command");
+    assert_eq!(Status::PACKAGE, "tools.command.v1");
 }
 
 #[test]

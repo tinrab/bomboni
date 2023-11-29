@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package tools;
 
-import "command/command.proto";
+import "command/v1/command.proto";
 
 service ToolsService {
   rpc ExecuteCommand(CommandRequest) returns (CommandResponse) {}
 }
 
-message CommandRequest { command.Command command = 1; }
+message CommandRequest { command.v1.Command command = 1; }
 
 message CommandResponse { string result = 1; }
 

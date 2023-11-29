@@ -1,4 +1,5 @@
-use convert_case::{Case, Casing};
+use crate::utility::str_to_case;
+use convert_case::Case;
 use prost_types::{DescriptorProto, FileDescriptorSet, OneofDescriptorProto};
 use syn::ExprPath;
 
@@ -15,10 +16,10 @@ impl<'a> Context<'a> {
     pub fn get_type_ident(&self, name: &str) -> ExprPath {
         let mut ident = String::new();
         for parent in &self.path {
-            ident.push_str(&parent.to_case(Case::Snake));
+            ident.push_str(&str_to_case(parent, Case::Snake));
             ident.push_str("::");
         }
-        ident.push_str(&name.to_case(Case::Pascal));
+        ident.push_str(&str_to_case(name, Case::Pascal));
         syn::parse_str::<ExprPath>(&ident).unwrap()
     }
 
@@ -36,13 +37,13 @@ impl<'a> Context<'a> {
     ) -> ExprPath {
         let mut ident = String::new();
         for parent in &self.path {
-            ident.push_str(&parent.to_case(Case::Snake));
+            ident.push_str(&str_to_case(parent, Case::Snake));
             ident.push_str("::");
         }
         ident.push_str(&format!(
             "{}::{}",
-            message.name().to_case(Case::Snake),
-            oneof.name().to_case(Case::Pascal)
+            str_to_case(message.name(), Case::Snake),
+            str_to_case(oneof.name(), Case::Pascal)
         ));
         syn::parse_str::<ExprPath>(&ident).unwrap()
     }

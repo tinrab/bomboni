@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
-use convert_case::{Case, Casing};
+use crate::utility::str_to_case;
+use convert_case::Case;
 use itertools::Itertools;
 use proc_macro2::{Ident, Literal, TokenStream};
 use prost_types::{field_descriptor_proto, DescriptorProto, OneofDescriptorProto};
@@ -54,8 +55,10 @@ fn write_name(
     oneof: &OneofDescriptorProto,
 ) {
     let message_ident = context.get_type_ident(message.name());
-    let oneof_name_ident =
-        format_ident!("{}_ONEOF_NAME", oneof.name().to_case(Case::ScreamingSnake));
+    let oneof_name_ident = format_ident!(
+        "{}_ONEOF_NAME",
+        str_to_case(oneof.name(), Case::ScreamingSnake)
+    );
     let oneof_name_literal = Literal::string(oneof.name());
     s.extend(quote! {
         impl #message_ident {
@@ -79,7 +82,7 @@ fn write_variant_names(
     {
         let variant_name_ident = format_ident!(
             "{}_VARIANT_NAME",
-            field.name().to_case(Case::ScreamingSnake)
+            str_to_case(field.name(), Case::ScreamingSnake)
         );
         let variant_name_literal = Literal::string(field.name());
         variant_names.extend(quote! {
@@ -122,10 +125,10 @@ fn write_variant_from(
                 while let Some(part) = field_type_name.next() {
                     field_type_path.push_str("::");
                     if field_type_name.peek().is_none() {
-                        field_type_path.push_str(&part.to_case(Case::Pascal));
+                        field_type_path.push_str(&str_to_case(part, Case::Pascal));
                         break;
                     }
-                    field_type_path.push_str(&part.to_case(Case::Snake));
+                    field_type_path.push_str(&str_to_case(part, Case::Snake));
                 }
                 let field_type_path = format!(
                     "{}{}",
@@ -161,7 +164,7 @@ fn write_variant_from(
         }
         .to_string();
 
-        let variant_ident = format_ident!("{}", field.name().to_case(Case::Pascal));
+        let variant_ident = format_ident!("{}", str_to_case(field.name(), Case::Pascal));
         from_map.entry(source_type).or_default().push(variant_ident);
     }
 
@@ -189,7 +192,7 @@ fn write_variant_from(
                 .all(|field| field.oneof_index.is_some())
         {
             let message_ident = context.get_type_ident(message.name());
-            let variant_ident = format_ident!("{}", oneof.name().to_case(Case::Snake));
+            let variant_ident = format_ident!("{}", str_to_case(oneof.name(), Case::Snake));
             s.extend(quote! {
                 /// From source variant type to owner message type.
                 impl From<#source_type> for #message_ident {
@@ -219,9 +222,9 @@ fn write_variant_utility(
     {
         let variant_name_ident = format_ident!(
             "{}_VARIANT_NAME",
-            field.name().to_case(Case::ScreamingSnake)
+            str_to_case(field.name(), Case::ScreamingSnake)
         );
-        let oneof_field_ident = format_ident!("{}", field.name().to_case(Case::Pascal));
+        let oneof_field_ident = format_ident!("{}", str_to_case(field.name(), Case::Pascal));
         variant_cases.extend(quote! {
             Self::#oneof_field_ident(_) => Self::#variant_name_ident,
         });
@@ -253,7 +256,7 @@ fn write_into_owner(context: &Context, s: &mut TokenStream, message: &Descriptor
     let message_ident = context.get_type_ident(message.name());
     let oneof = message.oneof_decl.first().unwrap();
     let oneof_ident = context.get_oneof_ident(message, oneof);
-    let variant_ident = format_ident!("{}", oneof.name().to_case(Case::Snake));
+    let variant_ident = format_ident!("{}", str_to_case(oneof.name(), Case::Snake));
 
     s.extend(quote! {
         impl From<#oneof_ident> for #message_ident {

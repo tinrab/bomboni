@@ -1,4 +1,5 @@
-use convert_case::{Case, Casing};
+use crate::utility::str_to_case;
+use convert_case::Case;
 use proc_macro2::{Literal, TokenStream};
 use prost_types::EnumDescriptorProto;
 use quote::{format_ident, quote};
@@ -36,8 +37,10 @@ fn write_value_names(context: &Context, s: &mut TokenStream, enum_type: &EnumDes
     let mut value_names_array = TokenStream::new();
 
     for value in &enum_type.value {
-        let value_name_ident =
-            format_ident!("{}_VALUE_NAME", value.name().to_case(Case::ScreamingSnake));
+        let value_name_ident = format_ident!(
+            "{}_VALUE_NAME",
+            str_to_case(value.name(), Case::ScreamingSnake)
+        );
         let value_name = Literal::string(value.name());
 
         value_names.extend(quote! {
@@ -126,7 +129,7 @@ fn write_serde(context: &Context, s: &mut TokenStream, enum_type: &EnumDescripto
         }
     });
 
-    let mod_ident = format_ident!("{}_serde", enum_type.name().to_case(Case::Snake));
+    let mod_ident = format_ident!("{}_serde", str_to_case(enum_type.name(), Case::Snake));
     s.extend(quote! {
         /// Utility for working with i32s in message fields.
         /// Usable with #[serde(with = "...")]

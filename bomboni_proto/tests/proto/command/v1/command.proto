@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package tools.command;
+package tools.command.v1;
 
 import "perms/perms.proto";
 
