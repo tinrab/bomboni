@@ -1,6 +1,6 @@
 [package]
 name = "bomboni"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utility Library for Rust"
 repository = "https://github.com/tinrab/bomboni"
@@ -30,12 +30,17 @@ prost = ["dep:bomboni_prost"]
 proto = ["prost", "dep:bomboni_proto"]
 request = ["dep:bomboni_request"]
 template = ["dep:bomboni_template"]
+serde = ["bomboni_common/serde"]
+json = ["bomboni_proto/json"]
+chrono = ["bomboni_proto/chrono"]
+tokio = ["bomboni_common/tokio"]
+tonic = ["bomboni_proto/tonic", "bomboni_request/tonic"]
 
 [dependencies]
-bomboni_common = { path = "bomboni_common", version = "0.1.6" }
-bomboni_derive = { path = "bomboni_derive", version = "0.1.6" }
+bomboni_common = { path = "bomboni_common", version = "0.1.7" }
+bomboni_derive = { path = "bomboni_derive", version = "0.1.7" }
 
-bomboni_prost = { path = "bomboni_prost", version = "0.1.6", optional = true }
-bomboni_proto = { path = "bomboni_proto", version = "0.1.6", optional = true }
-bomboni_request = { path = "bomboni_request", version = "0.1.6", optional = true }
-bomboni_template = { path = "bomboni_template", version = "0.1.6", optional = true }
+bomboni_prost = { path = "bomboni_prost", version = "0.1.7", optional = true }
+bomboni_proto = { path = "bomboni_proto", version = "0.1.7", optional = true }
+bomboni_request = { path = "bomboni_request", version = "0.1.7", optional = true }
+bomboni_template = { path = "bomboni_template", version = "0.1.7", optional = true }

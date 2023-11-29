@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_common"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Common things for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
