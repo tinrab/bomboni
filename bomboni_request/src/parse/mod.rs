@@ -603,7 +603,7 @@ mod tests {
         #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(resource {
-                fields = [name, create_time, deleted],
+                fields = [name, create_time, deleted, etag],
             })]
             resource: ParsedResource,
         }
@@ -620,6 +620,7 @@ mod tests {
                 name: "items/42".into(),
                 create_time: Some(OffsetDateTime::UNIX_EPOCH.into()),
                 deleted: true,
+                etag: Some("abc".into()),
                 ..Default::default()
             })
             .unwrap(),
@@ -628,6 +629,7 @@ mod tests {
                     name: "items/42".into(),
                     create_time: Some(OffsetDateTime::UNIX_EPOCH),
                     deleted: true,
+                    etag: Some("abc".into()),
                     ..Default::default()
                 }
             }

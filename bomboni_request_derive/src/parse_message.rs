@@ -341,7 +341,7 @@ fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
             //         CommonError::RequiredFieldMissing,
             //     ));
             // }
-            result.name = source.name;
+            result.name = source.name.clone();
         });
     }
     if options.fields.create_time {
@@ -390,7 +390,7 @@ fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
     }
     if options.fields.etag {
         result.extend(quote! {
-            result.etag = source.etag.filter(|etag| !etag.is_empty());
+            result.etag = source.etag.clone().filter(|etag| !etag.is_empty());
         });
     }
 
