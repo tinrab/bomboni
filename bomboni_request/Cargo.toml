@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request"
-version = "0.1.11"
+version = "0.1.13"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -14,13 +14,13 @@ name = "bomboni_request"
 path = "src/lib.rs"
 
 [features]
+derive = ["dep:bomboni_request_derive"]
 testing = []
 tonic = ["bomboni_proto/tonic", "dep:tonic"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.11" }
-bomboni_derive = { path = "../bomboni_derive", version = "0.1.11" }
-bomboni_proto = { path = "../bomboni_proto", version = "0.1.11" }
+bomboni_common = { path = "../bomboni_common", version = "0.1.13" }
+bomboni_proto = { path = "../bomboni_proto", version = "0.1.13" }
 thiserror = "1.0.50"
 itertools = "0.12.0"
 time = { version = "0.3.30", features = ["formatting", "parsing"] }
@@ -32,5 +32,7 @@ aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
 rsa = "0.9.5"
 rand = "0.8.5"
+regex = "1.10.2"
 
 tonic = { version = "0.10.2", optional = true }
+bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.13", optional = true }

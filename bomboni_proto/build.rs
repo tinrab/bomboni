@@ -12,6 +12,12 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     #[cfg(any(feature = "testing", debug_assertions))]
     {
         let fd_path = out_dir.join("test.pb");
+
+        let proto_paths = ["./tests/proto/tools.proto"];
+        for proto_path in &proto_paths {
+            println!("cargo:rerun-if-changed={proto_path}");
+        }
+
         let mut config = prost_build::Config::new();
         config
             .file_descriptor_set_path(&fd_path)
@@ -19,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
             .extern_path(".google", "::bomboni_proto::google")
             .protoc_arg("--experimental_allow_proto3_optional")
             .btree_map(["."])
-            .compile_protos(&["./tests/proto/tools.proto"], &["./tests/proto/"])?;
+            .compile_protos(&proto_paths, &["./tests/proto/"])?;
 
         compile(CompileConfig {
             api: ApiConfig {

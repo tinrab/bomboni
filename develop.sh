@@ -33,6 +33,7 @@ function lint() {
 		-D clippy::perf \
 		-D clippy::style \
 		-D clippy::pedantic \
+		-A unused_braces \
 		-A clippy::module_name_repetitions \
 		-A clippy::cast_possible_truncation \
 		-A clippy::cast_possible_wrap \
@@ -56,7 +57,7 @@ function publish() {
 		cargo publish -p bomboni_common
 		cargo publish -p bomboni_prost
 		cargo publish -p bomboni_proto
-		cargo publish -p bomboni_derive
+		cargo publish -p bomboni_request_derive
 		cargo publish -p bomboni_request
 		cargo publish -p bomboni_template
 		cargo publish -p bomboni
@@ -64,7 +65,7 @@ function publish() {
 		cargo publish -p bomboni_common --dry-run --allow-dirty
 		cargo publish -p bomboni_prost --dry-run --allow-dirty
 		cargo publish -p bomboni_proto --dry-run --allow-dirty
-		cargo publish -p bomboni_derive --dry-run --allow-dirty
+		cargo publish -p bomboni_request_derive --dry-run --allow-dirty
 		cargo publish -p bomboni_request --dry-run --allow-dirty
 		cargo publish -p bomboni_template --dry-run --allow-dirty
 		cargo publish -p bomboni --dry-run --allow-dirty

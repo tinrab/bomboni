@@ -19,7 +19,7 @@ pub mod collections;
 #[macro_export(local_inner_macros)]
 macro_rules! regex {
     ($re:literal $(,)?) => {{
-        static REGEX: ::std::sync::OnceLock<regex::Regex> = ::std::sync::OnceLock::new();
+        static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
         REGEX.get_or_init(|| ::regex::Regex::new($re).unwrap())
     }};
 }

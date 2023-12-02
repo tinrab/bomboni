@@ -1,6 +1,6 @@
 [package]
-name = "bomboni_derive"
-version = "0.1.11"
+name = "bomboni_request_derive"
+version = "0.1.13"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Provides derive implementations for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -10,7 +10,7 @@ readme = "../README.md"
 edition = "2021"
 
 [lib]
-name = "bomboni_derive"
+name = "bomboni_request_derive"
 path = "src/lib.rs"
 proc-macro = true
 

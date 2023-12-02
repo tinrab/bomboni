@@ -11,8 +11,6 @@ use std::error::Error;
 
 #[derive(Error, Debug)]
 pub enum RequestError {
-    #[error("requested entity was not found")]
-    ResourceNotFound,
     #[error("invalid `{name}` request")]
     BadRequest {
         name: String,
@@ -38,9 +36,13 @@ pub struct FieldError {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum FieldErrorKind {
+pub enum CommonError {
     #[error(transparent)]
     Query(#[from] QueryError),
+    #[error("requested entity was not found")]
+    ResourceNotFound,
+    #[error("unauthorized")]
+    Unauthorized,
     #[error("no value provided for required field")]
     RequiredFieldMissing,
     #[error("expected `{expected_format}`, but got `{name}`.")]
@@ -58,14 +60,26 @@ pub enum FieldErrorKind {
     },
     #[error("expected resource parent `{expected}`, but got `{parent}`")]
     InvalidParent { expected: String, parent: String },
+    #[error("expected a string in format `{expected}`")]
+    InvalidStringFormat { expected: String },
     #[error("invalid ID format")]
     InvalidId,
+    #[error("duplicate ID")]
+    DuplicateId,
     #[error("invalid display name format")]
     InvalidDisplayName,
     #[error("invalid date time format")]
     InvalidDateTime,
     #[error("invalid enum value")]
     InvalidEnumValue,
+    #[error("unknown oneof variant")]
+    UnknownOneofVariant,
+    #[error("invalid numeric value")]
+    InvalidNumericValue,
+    #[error("out of range")]
+    NumericOutOfRange,
+    #[error("duplicate value")]
+    DuplicateValue,
 }
 
 pub trait DomainError: Error {
@@ -81,18 +95,6 @@ pub trait DomainError: Error {
 }
 
 pub type DomainErrorBox = Box<dyn DomainError + Send + Sync>;
-
-pub trait RequestParse<T>: Sized {
-    type Error;
-
-    fn parse(value: T) -> Result<Self, Self::Error>;
-}
-
-pub trait RequestParseInto<T>: Sized {
-    type Error;
-
-    fn parse_into(self) -> Result<T, Self::Error>;
-}
 
 impl RequestError {
     #[must_use]
@@ -112,6 +114,11 @@ impl RequestError {
                 })
                 .collect(),
         }
+    }
+
+    #[must_use]
+    pub fn domain<E: Into<DomainErrorBox>>(error: E) -> Self {
+        Self::Domain(error.into())
     }
 
     #[must_use]
@@ -152,6 +159,7 @@ impl RequestError {
                 ..error
             }
             .into(),
+            Self::Domain(error) => Self::field(root_field, error),
             // TODO: skip or panic?
             err => err,
             // _ => unreachable!(),
@@ -230,7 +238,6 @@ impl RequestError {
     pub fn code(&self) -> Code {
         match self {
             Self::Encode(_) | Self::Decode(_) | Self::BadRequest { .. } => Code::InvalidArgument,
-            Self::ResourceNotFound => Code::NotFound,
             Self::Field(error) => error.code(),
             Self::Domain(error) => error.code(),
         }
@@ -298,13 +305,16 @@ impl From<FieldError> for RequestError {
     }
 }
 
-impl DomainError for FieldErrorKind {
+impl DomainError for CommonError {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 
     fn code(&self) -> Code {
-        Code::InvalidArgument
+        match self {
+            Self::ResourceNotFound => Code::NotFound,
+            _ => Code::InvalidArgument,
+        }
     }
 }
 
@@ -323,24 +333,13 @@ impl<T: 'static + DomainError + Send + Sync> From<T> for RequestError {
     }
 }
 
-impl<T, U, E> RequestParseInto<U> for T
-where
-    U: RequestParse<T, Error = E>,
-{
-    type Error = E;
-
-    fn parse_into(self) -> Result<U, Self::Error> {
-        U::parse(self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn it_works() {
-        let err = RequestError::bad_request("Test", [("x", FieldErrorKind::InvalidId)]);
+        let err = RequestError::bad_request("Test", [("x", CommonError::InvalidId)]);
         assert_eq!(err.to_string(), "invalid `Test` request");
         assert_eq!(
             err.details().remove(0).unpack_into::<BadRequest>().unwrap(),
