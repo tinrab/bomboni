@@ -520,7 +520,7 @@ fn expand_write_resource(field: &ParseField) -> TokenStream {
     }
     if options.fields.etag {
         result.extend(quote! {
-            etag: value.#ident.etag.unwrap_or_else(Default::default),
+            etag: value.#ident.etag,
         });
     }
 

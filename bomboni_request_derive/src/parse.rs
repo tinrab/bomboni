@@ -90,7 +90,7 @@ pub struct ParseVariant {
     pub with: Option<Expr>,
 }
 
-#[derive(Debug, FromMeta)]
+#[derive(Debug)]
 pub struct ResourceOptions {
     pub fields: ResourceFields,
 }
@@ -116,6 +116,46 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     match &options.data {
         ast::Data::Struct(fields) => parse_message::expand(&options, &fields.fields),
         ast::Data::Enum(variants) => parse_oneof::expand(&options, variants),
+    }
+}
+
+impl FromMeta for ResourceOptions {
+    fn from_list(items: &[ast::NestedMeta]) -> darling::Result<Self> {
+        let mut fields = ResourceFields::default();
+        for item in items {
+            match item {
+                ast::NestedMeta::Meta(meta) => {
+                    let ident = meta.path().get_ident().unwrap();
+                    match ident.to_string().as_str() {
+                        "fields" => {
+                            fields = ResourceFields::from_meta(meta)?;
+                        }
+                        _ => {
+                            return Err(
+                                darling::Error::custom("unknown resource option").with_span(ident)
+                            );
+                        }
+                    }
+                }
+                ast::NestedMeta::Lit(lit) => {
+                    return Err(darling::Error::custom("unexpected literal").with_span(lit));
+                }
+            }
+        }
+        Ok(Self { fields })
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Self {
+            fields: ResourceFields {
+                name: true,
+                create_time: true,
+                update_time: true,
+                delete_time: true,
+                deleted: true,
+                etag: true,
+            },
+        })
     }
 }
 

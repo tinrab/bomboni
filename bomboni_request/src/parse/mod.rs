@@ -1,5 +1,6 @@
 use bomboni_common::id::Id;
 use time::OffsetDateTime;
+pub mod helpers;
 
 pub trait RequestParse<T>: Sized {
     type Error;
@@ -571,7 +572,7 @@ mod tests {
             update_time: Option<Timestamp>,
             delete_time: Option<Timestamp>,
             deleted: bool,
-            // etag: Option<String>,
+            etag: Option<String>,
         }
 
         #[derive(Parse, Debug, PartialEq)]
@@ -580,6 +581,13 @@ mod tests {
             #[parse(resource {
                 fields = [name, create_time, deleted],
             })]
+            resource: ParsedResource,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, write)]
+        struct ParsedItemDefaultResource {
+            #[parse(resource)]
             resource: ParsedResource,
         }
 
@@ -607,13 +615,31 @@ mod tests {
                     create_time: Some(OffsetDateTime::UNIX_EPOCH),
                     deleted: true,
                     ..Default::default()
-                }
+                },
             }),
             Item {
                 name: "items/42".into(),
                 create_time: Some(OffsetDateTime::UNIX_EPOCH.into()),
                 deleted: true,
                 ..Default::default()
+            }
+        );
+
+        assert_eq!(
+            ParsedItemDefaultResource::parse(Item {
+                name: "items/42".into(),
+                create_time: Some(OffsetDateTime::UNIX_EPOCH.into()),
+                deleted: true,
+                ..Default::default()
+            })
+            .unwrap(),
+            ParsedItemDefaultResource {
+                resource: ParsedResource {
+                    name: "items/42".into(),
+                    create_time: Some(OffsetDateTime::UNIX_EPOCH),
+                    deleted: true,
+                    ..Default::default()
+                }
             }
         );
     }
