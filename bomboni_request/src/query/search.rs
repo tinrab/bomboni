@@ -10,12 +10,12 @@ use crate::{
 
 use super::{
     error::{QueryError, QueryResult},
-    page_token::PageTokenBuilder,
+    page_token::{FilterPageToken, PageTokenBuilder},
     utility::{parse_query_filter, parse_query_ordering},
 };
 
 #[derive(Debug, Clone)]
-pub struct SearchQuery<T> {
+pub struct SearchQuery<T = FilterPageToken> {
     pub query: String,
     pub filter: Filter,
     pub ordering: Ordering,

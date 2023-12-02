@@ -12,14 +12,14 @@ use crate::{
 
 use super::{
     error::{QueryError, QueryResult},
-    page_token::PageTokenBuilder,
+    page_token::{FilterPageToken, PageTokenBuilder},
     utility::{parse_query_filter, parse_query_ordering},
 };
 
 /// Represents a list query.
 /// List queries list paged, filtered and ordered items.
 #[derive(Debug, Clone)]
-pub struct ListQuery<T> {
+pub struct ListQuery<T = FilterPageToken> {
     pub filter: Filter,
     pub ordering: Ordering,
     pub page_size: i32,
@@ -199,7 +199,7 @@ mod tests {
                     .page_token_builder
                     .build_next(&first_page.filter, &first_page.ordering, &last_item)
                     .unwrap();
-                let next_page: ListQuery<crate::query::page_token::FilterPageToken> = qb
+                let next_page: ListQuery = qb
                     .build(Some(3), Some(&next_page_token), $filter2, $ordering2)
                     .unwrap();
                 assert_eq!(
