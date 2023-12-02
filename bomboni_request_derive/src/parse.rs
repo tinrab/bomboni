@@ -61,6 +61,10 @@ pub struct ParseField {
     /// The names of the functions must be `parse` and `write` respectively.
     #[darling(with = parse_expr::parse_str_literal, map = Some)]
     pub with: Option<Expr>,
+    /// Make this field derived.
+    /// The function must have the signature `fn(source: &Source) -> RequestResult<T>`.
+    #[darling(with = parse_expr::parse_str_literal, map = Some)]
+    pub derive: Option<Expr>,
 }
 
 #[derive(Debug, FromVariant)]

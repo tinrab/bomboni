@@ -50,6 +50,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn derived_fields() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            x: i32,
+            y: i32,
+        }
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(derive = derive_value)]
+            z: i32,
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        fn derive_value(item: &Item) -> RequestResult<i32> {
+            Ok(item.x + item.y)
+        }
+
+        assert_eq!(ParsedItem::parse(Item { x: 3, y: 5 }).unwrap().z, 8);
+
+        assert_eq!(Item::from(ParsedItem { z: 8 }), Item::default());
+    }
+
+    #[test]
     fn it_works() {
         #[derive(Debug, PartialEq)]
         struct Item {

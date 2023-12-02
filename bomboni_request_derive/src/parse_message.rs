@@ -36,14 +36,11 @@ fn expand_parse(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<To
             continue;
         }
 
-        let parse_field = if field.resource.is_some() {
-            expand_parse_resource_field(field)?
+        if field.resource.is_some() {
+            parse_fields.extend(expand_parse_resource_field(field)?);
         } else {
-            expand_parse_field(field)?
+            parse_fields.extend(expand_parse_field(field)?);
         };
-        parse_fields.extend(quote! {
-            #field_ident: { #parse_field },
-        });
     }
 
     Ok(quote! {
@@ -77,6 +74,13 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
     } else {
         field.ident.clone().unwrap()
     };
+    let target_ident = field.ident.as_ref().unwrap();
+
+    if let Some(derive) = field.derive.as_ref() {
+        return Ok(quote! {
+            #target_ident: { #derive(&source)? },
+        });
+    }
 
     let (is_option, is_nested, is_string) = check_proto_type(&field.ty);
 
@@ -307,8 +311,10 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
     }
 
     Ok(quote! {
-        #result
-        target
+        #target_ident: {
+            #result
+            target
+        },
     })
 }
 
@@ -320,6 +326,7 @@ fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
         ));
     }
 
+    let target_ident = field.ident.as_ref().unwrap();
     let options = field.resource.as_ref().unwrap();
 
     let mut result = quote! {
@@ -388,8 +395,10 @@ fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
     }
 
     Ok(quote! {
-        #result
-        result
+        #target_ident: {
+            #result
+            result
+        },
     })
 }
 
@@ -400,7 +409,7 @@ fn expand_write(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {
     let mut write_fields = quote!();
 
     for field in fields {
-        if field.skip {
+        if field.skip || field.derive.is_some() {
             continue;
         }
 
