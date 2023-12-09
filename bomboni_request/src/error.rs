@@ -80,6 +80,12 @@ pub enum CommonError {
     NumericOutOfRange,
     #[error("duplicate value")]
     DuplicateValue,
+    #[error("already exists")]
+    AlreadyExists,
+    #[error("not found")]
+    NotFound,
+    #[error("type mismatch")]
+    TypeMismatch,
 }
 
 pub trait DomainError: Error {
@@ -312,7 +318,9 @@ impl DomainError for CommonError {
 
     fn code(&self) -> Code {
         match self {
-            Self::ResourceNotFound => Code::NotFound,
+            Self::ResourceNotFound | Self::NotFound => Code::NotFound,
+            Self::AlreadyExists => Code::AlreadyExists,
+            Self::Unauthorized => Code::PermissionDenied,
             _ => Code::InvalidArgument,
         }
     }

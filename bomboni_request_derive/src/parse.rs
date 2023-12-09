@@ -1,20 +1,29 @@
 use darling::util::parse_expr;
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
 use proc_macro2::{Ident, TokenStream};
-use syn::{self, DeriveInput, Expr, ExprArray, ExprPath, Meta, MetaNameValue, Type};
+use syn::{self, DeriveInput, Expr, ExprArray, Meta, MetaNameValue, Path, Type};
 
 use crate::{parse_message, parse_oneof};
 
-#[derive(FromDeriveInput, Debug)]
+#[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse))]
 pub struct ParseOptions {
     pub ident: Ident,
     pub data: ast::Data<ParseVariant, ParseField>,
     /// Source proto type.
-    pub source: ExprPath,
+    pub source: Path,
     /// Set to true to implement `From` trait for converting parsed type back into source proto type.
     #[darling(default)]
     pub write: bool,
+    /// Used to create tagged unions.
+    #[darling(default)]
+    pub tagged_union: Option<ParseTaggedUnion>,
+}
+
+#[derive(FromMeta, Debug)]
+pub struct ParseTaggedUnion {
+    pub oneof: Path,
+    pub field: Ident,
 }
 
 #[derive(Debug, FromField)]

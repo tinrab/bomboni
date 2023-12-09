@@ -49,28 +49,71 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn derived_fields() {
-        #[derive(Debug, PartialEq, Default)]
-        struct Item {
-            x: i32,
-            y: i32,
-        }
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, write)]
-        struct ParsedItem {
-            #[parse(derive = derive_value)]
-            z: i32,
-        }
+    #[derive(Debug, Clone, PartialEq)]
+    struct ValueType {
+        kind: Option<ValueTypeKind>,
+    }
 
-        #[allow(clippy::unnecessary_wraps)]
-        fn derive_value(item: &Item) -> RequestResult<i32> {
-            Ok(item.x + item.y)
+    #[derive(Debug, Clone, PartialEq)]
+    enum ValueTypeKind {
+        Inner(Box<ValueType>),
+        Primitive(String),
+        Generic(GenericValueType),
+        Unit(()),
+    }
+
+    impl ValueTypeKind {
+        pub fn get_variant_name(&self) -> &'static str {
+            match self {
+                Self::Inner(_) => "inner",
+                Self::Primitive(_) => "primitive",
+                Self::Generic(_) => "generic",
+                Self::Unit(()) => "unit",
+            }
         }
+    }
 
-        assert_eq!(ParsedItem::parse(Item { x: 3, y: 5 }).unwrap().z, 8);
+    #[derive(Debug, Clone, PartialEq, Default)]
+    struct GenericValueType {
+        parameter: String,
+    }
 
-        assert_eq!(Item::from(ParsedItem { z: 8 }), Item::default());
+    #[derive(Debug, Clone, Parse, PartialEq)]
+    #[parse(source = ValueType, tagged_union { oneof = ValueTypeKind, field = kind }, write)]
+    enum ParsedValueType {
+        Inner(Box<ParsedValueType>),
+        Primitive(String),
+        Generic(ParsedGenericValueType),
+        Unit,
+    }
+
+    #[derive(Debug, Clone, Parse, PartialEq)]
+    #[parse(source = GenericValueType, write)]
+    struct ParsedGenericValueType {
+        parameter: String,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    #[repr(i32)]
+    enum DataTypeEnum {
+        Unspecified = 0,
+        String = 1,
+        Boolean = 2,
+        Number = 3,
+    }
+
+    impl TryFrom<i32> for DataTypeEnum {
+        type Error = ();
+
+        fn try_from(value: i32) -> Result<Self, Self::Error> {
+            match value {
+                0 => Ok(Self::Unspecified),
+                1 => Ok(Self::String),
+                2 => Ok(Self::Boolean),
+                3 => Ok(Self::Number),
+                _ => Err(()),
+            }
+        }
     }
 
     #[test]
@@ -671,6 +714,59 @@ mod tests {
     }
 
     #[test]
+    fn derived_fields() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            x: i32,
+            y: i32,
+            name: String,
+        }
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(derive = derive_value)]
+            z: i32,
+            name: String,
+            #[parse(derive = derive_upper_name)]
+            upper_name: String,
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        fn derive_value(item: &Item) -> RequestResult<i32> {
+            Ok(item.x + item.y)
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        fn derive_upper_name(item: &Item) -> RequestResult<String> {
+            Ok(item.name.to_uppercase())
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                x: 3,
+                y: 5,
+                name: "Item".into()
+            })
+            .unwrap()
+            .z,
+            8
+        );
+
+        assert_eq!(
+            Item::from(ParsedItem {
+                z: 8,
+                name: "Item".into(),
+                upper_name: String::new()
+            }),
+            Item {
+                x: 0,
+                y: 0,
+                name: "Item".into()
+            }
+        );
+    }
+
+    #[test]
     fn parse_names() {
         let f = parse_resource_name!({
             "users": u32,
@@ -693,5 +789,137 @@ mod tests {
             "b": u32,
         })("a/1/b/1/c/1")
         .is_none());
+    }
+
+    #[test]
+    fn parse_union() {
+        assert_eq!(
+            ParsedValueType::parse(ValueType {
+                kind: Some(ValueTypeKind::Inner(Box::new(ValueType {
+                    kind: Some(ValueTypeKind::Primitive("abc".into()))
+                })))
+            })
+            .unwrap(),
+            ParsedValueType::Inner(Box::new(ParsedValueType::Primitive("abc".into())))
+        );
+        assert_eq!(
+            ValueType::from(ParsedValueType::Inner(Box::new(
+                ParsedValueType::Primitive("abc".into())
+            ))),
+            ValueType {
+                kind: Some(ValueTypeKind::Inner(Box::new(ValueType {
+                    kind: Some(ValueTypeKind::Primitive("abc".into()))
+                })))
+            }
+        );
+        assert!(matches!(
+            ParsedValueType::parse(ValueType { kind: None }).unwrap_err(),
+            RequestError::Field(FieldError {
+                error,field
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && field == "kind"
+        ));
+        assert_eq!(
+            ParsedValueType::parse(ValueType {
+                kind: Some(ValueTypeKind::Generic(GenericValueType {
+                    parameter: "abc".into()
+                }))
+            })
+            .unwrap(),
+            ParsedValueType::Generic(ParsedGenericValueType {
+                parameter: "abc".into()
+            })
+        );
+        assert_eq!(
+            ValueType::from(ParsedValueType::Generic(ParsedGenericValueType {
+                parameter: "abc".into()
+            })),
+            ValueType {
+                kind: Some(ValueTypeKind::Generic(GenericValueType {
+                    parameter: "abc".into()
+                }))
+            }
+        );
+    }
+
+    #[test]
+    fn parse_vecs() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            values: Vec<i32>,
+            strings: Vec<String>,
+            items: Vec<NestedItem>,
+            value_types: Vec<ValueType>,
+            enums: Vec<i32>,
+        }
+
+        #[derive(Debug, PartialEq, Default)]
+        struct NestedItem {
+            value: i32,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = Item)]
+        struct ParsedItem {
+            values: Vec<i32>,
+            #[parse(regex = "^[a-z]$")]
+            strings: Vec<String>,
+            items: Vec<ParsedNestedItem>,
+            value_types: Vec<ParsedValueType>,
+            #[parse(enumeration)]
+            enums: Vec<DataTypeEnum>,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = NestedItem)]
+        struct ParsedNestedItem {
+            value: i32,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                values: vec![1, 2, 3],
+                strings: vec!["a".into(), "b".into()],
+                items: vec![NestedItem { value: 1 }, NestedItem { value: 2 }],
+                value_types: vec![ValueType {
+                    kind: Some(ValueTypeKind::Primitive("abc".into()))
+                }],
+                enums: vec![1],
+            })
+            .unwrap(),
+            ParsedItem {
+                values: vec![1, 2, 3],
+                strings: vec!["a".into(), "b".into()],
+                items: vec![ParsedNestedItem { value: 1 }, ParsedNestedItem { value: 2 }],
+                value_types: vec![ParsedValueType::Primitive("abc".into())],
+                enums: vec![DataTypeEnum::String],
+            }
+        );
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                strings: vec!["Hello".into()],
+                ..Default::default()
+            }).unwrap_err(),
+            RequestError::Field(FieldError {
+                error, field
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::InvalidStringFormat { .. }
+            ) && field == "strings"
+        ));
+        assert!(matches!(ParsedItem::parse(Item {
+                enums: vec![99i32],
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Field(FieldError {
+                error, field
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::InvalidEnumValue
+            ) && field == "enums"
+        ));
     }
 }

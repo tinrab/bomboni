@@ -3,7 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 
 use crate::parse::{ParseField, ParseOptions};
-use crate::utility::check_proto_type;
+use crate::utility::{get_proto_type_info, ProtoTypeInfo};
 
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<TokenStream> {
     let parse = expand_parse(options, fields)?;
@@ -26,9 +26,26 @@ fn expand_parse(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<To
     // Set default for skipped fields
     let mut skipped_fields = quote!();
 
+    // Parse fields in order, starting with derived ones.
+    // This is needed because derived fields may depend on other fields, and we want to avoid unnecessary cloning.
     for field in fields {
-        let field_ident = field.ident.as_ref().unwrap();
+        if field.derive.is_some() {
+            parse_fields.extend(expand_parse_field(field)?);
+        }
+    }
+    // Parse resource fields
+    for field in fields {
+        if field.resource.is_some() {
+            parse_fields.extend(expand_parse_resource_field(field)?);
+        }
+    }
 
+    for field in fields {
+        if field.derive.is_some() || field.resource.is_some() {
+            continue;
+        }
+
+        let field_ident = field.ident.as_ref().unwrap();
         if field.skip {
             skipped_fields.extend(quote! {
                 #field_ident: Default::default(),
@@ -36,11 +53,7 @@ fn expand_parse(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<To
             continue;
         }
 
-        if field.resource.is_some() {
-            parse_fields.extend(expand_parse_resource_field(field)?);
-        } else {
-            parse_fields.extend(expand_parse_field(field)?);
-        };
+        parse_fields.extend(expand_parse_field(field)?);
     }
 
     Ok(quote! {
@@ -59,6 +72,14 @@ fn expand_parse(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<To
 }
 
 fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
+    let target_ident = field.ident.as_ref().unwrap();
+
+    if let Some(derive) = field.derive.as_ref() {
+        return Ok(quote! {
+            #target_ident: { #derive(&source)? },
+        });
+    }
+
     let field_name = if let Some(name) = field.name.as_ref() {
         quote! { #name }
     } else {
@@ -74,15 +95,14 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
     } else {
         field.ident.clone().unwrap()
     };
-    let target_ident = field.ident.as_ref().unwrap();
 
-    if let Some(derive) = field.derive.as_ref() {
-        return Ok(quote! {
-            #target_ident: { #derive(&source)? },
-        });
-    }
-
-    let (is_option, is_nested, is_string) = check_proto_type(&field.ty);
+    let ProtoTypeInfo {
+        is_option,
+        is_nested,
+        is_string,
+        is_vec,
+        ..
+    } = get_proto_type_info(&field.ty);
 
     if (field.with.is_some() || field.parse_with.is_some())
         && (field.enumeration || field.oneof || field.regex.is_some())
@@ -154,6 +174,59 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
                     .map_err(|err: RequestError| err.wrap(#field_name))?;
             });
         }
+    } else if is_vec {
+        // Fill with default values
+        if field.default.is_some() {
+            result.extend(quote! {
+                let target = if target.is_empty () {
+                    #default_expr
+                } else { target };
+            });
+        }
+        if is_string {
+            if let Some(regex) = field.regex.as_ref() {
+                result.extend(quote! {
+                    static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
+                    let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
+                    let mut v = Vec::new();
+                    for s in target.into_iter() {
+                        if !re.is_match(&s) {
+                            // TODO: add element index?
+                            return Err(RequestError::field(
+                                #field_name,
+                                CommonError::InvalidStringFormat {
+                                    expected: #regex.into(),
+                                },
+                            ));
+                        }
+                        v.push(s);
+                    }
+                    let target = v;
+                });
+            }
+        } else if field.enumeration {
+            result.extend(quote! {
+                let mut v = Vec::new();
+                for e in target.into_iter() {
+                    v.push(
+                        e.try_into()
+                        .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?
+                    );
+                }
+                let target = v;
+            });
+        } else if is_nested {
+            result.extend(quote! {
+                let mut v = Vec::new();
+                for e in target.into_iter() {
+                    v.push(
+                        e.parse_into()
+                        .map_err(|err: RequestError| err.wrap(#field_name))?
+                    );
+                }
+                let target = v;
+            });
+        }
     } else if field.enumeration {
         if field.source_option {
             result.extend(quote! {
@@ -194,21 +267,14 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         if is_option {
             result.extend(quote! {
                 let target = if let Some(target) = target {
-                    let variant_name = target.get_variant_name();
-                    Some(
-                        target.parse_into()
-                            .map_err(|err: RequestError| err.wrap(variant_name))?
-                    )
+                    Some(target.parse_into()?)
                 } else {
                     None
                 };
             });
         } else if field.default.is_some() {
             result.extend(quote! {
-                let target = target.unwrap_or_else(|| #default_expr);
-                let variant_name = target.get_variant_name();
-                let target = target.parse_into()
-                    .map_err(|err: RequestError| err.wrap(variant_name))?;
+                let target = target.unwrap_or_else(|| #default_expr).parse_into()?;
             });
         } else {
             result.extend(quote! {
@@ -219,9 +285,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
                         CommonError::RequiredFieldMissing,
                     )
                 })?;
-                let variant_name = target.get_variant_name();
-                let target = target.parse_into()
-                    .map_err(|err: RequestError| err.wrap(variant_name))?;
+                let target = target.parse_into()?;
             });
         }
     } else if is_nested {
@@ -436,7 +500,12 @@ fn expand_write(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {
 fn expand_write_field(field: &ParseField) -> TokenStream {
     let source_ident = field.ident.as_ref().unwrap();
 
-    let (is_option, is_nested, is_string) = check_proto_type(&field.ty);
+    let ProtoTypeInfo {
+        is_option,
+        is_nested,
+        is_string,
+        ..
+    } = get_proto_type_info(&field.ty);
 
     let mut result = quote! {
         let target = value.#source_ident;
