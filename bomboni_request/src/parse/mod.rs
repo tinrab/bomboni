@@ -39,7 +39,7 @@ pub struct ParsedResource {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use bomboni_common::{btree_map, btree_map_into, hash_map_into};
     use bomboni_proto::google::protobuf::Timestamp;
@@ -48,50 +48,6 @@ mod tests {
     use crate::error::{CommonError, FieldError, RequestError, RequestResult};
 
     use super::*;
-
-    #[derive(Debug, Clone, PartialEq)]
-    struct ValueType {
-        kind: Option<ValueTypeKind>,
-    }
-
-    #[derive(Debug, Clone, PartialEq)]
-    enum ValueTypeKind {
-        Inner(Box<ValueType>),
-        Primitive(String),
-        Generic(GenericValueType),
-        Unit(()),
-    }
-
-    impl ValueTypeKind {
-        pub fn get_variant_name(&self) -> &'static str {
-            match self {
-                Self::Inner(_) => "inner",
-                Self::Primitive(_) => "primitive",
-                Self::Generic(_) => "generic",
-                Self::Unit(()) => "unit",
-            }
-        }
-    }
-
-    #[derive(Debug, Clone, PartialEq, Default)]
-    struct GenericValueType {
-        parameter: String,
-    }
-
-    #[derive(Debug, Clone, Parse, PartialEq)]
-    #[parse(source = ValueType, tagged_union { oneof = ValueTypeKind, field = kind }, write)]
-    enum ParsedValueType {
-        Inner(Box<ParsedValueType>),
-        Primitive(String),
-        Generic(ParsedGenericValueType),
-        Unit,
-    }
-
-    #[derive(Debug, Clone, Parse, PartialEq)]
-    #[parse(source = GenericValueType, write)]
-    struct ParsedGenericValueType {
-        parameter: String,
-    }
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     #[repr(i32)]
@@ -124,7 +80,6 @@ mod tests {
             optional_string: Option<String>,
             required_string: String,
             required_string_optional: Option<String>,
-            default_primitive: Option<i32>,
             nested: Option<NestedItem>,
             optional_nested: Option<NestedItem>,
             default_nested: Option<NestedItem>,
@@ -140,7 +95,6 @@ mod tests {
                     optional_string: Some("abc".into()),
                     required_string: "abc".into(),
                     required_string_optional: Some("abc".into()),
-                    default_primitive: Some(42),
                     nested: Some(NestedItem {}),
                     optional_nested: Some(NestedItem {}),
                     default_nested: Some(NestedItem {}),
@@ -164,8 +118,6 @@ mod tests {
             required_string: String,
             #[parse(source_option)]
             required_string_optional: String,
-            #[parse(source_option)]
-            default_primitive: i32,
             nested: ParsedNestedItem,
             optional_nested: Option<ParsedNestedItem>,
             #[parse(default = NestedItem::default())]
@@ -255,7 +207,7 @@ mod tests {
         macro_rules! assert_parse_field_err {
             ($item:expr, $field:expr, $err:expr) => {{
                 let err = ParsedItem::parse($item).unwrap_err();
-                if let RequestError::Field(FieldError { error, field }) = err {
+                if let RequestError::Field(FieldError { error, field, .. }) = err {
                     assert_eq!(field, $field);
                     assert_eq!(error.as_any().downcast_ref::<CommonError>().unwrap(), $err);
                 } else {
@@ -329,23 +281,12 @@ mod tests {
             &CommonError::RequiredFieldMissing
         );
 
-        // Error should be wrapped with the oneof variant name
-        assert_parse_field_err!(
-            Item {
-                oneof: Some(OneofKind::String(String::new())),
-                ..Default::default()
-            },
-            "string",
-            &CommonError::RequiredFieldMissing
-        );
-
         assert_eq!(
             ParsedItem::parse(Item {
                 string: "abc".into(),
                 optional_string: Some("hello".into()),
                 required_string: "world".into(),
                 required_string_optional: Some("world".into()),
-                default_primitive: Some(42),
                 nested: Some(NestedItem {}),
                 optional_nested: Some(NestedItem {}),
                 default_nested: None,
@@ -359,7 +300,6 @@ mod tests {
                 opt_s: Some("hello".into()),
                 required_string: "world".into(),
                 required_string_optional: "world".into(),
-                default_primitive: 42,
                 nested: ParsedNestedItem {},
                 optional_nested: Some(ParsedNestedItem {}),
                 default_nested: ParsedNestedItem {},
@@ -376,7 +316,6 @@ mod tests {
                 opt_s: Some("abc".into()),
                 required_string: "abc".into(),
                 required_string_optional: "abc".into(),
-                default_primitive: 42,
                 nested: ParsedNestedItem {},
                 optional_nested: Some(ParsedNestedItem {}),
                 default_nested: ParsedNestedItem {},
@@ -390,7 +329,6 @@ mod tests {
                 optional_string: Some("abc".into()),
                 required_string: "abc".into(),
                 required_string_optional: Some("abc".into()),
-                default_primitive: Some(42),
                 nested: Some(NestedItem {}),
                 optional_nested: Some(NestedItem {}),
                 default_nested: Some(NestedItem {}),
@@ -438,7 +376,6 @@ mod tests {
         struct Item {
             name: String,
             value: String,
-            optional_value: Option<String>,
         }
 
         impl Default for Item {
@@ -446,7 +383,6 @@ mod tests {
                 Self {
                     name: "a/1/b/1".into(),
                     value: "42".into(),
-                    optional_value: None,
                 }
             }
         }
@@ -458,8 +394,6 @@ mod tests {
             name: (u32, u64),
             #[parse(parse_with = parse_value)]
             value: i32,
-            #[parse(parse_with = parse_value, source_option)]
-            optional_value: Option<i32>,
         }
 
         impl Default for ParsedItem {
@@ -467,7 +401,6 @@ mod tests {
                 Self {
                     name: (1, 1),
                     value: 42,
-                    optional_value: None,
                 }
             }
         }
@@ -513,31 +446,6 @@ mod tests {
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidName { .. }
-            )
-        ));
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                optional_value: Some("42".into()),
-                ..Default::default()
-            })
-            .unwrap(),
-            ParsedItem {
-                optional_value: Some(42),
-                ..Default::default()
-            }
-        );
-        assert!(matches!(
-            ParsedItem::parse(Item {
-                optional_value: Some("x".into()),
-                ..Default::default()
-            })
-            .unwrap_err(),
-            RequestError::Field(FieldError {
-                error,..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::InvalidNumericValue
             )
         ));
     }
@@ -792,66 +700,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_union() {
-        assert_eq!(
-            ParsedValueType::parse(ValueType {
-                kind: Some(ValueTypeKind::Inner(Box::new(ValueType {
-                    kind: Some(ValueTypeKind::Primitive("abc".into()))
-                })))
-            })
-            .unwrap(),
-            ParsedValueType::Inner(Box::new(ParsedValueType::Primitive("abc".into())))
-        );
-        assert_eq!(
-            ValueType::from(ParsedValueType::Inner(Box::new(
-                ParsedValueType::Primitive("abc".into())
-            ))),
-            ValueType {
-                kind: Some(ValueTypeKind::Inner(Box::new(ValueType {
-                    kind: Some(ValueTypeKind::Primitive("abc".into()))
-                })))
-            }
-        );
-        assert!(matches!(
-            ParsedValueType::parse(ValueType { kind: None }).unwrap_err(),
-            RequestError::Field(FieldError {
-                error,field
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::RequiredFieldMissing
-            ) && field == "kind"
-        ));
-        assert_eq!(
-            ParsedValueType::parse(ValueType {
-                kind: Some(ValueTypeKind::Generic(GenericValueType {
-                    parameter: "abc".into()
-                }))
-            })
-            .unwrap(),
-            ParsedValueType::Generic(ParsedGenericValueType {
-                parameter: "abc".into()
-            })
-        );
-        assert_eq!(
-            ValueType::from(ParsedValueType::Generic(ParsedGenericValueType {
-                parameter: "abc".into()
-            })),
-            ValueType {
-                kind: Some(ValueTypeKind::Generic(GenericValueType {
-                    parameter: "abc".into()
-                }))
-            }
-        );
-    }
-
-    #[test]
-    fn parse_vecs() {
+    fn parse_collections() {
         #[derive(Debug, PartialEq, Default)]
         struct Item {
             values: Vec<i32>,
             strings: Vec<String>,
             items: Vec<NestedItem>,
-            value_types: Vec<ValueType>,
+            values_map: BTreeMap<String, i32>,
+            items_map: HashMap<i32, NestedItem>,
             enums: Vec<i32>,
         }
 
@@ -861,19 +717,20 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = Item)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             values: Vec<i32>,
             #[parse(regex = "^[a-z]$")]
             strings: Vec<String>,
             items: Vec<ParsedNestedItem>,
-            value_types: Vec<ParsedValueType>,
+            values_map: BTreeMap<String, i32>,
+            items_map: HashMap<i32, ParsedNestedItem>,
             #[parse(enumeration)]
             enums: Vec<DataTypeEnum>,
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = NestedItem)]
+        #[parse(source = NestedItem, write)]
         struct ParsedNestedItem {
             value: i32,
         }
@@ -883,9 +740,14 @@ mod tests {
                 values: vec![1, 2, 3],
                 strings: vec!["a".into(), "b".into()],
                 items: vec![NestedItem { value: 1 }, NestedItem { value: 2 }],
-                value_types: vec![ValueType {
-                    kind: Some(ValueTypeKind::Primitive("abc".into()))
-                }],
+                values_map: btree_map_into! {
+                    "a" => 1,
+                    "b" => 2,
+                },
+                items_map: hash_map_into! {
+                    1 => NestedItem { value: 1 },
+                    2 => NestedItem { value: 2 },
+                },
                 enums: vec![1],
             })
             .unwrap(),
@@ -893,7 +755,14 @@ mod tests {
                 values: vec![1, 2, 3],
                 strings: vec!["a".into(), "b".into()],
                 items: vec![ParsedNestedItem { value: 1 }, ParsedNestedItem { value: 2 }],
-                value_types: vec![ParsedValueType::Primitive("abc".into())],
+                values_map: btree_map_into! {
+                    "a" => 1,
+                    "b" => 2,
+                },
+                items_map: hash_map_into! {
+                    1 => ParsedNestedItem { value: 1 },
+                    2 => ParsedNestedItem { value: 2 },
+                },
                 enums: vec![DataTypeEnum::String],
             }
         );
@@ -903,7 +772,7 @@ mod tests {
                 ..Default::default()
             }).unwrap_err(),
             RequestError::Field(FieldError {
-                error, field
+                error, field, ..
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidStringFormat { .. }
@@ -915,11 +784,194 @@ mod tests {
             })
             .unwrap_err(),
             RequestError::Field(FieldError {
-                error, field
+                error, field, ..
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidEnumValue
             ) && field == "enums"
         ));
+
+        assert_eq!(
+            Item::from(ParsedItem {
+                values: vec![1, 2, 3],
+                strings: vec!["a".into(), "b".into()],
+                items: vec![ParsedNestedItem { value: 1 }, ParsedNestedItem { value: 2 }],
+                values_map: btree_map_into! {
+                    "a" => 1,
+                    "b" => 2,
+                },
+                items_map: hash_map_into! {
+                    1 => ParsedNestedItem { value: 1 },
+                    2 => ParsedNestedItem { value: 2 },
+                },
+                enums: vec![DataTypeEnum::String],
+            }),
+            Item {
+                values: vec![1, 2, 3],
+                strings: vec!["a".into(), "b".into()],
+                items: vec![NestedItem { value: 1 }, NestedItem { value: 2 }],
+                values_map: btree_map_into! {
+                    "a" => 1,
+                    "b" => 2,
+                },
+                items_map: hash_map_into! {
+                    1 => NestedItem { value: 1 },
+                    2 => NestedItem { value: 2 },
+                },
+                enums: vec![1],
+            }
+        );
+    }
+
+    #[test]
+    fn parse_boxes() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            value: Box<i32>,
+            item: Option<Box<NestedItem>>,
+            unboxed_item: Option<Box<NestedItem>>,
+            optional_item: Option<Box<NestedItem>>,
+        }
+
+        #[derive(Debug, PartialEq, Default)]
+        struct NestedItem {
+            value: i32,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            value: Box<i32>,
+            item: Box<ParsedNestedItem>,
+            #[parse(source_box)]
+            unboxed_item: ParsedNestedItem,
+            optional_item: Option<Box<ParsedNestedItem>>,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = NestedItem, write)]
+        struct ParsedNestedItem {
+            value: i32,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                value: Box::new(42),
+                item: Some(Box::new(NestedItem { value: 42 })),
+                unboxed_item: Some(Box::new(NestedItem { value: 42 })),
+                optional_item: Some(Box::new(NestedItem { value: 42 })),
+            })
+            .unwrap(),
+            ParsedItem {
+                value: Box::new(42),
+                item: Box::new(ParsedNestedItem { value: 42 }),
+                unboxed_item: ParsedNestedItem { value: 42 },
+                optional_item: Some(Box::new(ParsedNestedItem { value: 42 })),
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                value: Box::new(42),
+                item: Box::new(ParsedNestedItem { value: 42 }),
+                unboxed_item: ParsedNestedItem { value: 42 },
+                optional_item: Some(Box::new(ParsedNestedItem { value: 42 })),
+            }),
+            Item {
+                value: Box::new(42),
+                item: Some(Box::new(NestedItem { value: 42 })),
+                unboxed_item: Some(Box::new(NestedItem { value: 42 })),
+                optional_item: Some(Box::new(NestedItem { value: 42 })),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_tagged_union() {
+        #[derive(Debug, Clone, PartialEq)]
+        struct Value {
+            kind: Option<ValueKind>,
+        }
+
+        #[derive(Debug, Clone, PartialEq)]
+        enum ValueKind {
+            Number(i32),
+            Inner(Box<Value>),
+            Nested(NestedValue),
+        }
+
+        #[derive(Debug, Clone, Default, PartialEq)]
+        struct NestedValue {
+            value: i32,
+        }
+
+        impl ValueKind {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::Number(_) => "number",
+                    Self::Inner(_) => "inner",
+                    Self::Nested(_) => "nested",
+                }
+            }
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
+        enum ParsedValue {
+            Number(i32),
+            Inner(Box<ParsedValue>),
+            Nested(ParsedNestedValue),
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = NestedValue, write)]
+        struct ParsedNestedValue {
+            value: i32,
+        }
+
+        assert_eq!(
+            ParsedValue::parse(Value {
+                kind: Some(ValueKind::Number(42)),
+            })
+            .unwrap(),
+            ParsedValue::Number(42)
+        );
+        assert_eq!(
+            Value::from(ParsedValue::Number(42)),
+            Value {
+                kind: Some(ValueKind::Number(42)),
+            }
+        );
+
+        assert_eq!(
+            ParsedValue::parse(Value {
+                kind: Some(ValueKind::Inner(Box::new(Value {
+                    kind: Some(ValueKind::Number(42)),
+                }))),
+            })
+            .unwrap(),
+            ParsedValue::Inner(Box::new(ParsedValue::Number(42)))
+        );
+        assert_eq!(
+            Value::from(ParsedValue::Inner(Box::new(ParsedValue::Number(42)))),
+            Value {
+                kind: Some(ValueKind::Inner(Box::new(Value {
+                    kind: Some(ValueKind::Number(42)),
+                }))),
+            }
+        );
+
+        assert_eq!(
+            ParsedValue::parse(Value {
+                kind: Some(ValueKind::Nested(NestedValue { value: 42 })),
+            })
+            .unwrap(),
+            ParsedValue::Nested(ParsedNestedValue { value: 42 })
+        );
+        assert_eq!(
+            Value::from(ParsedValue::Nested(ParsedNestedValue { value: 42 })),
+            Value {
+                kind: Some(ValueKind::Nested(NestedValue { value: 42 })),
+            }
+        );
     }
 }

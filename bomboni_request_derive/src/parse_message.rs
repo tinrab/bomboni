@@ -100,7 +100,9 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         is_option,
         is_nested,
         is_string,
+        is_box,
         is_vec,
+        map_ident,
         ..
     } = get_proto_type_info(&field.ty);
 
@@ -125,17 +127,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         ));
     }
 
-    let mut result = quote! {
-        let target = source.#source_ident;
-    };
-
-    let default_expr = if let Some(default) = field.default.as_ref() {
-        quote! { #default }
-    } else {
-        quote! { Default::default() }
-    };
-
-    if field.with.is_some() || field.parse_with.is_some() {
+    let parse_source = if field.with.is_some() || field.parse_with.is_some() {
         let parse_with = if let Some(with) = field.with.as_ref() {
             quote! {
                 #with::parse
@@ -143,192 +135,135 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         } else {
             field.parse_with.as_ref().unwrap().to_token_stream()
         };
-        if is_option {
-            if field.source_option {
-                result.extend(quote! {
-                    let target = if let Some(target) = target {
-                        Some(
-                            #parse_with(target)
-                                .map_err(|err: RequestError| err.wrap(#field_name))?
-                        )
-                    } else {
-                        None
-                    };
-                });
-            } else {
-                result.extend(quote! {
-                    let target = Some(
-                        #parse_with(target)
-                            .map_err(|err: RequestError| err.wrap(#field_name))?
-                    );
-                });
-            }
-        } else {
-            if field.source_option {
-                result.extend(quote! {
-                    let target = target.unwrap_or_else(|| #default_expr);
-                });
-            }
-            result.extend(quote! {
-                let target = #parse_with(target)
-                    .map_err(|err: RequestError| err.wrap(#field_name))?;
-            });
+        quote! {
+            let target = #parse_with(target)
+                .map_err(|err: RequestError| err.wrap(#field_name))?;
         }
     } else if is_vec {
-        // Fill with default values
-        if field.default.is_some() {
-            result.extend(quote! {
-                let target = if target.is_empty () {
-                    #default_expr
-                } else { target };
+        let mut parse_source = quote!();
+        let mut parse_item = quote!();
+        if let Some(regex) = field.regex.as_ref() {
+            parse_source.extend(quote! {
+                static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
+                let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
             });
-        }
-        if is_string {
-            if let Some(regex) = field.regex.as_ref() {
-                result.extend(quote! {
-                    static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
-                    let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
-                    let mut v = Vec::new();
-                    for s in target.into_iter() {
-                        if !re.is_match(&s) {
-                            // TODO: add element index?
-                            return Err(RequestError::field(
-                                #field_name,
-                                CommonError::InvalidStringFormat {
-                                    expected: #regex.into(),
-                                },
-                            ));
-                        }
-                        v.push(s);
-                    }
-                    let target = v;
-                });
-            }
-        } else if field.enumeration {
-            result.extend(quote! {
-                let mut v = Vec::new();
-                for e in target.into_iter() {
-                    v.push(
-                        e.try_into()
-                        .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?
-                    );
+            parse_item.extend(quote! {
+                if !re.is_match(&target) {
+                    return Err(RequestError::field_index(
+                        #field_name,
+                        i,
+                        CommonError::InvalidStringFormat {
+                            expected: #regex.into(),
+                        },
+                    ));
                 }
-                let target = v;
+            });
+        } else if field.enumeration {
+            parse_item.extend(quote! {
+                let target = target.try_into()
+                    .map_err(|_| RequestError::field_index(#field_name, i, CommonError::InvalidEnumValue))?;
             });
         } else if is_nested {
-            result.extend(quote! {
-                let mut v = Vec::new();
-                for e in target.into_iter() {
-                    v.push(
-                        e.parse_into()
-                        .map_err(|err: RequestError| err.wrap(#field_name))?
-                    );
+            parse_item.extend(quote! {
+                let target = target.parse_into()
+                    .map_err(|err: RequestError| err.wrap_index(#field_name, i))?;
+            });
+        }
+        quote! {
+            #parse_source
+            let mut v = Vec::new();
+            for (i, target) in target.into_iter().enumerate() {
+                #parse_item
+                v.push(target);
+            }
+            let target = v;
+        }
+    } else if let Some(map_ident) = map_ident.as_ref() {
+        let mut parse_source = quote!();
+        let mut parse_item = quote!();
+        if let Some(regex) = field.regex.as_ref() {
+            parse_source.extend(quote! {
+                static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
+                let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
+            });
+            parse_item.extend(quote! {
+                if !re.is_match(&target) {
+                    return Err(RequestError::field(
+                        #field_name,
+                        CommonError::InvalidStringFormat {
+                            expected: #regex.into(),
+                        },
+                    ));
                 }
-                let target = v;
             });
-        }
-    } else if field.enumeration {
-        if field.source_option {
-            result.extend(quote! {
-                let target = target.unwrap_or_else(|| #default_expr);
-            });
-        }
-        // Assume that missing enum value is represented by `0`
-        if is_option {
-            result.extend(quote! {
-                let target = if target == 0 {
-                    None
-                } else {
-                    Some(
-                        target.try_into()
-                        .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?
-                    )
-                };
-            });
-        } else if field.default.is_some() {
-            result.extend(quote! {
+        } else if field.enumeration {
+            parse_item.extend(quote! {
                 let target = target.try_into()
                     .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?;
             });
-        } else {
-            result.extend(quote! {
-                if target == 0 {
-                    return Err(RequestError::field(
-                        #field_name,
-                        CommonError::RequiredFieldMissing,
-                    ));
-                }
-                let target = target
-                    .try_into()
-                    .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?;
+        } else if is_nested {
+            parse_item.extend(quote! {
+                let target = target.parse_into()
+                    .map_err(|err: RequestError| err.wrap(#field_name))?;
             });
+        }
+        // TODO: add map key to RequestError?
+        quote! {
+            #parse_source
+            let mut m = #map_ident::new();
+            for (k, target) in target.into_iter() {
+                #parse_item
+                m.insert(k, target);
+            }
+            let target = m;
+        }
+    } else if field.enumeration {
+        quote! {
+            if target == 0 {
+                return Err(RequestError::field(
+                    #field_name,
+                    CommonError::RequiredFieldMissing,
+                ));
+            }
+            let target = target.try_into()
+                .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?;
         }
     } else if field.oneof {
-        if is_option {
-            result.extend(quote! {
-                let target = if let Some(target) = target {
-                    Some(target.parse_into()?)
-                } else {
-                    None
-                };
-            });
-        } else if field.default.is_some() {
-            result.extend(quote! {
-                let target = target.unwrap_or_else(|| #default_expr).parse_into()?;
-            });
+        let parse_source = if is_box || field.source_box {
+            quote! {
+                let target = *target;
+            }
         } else {
-            result.extend(quote! {
-                let target = target
-                .ok_or_else(|| {
-                    RequestError::field(
-                        #field_name,
-                        CommonError::RequiredFieldMissing,
-                    )
-                })?;
-                let target = target.parse_into()?;
-            });
+            quote!()
+        };
+        quote! {
+            #parse_source
+            let target = target.parse_into()?;
         }
     } else if is_nested {
-        // Source field for nested messages is always wrapped in `Option`
-        if is_option {
-            result.extend(quote! {
-                let target = if let Some(target) = target {
-                    Some(
-                        target.parse_into()
-                            .map_err(|err: RequestError| err.wrap(#field_name))?
-                    )
-                } else {
-                    None
-                };
-            });
-        } else if field.default.is_some() {
-            result.extend(quote! {
-                let target = target
-                .unwrap_or_else(|| #default_expr)
-                .parse_into()
-                .map_err(|err: RequestError| err.wrap(#field_name))?;
-            });
+        let parse_source = if is_box || field.source_box {
+            quote! {
+                let target = *target;
+            }
         } else {
-            result.extend(quote! {
-                let target = target
-                .ok_or_else(|| {
-                    RequestError::field(
-                        #field_name,
-                        CommonError::RequiredFieldMissing,
-                    )
-                })?
-                .parse_into()
+            quote!()
+        };
+        quote! {
+            #parse_source
+            let target = target.parse_into()
                 .map_err(|err: RequestError| err.wrap(#field_name))?;
-            });
         }
     } else if is_string {
-        if field.source_option {
-            result.extend(quote! {
-                let target = target.unwrap_or_else(|| #default_expr);
-            });
-        }
+        let mut parse_source = quote! {
+            if target.is_empty() {
+                return Err(RequestError::field(
+                    #field_name,
+                    CommonError::RequiredFieldMissing,
+                ));
+            }
+        };
         if let Some(regex) = field.regex.as_ref() {
-            result.extend(quote! {{
+            parse_source.extend(quote! {{
                 static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
                 let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
                 if !re.is_match(&target) {
@@ -341,42 +276,124 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
                 }
             }});
         }
-        // Treat empty string as `None`
-        if is_option {
-            result.extend(quote! {
-                let target = if target.is_empty() {
-                    None
-                } else {
-                    Some(target)
-                };
-            });
+        parse_source
+    } else if is_box || field.source_box {
+        quote! {
+            let target = *target;
+        }
+    } else {
+        quote!()
+    };
+
+    let mut parse = quote! {
+        let target = source.#source_ident;
+    };
+
+    let default_expr = if let Some(default) = field.default.as_ref() {
+        quote! { #default }
+    } else {
+        quote! { Default::default() }
+    };
+
+    // Source field for nested messages is always wrapped in `Option`
+    let source_option = field.source_option
+        || (is_nested
+            && (field.with.is_none() && field.parse_with.is_none())
+            && !is_vec
+            && map_ident.is_none()
+            && !field.enumeration);
+
+    if is_option {
+        if source_option {
+            if is_vec || is_string {
+                parse.extend(quote! {
+                    let target = if let Some(target) = target.filter(|target| !target.is_empty()) {
+                        #parse_source
+                        Some(target)
+                    } else {
+                        None
+                    };
+                });
+            } else if field.enumeration {
+                parse.extend(quote! {
+                    let target = if let Some(target) = target.filter(|e| *e != 0) {
+                        #parse_source
+                        Some(target)
+                    } else {
+                        None
+                    };
+                });
+            } else {
+                parse.extend(quote! {
+                    let target = if let Some(target) = target {
+                        #parse_source
+                        Some(target)
+                    } else {
+                        None
+                    };
+                });
+            }
         } else {
-            result.extend(quote! {
-                if target.is_empty() {
-                    return Err(RequestError::field(
-                        #field_name,
-                        CommonError::RequiredFieldMissing,
-                    ));
+            parse.extend(if is_vec || is_string {
+                quote! {
+                    let target = if target.is_empty() {
+                        None
+                    } else {
+                        #parse_source
+                        Some(target)
+                    };
+                }
+            } else if !is_vec && field.enumeration {
+                quote! {
+                    let target = if target == 0 {
+                        None
+                    } else {
+                        #parse_source
+                        Some(target)
+                    };
+                }
+            } else {
+                quote! {
+                    #parse_source
+                    let target = Some(target);
                 }
             });
         }
     } else {
-        // Parse primitive
-        if field.source_option {
-            result.extend(quote! {
-                let target = target.unwrap_or_else(|| #default_expr);
-            });
+        if source_option {
+            if field.default.is_some() {
+                parse.extend(quote! {
+                    let target = target.unwrap_or_else(|| #default_expr);
+                });
+            } else {
+                parse.extend(quote! {
+                    let target = target.ok_or_else(|| {
+                        RequestError::field(
+                            #field_name,
+                            CommonError::RequiredFieldMissing,
+                        )
+                    })?;
+                });
+            }
         }
+        parse.extend(parse_source);
+    }
+
+    if is_box {
         if is_option {
-            result.extend(quote! {
-                let target = Some(target);
+            parse.extend(quote! {
+                let target = target.map(Box::new);
+            });
+        } else {
+            parse.extend(quote! {
+                let target = Box::new(target);
             });
         }
     }
 
     Ok(quote! {
         #target_ident: {
-            #result
+            #parse
             target
         },
     })
@@ -498,69 +515,155 @@ fn expand_write(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {
 }
 
 fn expand_write_field(field: &ParseField) -> TokenStream {
-    let source_ident = field.ident.as_ref().unwrap();
-
-    let ProtoTypeInfo {
-        is_option,
-        is_nested,
-        is_string,
-        ..
-    } = get_proto_type_info(&field.ty);
-
-    let mut result = quote! {
-        let target = value.#source_ident;
-    };
-
-    if let Some(with) = field.with.as_ref() {
-        result.extend(quote! {
-            let target = #with::write(target);
-        });
-    } else if let Some(write_with) = field.write_with.as_ref() {
-        result.extend(quote! {
-            let target = #write_with(target);
-        });
-    } else if field.enumeration {
-        result.extend(quote! {
-            let target = target as i32;
-        });
-    } else if field.oneof {
-        if !is_option {
-            result.extend(quote! {
-                let target = Some(target.into());
-            });
-        }
-    } else if is_nested {
-        if is_option {
-            result.extend(quote! {
-                let target = target.map(Into::into);
-            });
-        } else {
-            result.extend(quote! {
-                let target = Some(target.into());
-            });
-        }
-    } else if is_string {
-        if !is_option && field.source_option {
-            result.extend(quote! {
-                let target = Some(target);
-            });
-        }
-    } else if !is_option && field.source_option {
-        result.extend(quote! {
-            let target = Some(target);
-        });
-    }
-
+    let target_ident = field.ident.as_ref().unwrap();
     let source_ident = if let Some(name) = field.source_name.as_ref() {
         Ident::from_string(name).unwrap()
     } else {
         field.ident.clone().unwrap()
     };
 
+    let ProtoTypeInfo {
+        is_option,
+        is_nested,
+        is_vec,
+        is_box,
+        map_ident,
+        ..
+    } = get_proto_type_info(&field.ty);
+
+    let write_target = if field.with.is_some() || field.write_with.is_some() {
+        let write_with = if let Some(with) = field.with.as_ref() {
+            quote! {
+                #with::write
+            }
+        } else {
+            field.write_with.as_ref().unwrap().to_token_stream()
+        };
+        quote! {
+            let source = #write_with(source);
+        }
+    } else if is_vec {
+        let mut write_item = quote!();
+        if field.enumeration {
+            write_item.extend(quote! {
+                let source = source as i32;
+            });
+        } else if is_nested {
+            write_item.extend(quote! {
+                let source = source.into();
+            });
+        }
+        quote! {
+            let mut v = Vec::new();
+            for source in source.into_iter() {
+                #write_item
+                v.push(source);
+            }
+            let source = v;
+        }
+    } else if let Some(map_ident) = map_ident.as_ref() {
+        let mut write_item = quote!();
+        if field.enumeration {
+            write_item.extend(quote! {
+                let source = source as i32;
+            });
+        } else if is_nested {
+            write_item.extend(quote! {
+                let source = source.into();
+            });
+        }
+        quote! {
+            let mut m = #map_ident::new();
+            for (k, source) in source.into_iter() {
+                #write_item
+                m.insert(k, source);
+            }
+            let source = m;
+        }
+    } else if field.enumeration {
+        quote! {
+            let source = source as i32;
+        }
+    } else if field.oneof || is_nested {
+        let write_target = if is_box {
+            quote! {
+                let source = *source;
+            }
+        } else {
+            quote!()
+        };
+        quote! {
+            #write_target
+            let source = source.into();
+        }
+    } else if is_box {
+        quote! {
+            let source = *source;
+        }
+    } else {
+        quote!()
+    };
+
+    let mut write = quote! {
+        let source = value.#target_ident;
+    };
+
+    let default_expr = if let Some(default) = field.default.as_ref() {
+        quote! { #default }
+    } else {
+        quote! { Default::default() }
+    };
+
+    let source_option = field.source_option
+        || (is_nested
+            && (field.with.is_none() && field.parse_with.is_none())
+            && !is_vec
+            && map_ident.is_none()
+            && !field.enumeration);
+
+    if is_option {
+        write.extend(if source_option {
+            quote! {
+                let source = if let Some(source) = source {
+                    #write_target
+                    Some(source)
+                } else {
+                    None
+                };
+            }
+        } else {
+            quote! {
+                let source = source.unwrap_or_else(|| #default_expr);
+                #write_target
+            }
+        });
+    } else {
+        write.extend(if source_option {
+            quote! {
+                #write_target
+                let source = Some(source);
+            }
+        } else {
+            write_target
+        });
+    }
+
+    if is_box || field.source_box {
+        if source_option {
+            write.extend(quote! {
+                let source = source.map(Box::new);
+            });
+        } else {
+            write.extend(quote! {
+                let source = Box::new(source);
+            });
+        }
+    }
+
     quote! {
         #source_ident: {
-            #result
-            target
+            #write
+            source
         },
     }
 }

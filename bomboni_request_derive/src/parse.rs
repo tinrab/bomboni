@@ -40,9 +40,12 @@ pub struct ParseField {
     /// Skip parsing field.
     #[darling(default)]
     pub skip: bool,
-    /// True if the source field is an `Option` type.
+    /// True if the source field should unwrapped from a `Option` type.
     #[darling(default)]
     pub source_option: bool,
+    /// True if the source field should be dereferenced from a `Box` type.
+    #[darling(default)]
+    pub source_box: bool,
     /// Parses enum value from `i32`.
     #[darling(default)]
     pub enumeration: bool,
@@ -86,6 +89,18 @@ pub struct ParseVariant {
     /// Skip parsing variant.
     #[darling(default)]
     pub skip: bool,
+    /// True if the source variant should unwrapped from a `Option` type.
+    #[darling(default)]
+    pub source_option: bool,
+    /// True if the source variant should be dereferenced from a `Box` type.
+    #[darling(default)]
+    pub source_box: bool,
+    /// Parses enum value from `i32`.
+    #[darling(default)]
+    pub enumeration: bool,
+    /// Custom expression that returns the default value.
+    #[darling(with = parse_expr::parse_str_literal, map = Some)]
+    pub default: Option<Expr>,
     /// String value will be checked against this regex.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,

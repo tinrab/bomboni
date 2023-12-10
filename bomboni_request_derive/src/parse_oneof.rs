@@ -10,7 +10,7 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<
         (
             expand_parse_tagged_union(options, variants, tagged_union)?,
             if options.write {
-                expand_write_tagged_union(options, variants, tagged_union)?
+                expand_write_tagged_union(options, variants, tagged_union)
             } else {
                 quote!()
             },
@@ -19,7 +19,7 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<
         (
             expand_parse(options, variants)?,
             if options.write {
-                expand_write(options, variants)?
+                expand_write(options, variants)
             } else {
                 quote!()
             },
@@ -144,13 +144,6 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         ));
     }
 
-    if let Some(with) = variant.with.as_ref() {
-        return Ok(quote! {
-            let target = #with(source).map_err(|err: RequestError| err.wrap(variant_name))?;
-            target
-        });
-    }
-
     let variant_type = variant.fields.iter().next().unwrap();
     let ProtoTypeInfo {
         is_option,
@@ -159,16 +152,6 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         is_box,
         ..
     } = get_proto_type_info(variant_type);
-
-    let mut result = quote! {
-        let target = source;
-    };
-
-    if is_box {
-        result.extend(quote! {
-            let target = *target;
-        });
-    }
 
     if (variant.with.is_some() || variant.parse_with.is_some()) && variant.regex.is_some() {
         return Err(syn::Error::new_spanned(
@@ -189,30 +172,39 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         ));
     }
 
-    if variant.with.is_some() || variant.parse_with.is_some() {
+    let parse_source = if variant.with.is_some() || variant.parse_with.is_some() {
         let parse_with = if let Some(with) = variant.with.as_ref() {
             quote! {
-                #with::parse(target)
+                #with::parse
             }
         } else {
             variant.parse_with.as_ref().unwrap().to_token_stream()
         };
-
-        result.extend(quote! {
-            let target = #parse_with(target).map_err(|err: RequestError| err.wrap(variant_name))?;
-        });
-        if is_option {
-            result.extend(quote! {
-                let target = Some(target);
-            });
+        quote! {
+            let target = #parse_with(target)
+                .map_err(|err: RequestError| err.wrap(variant_name))?;
+        }
+    } else if variant.enumeration {
+        quote! {
+            let target = target.try_into()
+                .map_err(|_| RequestError::field(variant_name, CommonError::InvalidEnumValue))?;
         }
     } else if is_nested {
-        result.extend(quote! {
-            let target = target.parse_into().map_err(|err: RequestError| err.wrap(variant_name))?;
-        });
+        let parse_source = if is_box || variant.source_box {
+            quote! {
+                let target = *target;
+            }
+        } else {
+            quote!()
+        };
+        quote! {
+            #parse_source
+            let target = target.parse_into()
+                .map_err(|err: RequestError| err.wrap(variant_name))?;
+        }
     } else if is_string {
         if let Some(regex) = variant.regex.as_ref() {
-            result.extend(quote! {{
+            quote! {
                 static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
                 let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
                 if !re.is_match(&target) {
@@ -223,48 +215,123 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
                         },
                     ));
                 }
-            }});
-        }
-        if is_option {
-            result.extend(quote! {
-                let target = if target.is_empty() {
-                    None
-                } else {
-                    Some(target)
-                };
-            });
+            }
         } else {
-            result.extend(quote! {
-                if target.is_empty() {
-                    return Err(RequestError::field(
-                        variant_name,
-                        CommonError::RequiredFieldMissing,
-                    ));
+            quote!()
+        }
+    } else if is_box || variant.source_box {
+        quote! {
+            let target = *target;
+        }
+    } else {
+        quote!()
+    };
+
+    let mut parse = quote! {
+        let target = source;
+    };
+
+    let default_expr = if let Some(default) = variant.default.as_ref() {
+        quote! { #default }
+    } else {
+        quote! { Default::default() }
+    };
+
+    if is_option {
+        if variant.source_option {
+            if is_string {
+                parse.extend(quote! {
+                    let target = if let Some(target) = target.filter(|target| !target.is_empty()) {
+                        #parse_source
+                        Some(target)
+                    } else {
+                        None
+                    };
+                });
+            } else if variant.enumeration {
+                parse.extend(quote! {
+                    let target = if let Some(target) = target.filter(|e| *e != 0) {
+                        #parse_source
+                        Some(target)
+                    } else {
+                        None
+                    };
+                });
+            } else {
+                parse.extend(quote! {
+                    let target = if let Some(target) = target {
+                        #parse_source
+                        Some(target)
+                    } else {
+                        None
+                    };
+                });
+            }
+        } else {
+            parse.extend(if is_string {
+                quote! {
+                    let target = if target.is_empty() {
+                        None
+                    } else {
+                        #parse_source
+                        Some(target)
+                    };
+                }
+            } else if variant.enumeration {
+                quote! {
+                    let target = if target == 0 {
+                        None
+                    } else {
+                        #parse_source
+                        Some(target)
+                    };
+                }
+            } else {
+                quote! {
+                    #parse_source
+                    let target = Some(target);
                 }
             });
         }
     } else {
-        // Parse primitive
+        if variant.source_option {
+            if variant.default.is_some() {
+                parse.extend(quote! {
+                    let target = target.unwrap_or_else(|| #default_expr);
+                });
+            } else {
+                parse.extend(quote! {
+                    let target = target.ok_or_else(|| {
+                        RequestError::field(
+                            variant_name,
+                            CommonError::RequiredFieldMissing,
+                        )
+                    })?;
+                });
+            }
+        }
+        parse.extend(parse_source);
+    }
+
+    if is_box {
         if is_option {
-            result.extend(quote! {
-                let target = Some(target);
+            parse.extend(quote! {
+                let target = target.map(Box::new);
+            });
+        } else {
+            parse.extend(quote! {
+                let target = Box::new(target);
             });
         }
     }
 
-    if is_box {
-        result.extend(quote! {
-            let target = Box::new(target);
-        });
-    }
-
     Ok(quote! {
-        #result
+        #parse
         target
     })
 }
 
-fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
+fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
     let source = &options.source;
     let ident = &options.ident;
 
@@ -288,9 +355,9 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
                 #ident::#target_variant_ident => #source::#source_variant_ident(Default::default()),
             });
         } else {
-            let write_variant = expand_write_variant(variant)?;
+            let write_variant = expand_write_variant(variant);
             write_variants.extend(quote! {
-                #ident::#target_variant_ident(source) => {
+                #ident::#target_variant_ident(value) => {
                     #source::#source_variant_ident({
                         #write_variant
                     })
@@ -299,7 +366,7 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
         }
     }
 
-    Ok(quote! {
+    quote! {
         impl From<#ident> for #source {
             fn from(value: #ident) -> Self {
                 match value {
@@ -308,14 +375,14 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
                 }
             }
         }
-    })
+    }
 }
 
 fn expand_write_tagged_union(
     options: &ParseOptions,
     variants: &[ParseVariant],
     tagged_union: &ParseTaggedUnion,
-) -> syn::Result<TokenStream> {
+) -> TokenStream {
     let source = &options.source;
     let ident = &options.ident;
     let oneof_ident = &tagged_union.oneof;
@@ -340,9 +407,9 @@ fn expand_write_tagged_union(
                 #ident::#target_variant_ident => #oneof_ident::#source_variant_ident(Default::default()),
             });
         } else {
-            let write_variant = expand_write_variant(variant)?;
+            let write_variant = expand_write_variant(variant);
             write_variants.extend(quote! {
-                #ident::#target_variant_ident(source) => {
+                #ident::#target_variant_ident(value) => {
                     #oneof_ident::#source_variant_ident({
                         #write_variant
                     })
@@ -351,7 +418,7 @@ fn expand_write_tagged_union(
         }
     }
 
-    Ok(quote! {
+    quote! {
         impl From<#ident> for #source {
             fn from(value: #ident) -> Self {
                 #source {
@@ -362,10 +429,10 @@ fn expand_write_tagged_union(
                 }
             }
         }
-    })
+    }
 }
 
-fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
+fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
     let variant_type = variant.fields.iter().next().unwrap();
     let ProtoTypeInfo {
         is_option,
@@ -373,45 +440,93 @@ fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         is_box,
         ..
     } = get_proto_type_info(variant_type);
-    if is_option {
-        return Err(syn::Error::new_spanned(
-            &variant.ident,
-            "oneof variants cannot be optional",
-        ));
-    }
 
-    let mut result = quote! {
-        let target = source;
+    let write_target = if variant.with.is_some() || variant.write_with.is_some() {
+        let write_with = if let Some(with) = variant.with.as_ref() {
+            quote! {
+                #with::write
+            }
+        } else {
+            variant.write_with.as_ref().unwrap().to_token_stream()
+        };
+        quote! {
+            let source = #write_with(source);
+        }
+    } else if variant.enumeration {
+        quote! {
+            let source = source as i32;
+        }
+    } else if is_nested {
+        let write_target = if is_box {
+            quote! {
+                let source = *source;
+            }
+        } else {
+            quote!()
+        };
+        quote! {
+            #write_target
+            let source = source.into();
+        }
+    } else if is_box {
+        quote! {
+            let source = *source;
+        }
+    } else {
+        quote!()
     };
 
-    if is_box {
-        result.extend(quote! {
-            let target = *target;
+    let mut write = quote! {
+        let source = value;
+    };
+
+    let default_expr = if let Some(default) = variant.default.as_ref() {
+        quote! { #default }
+    } else {
+        quote! { Default::default() }
+    };
+
+    if is_option {
+        write.extend(if variant.source_option {
+            quote! {
+                let source = if let Some(source) = source {
+                    #write_target
+                    Some(source)
+                } else {
+                    None
+                };
+            }
+        } else {
+            quote! {
+                let source = source.unwrap_or_else(|| #default_expr);
+                #write_target
+            }
+        });
+    } else {
+        write.extend(if variant.source_option {
+            quote! {
+                #write_target
+                let source = Some(source);
+            }
+        } else {
+            write_target
         });
     }
 
-    if let Some(with) = variant.with.as_ref() {
-        result.extend(quote! {
-            let target = #with::write(target);
-        });
-    } else if let Some(write_with) = variant.write_with.as_ref() {
-        result.extend(quote! {
-            let target = #write_with(target);
-        });
-    } else if is_nested {
-        result.extend(quote! {
-            let target = target.into();
-        });
+    if is_box || variant.source_box {
+        if variant.source_option {
+            write.extend(quote! {
+                let source = source.map(Box::new);
+            });
+        } else {
+            write.extend(quote! {
+                let source = Box::new(source);
+            });
+        }
     }
 
-    if is_box {
-        result.extend(quote! {
-            let target = Box::new(target);
-        });
+    quote! {
+        #write
+        source
     }
-
-    Ok(quote! {
-        #result
-        target
-    })
 }

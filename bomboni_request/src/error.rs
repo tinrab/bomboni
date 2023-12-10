@@ -8,6 +8,7 @@ use bomboni_proto::google::rpc::{Code, Status};
 use itertools::Itertools;
 use prost::{DecodeError, EncodeError};
 use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Error, Debug)]
 pub enum RequestError {
@@ -28,11 +29,11 @@ pub enum RequestError {
 
 pub type RequestResult<T> = Result<T, RequestError>;
 
-#[derive(Error, Debug)]
-#[error("field `{field}` error: {error}")]
+#[derive(Debug)]
 pub struct FieldError {
     pub field: String,
     pub error: DomainErrorBox,
+    pub index: Option<usize>,
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
@@ -117,6 +118,7 @@ impl RequestError {
                 .map(|(field, error)| FieldError {
                     field: field.to_string(),
                     error: error.into(),
+                    index: None,
                 })
                 .collect(),
         }
@@ -136,23 +138,21 @@ impl RequestError {
         FieldError {
             field: field.to_string(),
             error: error.into(),
+            index: None,
         }
         .into()
     }
 
     #[must_use]
-    pub fn field_path<P, F, E>(field_path: P, error: E) -> Self
+    pub fn field_index<F, E>(field: F, index: usize, error: E) -> Self
     where
-        P: IntoIterator<Item = F>,
         F: ToString,
         E: Into<DomainErrorBox>,
     {
         FieldError {
-            field: field_path
-                .into_iter()
-                .map(|step| step.to_string())
-                .join("."),
+            field: field.to_string(),
             error: error.into(),
+            index: Some(index),
         }
         .into()
     }
@@ -173,25 +173,17 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_field_path<P, F>(self, field_path: P) -> Self
-    where
-        P: IntoIterator<Item = F>,
-        F: ToString,
-    {
+    pub fn wrap_index(self, root_field: &str, root_index: usize) -> Self {
         match self {
             Self::Field(error) => FieldError {
-                field: format!(
-                    "{}.{}",
-                    field_path
-                        .into_iter()
-                        .map(|step| step.to_string())
-                        .join("."),
-                    error.field
-                ),
+                field: format!("{}[{}].{}", root_field, root_index, error.field),
                 ..error
             }
             .into(),
+            Self::Domain(error) => Self::field_index(root_field, root_index, error),
+            // TODO: skip or panic?
             err => err,
+            // _ => unreachable!(),
         }
     }
 
@@ -302,6 +294,22 @@ impl FieldError {
 
     pub fn details(&self) -> Vec<Any> {
         self.error.details()
+    }
+}
+
+impl Error for FieldError {}
+
+impl Display for FieldError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(index) = self.index {
+            write!(
+                f,
+                "field `{}[{}]` error: `{}`",
+                self.field, index, self.error
+            )
+        } else {
+            write!(f, "field `{}` error: `{}`", self.field, self.error)
+        }
     }
 }
 
