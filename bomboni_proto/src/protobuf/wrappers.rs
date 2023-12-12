@@ -81,99 +81,92 @@ impl_primitive_wrapper!(BoolValue, [bool]);
 impl_primitive_wrapper!(FloatValue, [f32]);
 impl_primitive_wrapper!(DoubleValue, [f32, f64]);
 
-impl FromStr for Int32Value {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(i32::from_str(s)?.into())
-    }
-}
-
-impl FromStr for UInt32Value {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(u32::from_str(s)?.into())
-    }
-}
-
-impl FromStr for Int64Value {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(i64::from_str(s)?.into())
-    }
-}
-
-impl From<isize> for Int64Value {
-    fn from(value: isize) -> Self {
-        Self {
-            value: value as i64,
+macro_rules! impl_size_wrapper {
+    ($type:tt, $as:ty) => {
+        impl From<isize> for $type {
+            fn from(value: isize) -> Self {
+                Self {
+                    value: value as $as,
+                }
+            }
         }
-    }
-}
 
-impl From<&isize> for Int64Value {
-    fn from(value: &isize) -> Self {
-        Self {
-            value: *value as i64,
+        impl From<&isize> for $type {
+            fn from(value: &isize) -> Self {
+                Self {
+                    value: (*value) as $as,
+                }
+            }
         }
-    }
-}
 
-impl From<Int64Value> for isize {
-    fn from(value: Int64Value) -> Self {
-        #![allow(trivial_casts, trivial_numeric_casts)]
-        value.value as Self
-    }
-}
-
-impl FromStr for UInt64Value {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(u64::from_str(s)?.into())
-    }
-}
-
-impl From<usize> for UInt64Value {
-    fn from(value: usize) -> Self {
-        Self {
-            value: value as u64,
+        impl From<$type> for isize {
+            fn from(value: $type) -> Self {
+                #![allow(trivial_casts, trivial_numeric_casts)]
+                value.value as isize
+            }
         }
-    }
-}
 
-impl From<&usize> for UInt64Value {
-    fn from(value: &usize) -> Self {
-        Self {
-            value: *value as u64,
+        impl From<usize> for $type {
+            fn from(value: usize) -> Self {
+                Self {
+                    value: value as $as,
+                }
+            }
         }
-    }
+
+        impl From<&usize> for $type {
+            fn from(value: &usize) -> Self {
+                Self {
+                    value: (*value) as $as,
+                }
+            }
+        }
+
+        impl From<$type> for usize {
+            fn from(value: $type) -> Self {
+                #![allow(trivial_casts, trivial_numeric_casts)]
+                value.value as usize
+            }
+        }
+    };
 }
 
-impl From<UInt64Value> for usize {
-    fn from(value: UInt64Value) -> Self {
-        #![allow(trivial_casts, trivial_numeric_casts)]
-        value.value as Self
-    }
+impl_size_wrapper!(Int32Value, i32);
+impl_size_wrapper!(UInt32Value, u32);
+
+impl_size_wrapper!(Int64Value, i64);
+impl_size_wrapper!(UInt64Value, u64);
+
+macro_rules! impl_int_from_str {
+    ($type:tt, $as:ty) => {
+        impl FromStr for $type {
+            type Err = ParseIntError;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Ok(<$as>::from_str(s)?.into())
+            }
+        }
+    };
+}
+impl_int_from_str!(Int32Value, i32);
+impl_int_from_str!(UInt32Value, u32);
+impl_int_from_str!(Int64Value, i64);
+impl_int_from_str!(UInt64Value, u64);
+
+macro_rules! impl_float_from_str {
+    ($type:tt, $as:ty) => {
+        impl FromStr for $type {
+            type Err = ParseFloatError;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Ok(<$as>::from_str(s)?.into())
+            }
+        }
+    };
 }
 
-impl FromStr for FloatValue {
-    type Err = ParseFloatError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(f32::from_str(s)?.into())
-    }
-}
-
-impl FromStr for DoubleValue {
-    type Err = ParseFloatError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(f64::from_str(s)?.into())
-    }
-}
+impl_float_from_str!(FloatValue, f32);
+impl_float_from_str!(DoubleValue, f64);
 
 macro_rules! impl_value_serde {
     ($type:ty, $as:ty) => {

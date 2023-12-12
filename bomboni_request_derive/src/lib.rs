@@ -1,18 +1,15 @@
 //! # A procedural macro crate for the Bomboni library.
 
-use parse_resource_name::ParseResourceName;
+use parse::{
+    parse_into_map::{self, ParseIntoMap},
+    parse_resource_name::{self, ParseResourceName},
+};
 use proc_macro::TokenStream;
 
 mod parse;
-mod parse_message;
-mod parse_oneof;
 mod utility;
 
-mod parse_into_map;
-mod parse_resource_name;
 use syn::{parse_macro_input, DeriveInput};
-
-use crate::parse_into_map::ParseIntoMap;
 
 /// A procedural macro that generates a function that parses a resource name into a tuple of typed segments.
 /// Resource name format is documented in Google's AIP [1].

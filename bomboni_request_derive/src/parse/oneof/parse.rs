@@ -6,28 +6,10 @@ use crate::parse::{ParseOptions, ParseTaggedUnion, ParseVariant};
 use crate::utility::{get_proto_type_info, ProtoTypeInfo};
 
 pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
-    let (parse, write) = if let Some(tagged_union) = options.tagged_union.as_ref() {
-        (
-            expand_parse_tagged_union(options, variants, tagged_union)?,
-            if options.write {
-                expand_write_tagged_union(options, variants, tagged_union)
-            } else {
-                quote!()
-            },
-        )
+    Ok(if let Some(tagged_union) = options.tagged_union.as_ref() {
+        expand_tagged_union(options, variants, tagged_union)?
     } else {
-        (
-            expand_parse(options, variants)?,
-            if options.write {
-                expand_write(options, variants)
-            } else {
-                quote!()
-            },
-        )
-    };
-    Ok(quote! {
-        #parse
-        #write
+        expand_parse(options, variants)?
     })
 }
 
@@ -75,7 +57,7 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
     })
 }
 
-fn expand_parse_tagged_union(
+fn expand_tagged_union(
     options: &ParseOptions,
     variants: &[ParseVariant],
     tagged_union: &ParseTaggedUnion,
@@ -231,6 +213,27 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         let target = source;
     };
 
+    if variant.wrapper {
+        match variant_type.to_token_stream().to_string().as_str() {
+            "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "isize" | "usize" => {
+                parse.extend(quote! {
+                    let target = target.value as #variant_type;
+                });
+            }
+            "String" | "bool" | "f32" | "f64" => {
+                parse.extend(quote! {
+                    let target = target.value;
+                });
+            }
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    &variant.ident,
+                    "unsupported wrapper type",
+                ));
+            }
+        }
+    }
+
     let default_expr = if let Some(default) = variant.default.as_ref() {
         quote! { #default }
     } else {
@@ -329,204 +332,4 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         #parse
         target
     })
-}
-
-fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
-    let source = &options.source;
-    let ident = &options.ident;
-
-    let mut write_variants = quote!();
-
-    for variant in variants {
-        if variant.skip {
-            continue;
-        }
-
-        let source_variant_ident = if let Some(name) = variant.source_name.as_ref() {
-            Ident::from_string(name).unwrap()
-        } else {
-            variant.ident.clone()
-        };
-        let target_variant_ident = &variant.ident;
-
-        if variant.fields.is_empty() {
-            // Handle unit variants
-            write_variants.extend(quote! {
-                #ident::#target_variant_ident => #source::#source_variant_ident(Default::default()),
-            });
-        } else {
-            let write_variant = expand_write_variant(variant);
-            write_variants.extend(quote! {
-                #ident::#target_variant_ident(value) => {
-                    #source::#source_variant_ident({
-                        #write_variant
-                    })
-                }
-            });
-        }
-    }
-
-    quote! {
-        impl From<#ident> for #source {
-            fn from(value: #ident) -> Self {
-                match value {
-                    #write_variants
-                    _ => panic!("unknown oneof variant"),
-                }
-            }
-        }
-    }
-}
-
-fn expand_write_tagged_union(
-    options: &ParseOptions,
-    variants: &[ParseVariant],
-    tagged_union: &ParseTaggedUnion,
-) -> TokenStream {
-    let source = &options.source;
-    let ident = &options.ident;
-    let oneof_ident = &tagged_union.oneof;
-    let field_ident = &tagged_union.field;
-
-    let mut write_variants = quote!();
-    for variant in variants {
-        if variant.skip {
-            continue;
-        }
-
-        let source_variant_ident = if let Some(name) = variant.source_name.as_ref() {
-            Ident::from_string(name).unwrap()
-        } else {
-            variant.ident.clone()
-        };
-        let target_variant_ident = &variant.ident;
-
-        if variant.fields.is_empty() {
-            // Handle unit variants
-            write_variants.extend(quote! {
-                #ident::#target_variant_ident => #oneof_ident::#source_variant_ident(Default::default()),
-            });
-        } else {
-            let write_variant = expand_write_variant(variant);
-            write_variants.extend(quote! {
-                #ident::#target_variant_ident(value) => {
-                    #oneof_ident::#source_variant_ident({
-                        #write_variant
-                    })
-                }
-            });
-        }
-    }
-
-    quote! {
-        impl From<#ident> for #source {
-            fn from(value: #ident) -> Self {
-                #source {
-                    #field_ident: Some(match value {
-                        #write_variants
-                        _ => panic!("unknown oneof variant"),
-                    }),
-                }
-            }
-        }
-    }
-}
-
-fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
-    let variant_type = variant.fields.iter().next().unwrap();
-    let ProtoTypeInfo {
-        is_option,
-        is_nested,
-        is_box,
-        ..
-    } = get_proto_type_info(variant_type);
-
-    let write_target = if variant.with.is_some() || variant.write_with.is_some() {
-        let write_with = if let Some(with) = variant.with.as_ref() {
-            quote! {
-                #with::write
-            }
-        } else {
-            variant.write_with.as_ref().unwrap().to_token_stream()
-        };
-        quote! {
-            let source = #write_with(source);
-        }
-    } else if variant.enumeration {
-        quote! {
-            let source = source as i32;
-        }
-    } else if is_nested {
-        let write_target = if is_box {
-            quote! {
-                let source = *source;
-            }
-        } else {
-            quote!()
-        };
-        quote! {
-            #write_target
-            let source = source.into();
-        }
-    } else if is_box {
-        quote! {
-            let source = *source;
-        }
-    } else {
-        quote!()
-    };
-
-    let mut write = quote! {
-        let source = value;
-    };
-
-    let default_expr = if let Some(default) = variant.default.as_ref() {
-        quote! { #default }
-    } else {
-        quote! { Default::default() }
-    };
-
-    if is_option {
-        write.extend(if variant.source_option {
-            quote! {
-                let source = if let Some(source) = source {
-                    #write_target
-                    Some(source)
-                } else {
-                    None
-                };
-            }
-        } else {
-            quote! {
-                let source = source.unwrap_or_else(|| #default_expr);
-                #write_target
-            }
-        });
-    } else {
-        write.extend(if variant.source_option {
-            quote! {
-                #write_target
-                let source = Some(source);
-            }
-        } else {
-            write_target
-        });
-    }
-
-    if is_box || variant.source_box {
-        if variant.source_option {
-            write.extend(quote! {
-                let source = source.map(Box::new);
-            });
-        } else {
-            write.extend(quote! {
-                let source = Box::new(source);
-            });
-        }
-    }
-
-    quote! {
-        #write
-        source
-    }
 }

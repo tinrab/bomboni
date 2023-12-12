@@ -42,7 +42,9 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use bomboni_common::{btree_map, btree_map_into, hash_map_into};
-    use bomboni_proto::google::protobuf::Timestamp;
+    use bomboni_proto::google::protobuf::{
+        Int32Value, Int64Value, StringValue, Timestamp, UInt32Value,
+    };
     use bomboni_request_derive::{impl_parse_into_map, parse_resource_name, Parse};
 
     use crate::error::{CommonError, FieldError, RequestError, RequestResult};
@@ -637,6 +639,8 @@ mod tests {
             name: String,
             #[parse(derive = derive_upper_name)]
             upper_name: String,
+            #[parse(derive = (derive_lower_name, name))]
+            lower_name: String,
         }
 
         #[allow(clippy::unnecessary_wraps)]
@@ -649,6 +653,12 @@ mod tests {
             Ok(item.name.to_uppercase())
         }
 
+        #[allow(clippy::unnecessary_wraps)]
+        fn derive_lower_name(name: &str, field_name: &str) -> RequestResult<String> {
+            assert_eq!(field_name, "name");
+            Ok(name.to_lowercase())
+        }
+
         assert_eq!(
             ParsedItem::parse(Item {
                 x: 3,
@@ -659,12 +669,26 @@ mod tests {
             .z,
             8
         );
-
+        assert_eq!(
+            ParsedItem::parse(Item {
+                x: 3,
+                y: 5,
+                name: "Item".into()
+            })
+            .unwrap(),
+            ParsedItem {
+                z: 8,
+                name: "Item".into(),
+                upper_name: "ITEM".into(),
+                lower_name: "item".into(),
+            }
+        );
         assert_eq!(
             Item::from(ParsedItem {
                 z: 8,
                 name: "Item".into(),
-                upper_name: String::new()
+                upper_name: String::new(),
+                lower_name: String::new(),
             }),
             Item {
                 x: 0,
@@ -883,6 +907,50 @@ mod tests {
                 optional_item: Some(Box::new(NestedItem { value: 42 })),
             }
         );
+    }
+
+    #[test]
+    fn variant_wrapper_value() {
+        #[derive(Debug, Clone, PartialEq)]
+        struct Value {
+            kind: Option<ValueKind>,
+        }
+
+        #[derive(Debug, Clone, PartialEq)]
+        enum ValueKind {
+            I32(Int32Value),
+            U16(UInt32Value),
+            String(StringValue),
+            ISize(Int64Value),
+            USize(UInt32Value),
+        }
+
+        impl ValueKind {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::I32(_) => "I32",
+                    Self::U16(_) => "U16",
+                    Self::String(_) => "String",
+                    Self::ISize(_) => "ISize",
+                    Self::USize(_) => "USize",
+                }
+            }
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
+        enum ParsedValue {
+            #[parse(wrapper)]
+            I32(i32),
+            #[parse(wrapper)]
+            U16(u16),
+            #[parse(wrapper)]
+            String(String),
+            #[parse(wrapper)]
+            ISize(isize),
+            #[parse(wrapper)]
+            USize(usize),
+        }
     }
 
     #[test]

@@ -1,9 +1,12 @@
 use darling::util::parse_expr;
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
 use proc_macro2::{Ident, TokenStream};
-use syn::{self, DeriveInput, Expr, ExprArray, Meta, MetaNameValue, Path, Type};
+use syn::{self, DeriveInput, Expr, ExprArray, ExprPath, Meta, MetaNameValue, Path, Type};
 
-use crate::{parse_message, parse_oneof};
+mod message;
+mod oneof;
+pub mod parse_into_map;
+pub mod parse_resource_name;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse))]
@@ -52,6 +55,9 @@ pub struct ParseField {
     /// Parses oneof value.
     #[darling(default)]
     pub oneof: bool,
+    /// Parses Protobuf's well-known wrapper type.
+    #[darling(default)]
+    pub wrapper: bool,
     /// Parse resource fields into this field.
     #[darling(default)]
     pub resource: Option<ResourceOptions>,
@@ -74,9 +80,7 @@ pub struct ParseField {
     #[darling(with = parse_expr::parse_str_literal, map = Some)]
     pub with: Option<Expr>,
     /// Make this field derived.
-    /// The function must have the signature `fn(source: &Source) -> RequestResult<T>`.
-    #[darling(with = parse_expr::parse_str_literal, map = Some)]
-    pub derive: Option<Expr>,
+    pub derive: Option<DeriveOptions>,
 }
 
 #[derive(Debug, FromVariant)]
@@ -98,6 +102,9 @@ pub struct ParseVariant {
     /// Parses enum value from `i32`.
     #[darling(default)]
     pub enumeration: bool,
+    /// Parses Protobuf's well-known wrapper type.
+    #[darling(default)]
+    pub wrapper: bool,
     /// Custom expression that returns the default value.
     #[darling(with = parse_expr::parse_str_literal, map = Some)]
     pub default: Option<Expr>,
@@ -133,6 +140,15 @@ pub struct ResourceFields {
     pub etag: bool,
 }
 
+#[derive(Debug)]
+pub struct DeriveOptions {
+    /// The function must have the signature `fn(source: &Source) -> RequestResult<T>`.
+    pub func: ExprPath,
+    /// Optional field that will be used as the source for the function.
+    /// Field name is passed in as the second argument, e.g. `fn(source: &Source, field_name: &str)`.
+    pub source_field: Option<ExprPath>,
+}
+
 pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let options = match ParseOptions::from_derive_input(&input) {
         Ok(v) => v,
@@ -142,8 +158,42 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     };
 
     match &options.data {
-        ast::Data::Struct(fields) => parse_message::expand(&options, &fields.fields),
-        ast::Data::Enum(variants) => parse_oneof::expand(&options, variants),
+        ast::Data::Struct(fields) => message::expand(&options, &fields.fields),
+        ast::Data::Enum(variants) => oneof::expand(&options, variants),
+    }
+}
+
+impl FromMeta for DeriveOptions {
+    fn from_expr(expr: &Expr) -> darling::Result<Self> {
+        Ok(match expr {
+            Expr::Path(path) => Self {
+                func: path.clone(),
+                source_field: None,
+            },
+            Expr::Tuple(tuple) => {
+                if tuple.elems.len() != 2 {
+                    return Err(darling::Error::custom("expected tuple of size 2").with_span(tuple));
+                }
+                let func = match &tuple.elems[0] {
+                    Expr::Path(path) => path.clone(),
+                    _ => {
+                        return Err(darling::Error::custom("expected function path")
+                            .with_span(&tuple.elems[0]));
+                    }
+                };
+                let source_field = match &tuple.elems[1] {
+                    Expr::Path(path) => Some(path.clone()),
+                    _ => {
+                        return Err(darling::Error::custom("expected field ident")
+                            .with_span(&tuple.elems[1]));
+                    }
+                };
+                Self { func, source_field }
+            }
+            _ => {
+                return Err(darling::Error::custom("expected function path").with_span(expr));
+            }
+        })
     }
 }
 
