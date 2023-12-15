@@ -99,6 +99,9 @@ pub struct ParseVariant {
     /// True if the source variant should be dereferenced from a `Box` type.
     #[darling(default)]
     pub source_box: bool,
+    /// True if the source is an empty unit variant.
+    #[darling(default)]
+    pub source_empty: bool,
     /// Parses enum value from `i32`.
     #[darling(default)]
     pub enumeration: bool,

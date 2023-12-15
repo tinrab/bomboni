@@ -1,9 +1,8 @@
 use darling::FromMeta;
-use itertools::Itertools;
-use proc_macro2::{Ident, Literal, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 
-use crate::parse::{DeriveOptions, ParseField, ParseOptions};
+use crate::parse::{ParseField, ParseOptions};
 use crate::utility::{get_proto_type_info, ProtoTypeInfo};
 
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {

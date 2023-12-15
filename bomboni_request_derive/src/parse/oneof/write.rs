@@ -1,16 +1,16 @@
 use darling::FromMeta;
-use proc_macro2::{Ident, Literal, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 
 use crate::parse::{ParseOptions, ParseTaggedUnion, ParseVariant};
 use crate::utility::{get_proto_type_info, ProtoTypeInfo};
 
-pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
-    Ok(if let Some(tagged_union) = options.tagged_union.as_ref() {
+pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
+    if let Some(tagged_union) = options.tagged_union.as_ref() {
         expand_write_tagged_union(options, variants, tagged_union)
     } else {
         expand_write(options, variants)
-    })
+    }
 }
 
 fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
@@ -32,9 +32,18 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStrea
         let target_variant_ident = &variant.ident;
 
         if variant.fields.is_empty() {
-            // Handle unit variants
-            write_variants.extend(quote! {
-                #ident::#target_variant_ident => #source::#source_variant_ident(Default::default()),
+            write_variants.extend(if variant.source_empty {
+                quote! {
+                    #ident::#target_variant_ident => {
+                        #source::#source_variant_ident
+                    }
+                }
+            } else {
+                quote! {
+                    #ident::#target_variant_ident => {
+                        #source::#source_variant_ident(Default::default())
+                    }
+                }
             });
         } else {
             let write_variant = expand_write_variant(variant);
@@ -84,9 +93,18 @@ fn expand_write_tagged_union(
         let target_variant_ident = &variant.ident;
 
         if variant.fields.is_empty() {
-            // Handle unit variants
-            write_variants.extend(quote! {
-                #ident::#target_variant_ident => #oneof_ident::#source_variant_ident(Default::default()),
+            write_variants.extend(if variant.source_empty {
+                quote! {
+                    #ident::#target_variant_ident => {
+                        #oneof_ident::#source_variant_ident
+                    }
+                }
+            } else {
+                quote! {
+                    #ident::#target_variant_ident => {
+                        #oneof_ident::#source_variant_ident(Default::default())
+                    }
+                }
             });
         } else {
             let write_variant = expand_write_variant(variant);

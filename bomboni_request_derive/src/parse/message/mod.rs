@@ -1,9 +1,6 @@
-use darling::FromMeta;
-use proc_macro2::{Ident, Literal, TokenStream};
-use quote::{quote, ToTokens};
+use proc_macro2::TokenStream;
 
-use crate::parse::{ParseOptions, ParseTaggedUnion, ParseVariant};
-use crate::utility::{get_proto_type_info, ProtoTypeInfo};
+use crate::parse::ParseOptions;
 
 use super::ParseField;
 

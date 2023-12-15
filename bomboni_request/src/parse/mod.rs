@@ -1042,4 +1042,71 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn parse_oneof() {
+        #[derive(Debug, Clone, PartialEq)]
+        enum Item {
+            String(String),
+            Data(Data),
+            Null(()),
+            Empty,
+            Dropped(i32),
+        }
+
+        impl Item {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::String(_) => "string",
+                    Self::Data(_) => "data",
+                    Self::Null(_) => "null",
+                    Self::Empty => "empty",
+                    Self::Dropped(_) => "dropped",
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Default, PartialEq)]
+        struct Data {
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source= Item, write)]
+        enum ParsedItem {
+            String(String),
+            Data(ParsedData),
+            Null(()),
+            #[parse(source_empty)]
+            Empty,
+            Dropped,
+        }
+
+        #[derive(Debug, Clone, Default, PartialEq, Parse)]
+        #[parse(source= Data, write)]
+        struct ParsedData {
+            value: i32,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item::String("abc".into())).unwrap(),
+            ParsedItem::String("abc".into())
+        );
+        assert_eq!(
+            Item::from(ParsedItem::String("abc".into())),
+            Item::String("abc".into())
+        );
+
+        assert_eq!(
+            ParsedItem::parse(Item::Data(Data { value: 42 })).unwrap(),
+            ParsedItem::Data(ParsedData { value: 42 })
+        );
+        assert_eq!(
+            Item::from(ParsedItem::Data(ParsedData { value: 42 })),
+            Item::Data(Data { value: 42 })
+        );
+
+        assert_eq!(ParsedItem::parse(Item::Empty).unwrap(), ParsedItem::Empty);
+        assert_eq!(Item::from(ParsedItem::Empty), Item::Empty);
+    }
 }

@@ -30,14 +30,30 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
         };
         let target_variant_ident = &variant.ident;
 
-        let parse_variant = expand_parse_variant(variant)?;
-        parse_variants.extend(quote! {
-            #source::#source_variant_ident(source) => {
-                #ident::#target_variant_ident({
-                    #parse_variant
-                })
-            }
-        });
+        if variant.fields.is_empty() {
+            parse_variants.extend(if variant.source_empty {
+                quote! {
+                    #source::#source_variant_ident => {
+                        #ident::#target_variant_ident
+                    }
+                }
+            } else {
+                quote! {
+                    #source::#source_variant_ident(_) => {
+                        #ident::#target_variant_ident
+                    }
+                }
+            });
+        } else {
+            let parse_variant = expand_parse_variant(variant)?;
+            parse_variants.extend(quote! {
+                #source::#source_variant_ident(source) => {
+                    #ident::#target_variant_ident({
+                        #parse_variant
+                    })
+                }
+            });
+        }
     }
 
     Ok(quote! {
@@ -82,9 +98,18 @@ fn expand_tagged_union(
         let target_variant_ident = &variant.ident;
 
         if variant.fields.is_empty() {
-            // Handle unit variants
-            parse_variants.extend(quote! {
-                #oneof_ident::#source_variant_ident(_) => #ident::#target_variant_ident,
+            parse_variants.extend(if variant.source_empty {
+                quote! {
+                    #oneof_ident::#source_variant_ident => {
+                        #ident::#target_variant_ident
+                    }
+                }
+            } else {
+                quote! {
+                    #oneof_ident::#source_variant_ident(_) => {
+                        #ident::#target_variant_ident
+                    }
+                }
             });
         } else {
             let parse_variant = expand_parse_variant(variant)?;
@@ -119,6 +144,19 @@ fn expand_tagged_union(
 }
 
 fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
+    if (variant.with.is_some() || variant.parse_with.is_some()) && variant.regex.is_some() {
+        return Err(syn::Error::new_spanned(
+            &variant.ident,
+            "some of these options cannot be used alongside `with`",
+        ));
+    }
+    if variant.with.is_some() && (variant.parse_with.is_some() || variant.write_with.is_some()) {
+        return Err(syn::Error::new_spanned(
+            &variant.ident,
+            "custom `parse_with` and `write_with` functions cannot be used alongside `with`",
+        ));
+    }
+
     if variant.fields.len() != 1 {
         return Err(syn::Error::new_spanned(
             &variant.ident,
@@ -135,22 +173,10 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         ..
     } = get_proto_type_info(variant_type);
 
-    if (variant.with.is_some() || variant.parse_with.is_some()) && variant.regex.is_some() {
-        return Err(syn::Error::new_spanned(
-            &variant.ident,
-            "some of these options cannot be used alongside `with`",
-        ));
-    }
     if variant.regex.is_some() && !is_string {
         return Err(syn::Error::new_spanned(
             &variant.ident,
             "regex can only be used with string variants",
-        ));
-    }
-    if variant.with.is_some() && (variant.parse_with.is_some() || variant.write_with.is_some()) {
-        return Err(syn::Error::new_spanned(
-            &variant.ident,
-            "custom `parse_with` and `write_with` functions cannot be used alongside `with`",
         ));
     }
 
