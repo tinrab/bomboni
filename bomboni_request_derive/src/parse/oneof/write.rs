@@ -141,7 +141,7 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
         ..
     } = get_proto_type_info(variant_type);
 
-    let write_target = if variant.with.is_some() || variant.write_with.is_some() {
+    let mut write_target = if variant.with.is_some() || variant.write_with.is_some() {
         let write_with = if let Some(with) = variant.with.as_ref() {
             quote! {
                 #with::write
@@ -176,6 +176,18 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
         quote!()
     };
 
+    if let Some(source_try_from) = variant.source_try_from.as_ref() {
+        let err_literal = format!(
+            "failed to convert `{}` to `{}`",
+            &variant.ident,
+            source_try_from.to_token_stream(),
+        );
+        write_target.extend(quote! {
+            let source: #source_try_from = source.try_into()
+                .expect(#err_literal);
+        });
+    }
+
     let mut write = quote! {
         let source = value;
     };
@@ -186,8 +198,10 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
         quote! { Default::default() }
     };
 
+    let source_option = variant.source_option || is_option;
+
     if is_option {
-        write.extend(if variant.source_option {
+        write.extend(if source_option {
             quote! {
                 let source = if let Some(source) = source {
                     #write_target
@@ -203,7 +217,7 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
             }
         });
     } else {
-        write.extend(if variant.source_option {
+        write.extend(if source_option {
             quote! {
                 #write_target
                 let source = Some(source);
@@ -214,7 +228,7 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
     }
 
     if is_box || variant.source_box {
-        if variant.source_option {
+        if source_option {
             write.extend(quote! {
                 let source = source.map(Box::new);
             });

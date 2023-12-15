@@ -54,7 +54,7 @@ fn expand_write_field(field: &ParseField) -> TokenStream {
         ..
     } = get_proto_type_info(field_type);
 
-    let write_target = if field.with.is_some() || field.write_with.is_some() {
+    let mut write_target = if field.with.is_some() || field.write_with.is_some() {
         let write_with = if let Some(with) = field.with.as_ref() {
             quote! {
                 #with::write
@@ -127,6 +127,14 @@ fn expand_write_field(field: &ParseField) -> TokenStream {
         quote!()
     };
 
+    if let Some(source_try_from) = field.source_try_from.as_ref() {
+        let err_literal = format!("failed to convert `{source_ident}` to `{source_try_from}`");
+        write_target.extend(quote! {
+            let source: #source_try_from = source.try_into()
+                .expect(#err_literal);
+        });
+    }
+
     let mut write = quote! {
         let source = value.#target_ident;
     };
@@ -138,6 +146,7 @@ fn expand_write_field(field: &ParseField) -> TokenStream {
     };
 
     let source_option = field.source_option
+        || is_option
         || (is_nested
             && (field.with.is_none() && field.parse_with.is_none())
             && !is_vec

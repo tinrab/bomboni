@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request"
-version = "0.1.30"
+version = "0.1.31"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -19,8 +19,8 @@ testing = []
 tonic = ["bomboni_proto/tonic", "dep:tonic"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.30" }
-bomboni_proto = { path = "../bomboni_proto", version = "0.1.30" }
+bomboni_common = { path = "../bomboni_common", version = "0.1.31" }
+bomboni_proto = { path = "../bomboni_proto", version = "0.1.31" }
 thiserror = "1.0.50"
 itertools = "0.12.0"
 time = { version = "0.3.30", features = ["formatting", "parsing"] }
@@ -35,4 +35,4 @@ rand = "0.8.5"
 regex = "1.10.2"
 
 tonic = { version = "0.10.2", optional = true }
-bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.30", optional = true }
+bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.31", optional = true }

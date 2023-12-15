@@ -129,8 +129,14 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
             "custom `parse_with` and `write_with` functions cannot be used alongside `with`",
         ));
     }
+    if field.wrapper && field.source_try_from.is_some() {
+        return Err(syn::Error::new_spanned(
+            &field.ident,
+            "wrapper fields cannot be casted",
+        ));
+    }
 
-    let parse_source = if field.with.is_some() || field.parse_with.is_some() {
+    let mut parse_source = if field.with.is_some() || field.parse_with.is_some() {
         let parse_with = if let Some(with) = field.with.as_ref() {
             quote! {
                 #with::parse
@@ -288,6 +294,13 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         quote!()
     };
 
+    if field.source_try_from.is_some() {
+        parse_source.extend(quote! {
+            let target = target.try_into()
+                .map_err(|_| RequestError::field(#field_name, CommonError::FailedConvertValue))?;
+        });
+    }
+
     let mut parse = quote! {
         let target = source.#source_ident;
     };
@@ -320,6 +333,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
 
     // Source field for nested messages is always wrapped in `Option`
     let source_option = field.source_option
+        || is_option
         || (is_nested
             && (field.with.is_none() && field.parse_with.is_none())
             && !is_vec
@@ -423,7 +437,12 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
 }
 
 fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
-    if field.source_option || field.enumeration || field.oneof || field.regex.is_some() {
+    if field.source_option
+        || field.enumeration
+        || field.oneof
+        || field.regex.is_some()
+        || field.source_try_from.is_some()
+    {
         return Err(syn::Error::new_spanned(
             &field.ident,
             "some of these options cannot be used alongside `resource`",

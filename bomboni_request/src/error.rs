@@ -77,6 +77,8 @@ pub enum CommonError {
     UnknownOneofVariant,
     #[error("invalid numeric value")]
     InvalidNumericValue,
+    #[error("failed to convert value")]
+    FailedConvertValue,
     #[error("out of range")]
     NumericOutOfRange,
     #[error("duplicate value")]

@@ -115,7 +115,7 @@ mod tests {
         struct ParsedItem {
             #[parse(source_name = "string")]
             s: String,
-            #[parse(source_option, source_name = "optional_string")]
+            #[parse(source_name = "optional_string")]
             opt_s: Option<String>,
             required_string: String,
             #[parse(source_option)]
@@ -1059,7 +1059,7 @@ mod tests {
                 match self {
                     Self::String(_) => "string",
                     Self::Data(_) => "data",
-                    Self::Null(_) => "null",
+                    Self::Null(()) => "null",
                     Self::Empty => "empty",
                     Self::Dropped(_) => "dropped",
                 }
@@ -1108,5 +1108,77 @@ mod tests {
 
         assert_eq!(ParsedItem::parse(Item::Empty).unwrap(), ParsedItem::Empty);
         assert_eq!(Item::from(ParsedItem::Empty), Item::Empty);
+    }
+
+    #[test]
+    fn source_convert() {
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Item {
+            casted_value: u32,
+            optional_casted: Option<u32>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(source_try_from = u32)]
+            casted_value: usize,
+            #[parse(source_try_from = u32)]
+            optional_casted: Option<usize>,
+        }
+
+        #[derive(Debug, Clone, PartialEq)]
+        enum Union {
+            A(u32),
+            B(Option<u32>),
+        }
+
+        impl Union {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::A(_) => "a",
+                    Self::B(_) => "b",
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = Union, write)]
+        enum ParsedUnion {
+            #[parse(source_try_from = u32)]
+            A(usize),
+            #[parse(source_try_from = u32)]
+            B(Option<usize>),
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                casted_value: 42,
+                optional_casted: Some(42),
+            })
+            .unwrap(),
+            ParsedItem {
+                casted_value: 42,
+                optional_casted: Some(42),
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                casted_value: 42,
+                optional_casted: Some(42),
+            }),
+            Item {
+                casted_value: 42,
+                optional_casted: Some(42),
+            }
+        );
+
+        assert_eq!(
+            ParsedUnion::parse(Union::A(42)).unwrap(),
+            ParsedUnion::A(42)
+        );
+        assert_eq!(Union::from(ParsedUnion::A(42)), Union::A(42));
+        assert_eq!(Union::from(ParsedUnion::B(Some(42))), Union::B(Some(42)));
+        assert_eq!(Union::from(ParsedUnion::B(None)), Union::B(None));
     }
 }

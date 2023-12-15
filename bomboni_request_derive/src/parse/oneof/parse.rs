@@ -156,6 +156,12 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             "custom `parse_with` and `write_with` functions cannot be used alongside `with`",
         ));
     }
+    if variant.wrapper && variant.source_try_from.is_some() {
+        return Err(syn::Error::new_spanned(
+            &variant.ident,
+            "wrapper variants cannot be casted",
+        ));
+    }
 
     if variant.fields.len() != 1 {
         return Err(syn::Error::new_spanned(
@@ -180,7 +186,7 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         ));
     }
 
-    let parse_source = if variant.with.is_some() || variant.parse_with.is_some() {
+    let mut parse_source = if variant.with.is_some() || variant.parse_with.is_some() {
         let parse_with = if let Some(with) = variant.with.as_ref() {
             quote! {
                 #with::parse
@@ -235,6 +241,13 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         quote!()
     };
 
+    if variant.source_try_from.is_some() {
+        parse_source.extend(quote! {
+            let target = target.try_into()
+                .map_err(|_| RequestError::field(variant_name, CommonError::FailedConvertValue))?;
+        });
+    }
+
     let mut parse = quote! {
         let target = source;
     };
@@ -266,8 +279,10 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         quote! { Default::default() }
     };
 
+    let source_option = variant.source_option || is_option;
+
     if is_option {
-        if variant.source_option {
+        if source_option {
             if is_string {
                 parse.extend(quote! {
                     let target = if let Some(target) = target.filter(|target| !target.is_empty()) {
@@ -323,7 +338,7 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             });
         }
     } else {
-        if variant.source_option {
+        if source_option {
             if variant.default.is_some() {
                 parse.extend(quote! {
                     let target = target.unwrap_or_else(|| #default_expr);

@@ -49,6 +49,9 @@ pub struct ParseField {
     /// True if the source field should be dereferenced from a `Box` type.
     #[darling(default)]
     pub source_box: bool,
+    /// Type used to convert from and into the target type.
+    #[darling(default)]
+    pub source_try_from: Option<Ident>,
     /// Parses enum value from `i32`.
     #[darling(default)]
     pub enumeration: bool,
@@ -102,6 +105,9 @@ pub struct ParseVariant {
     /// True if the source is an empty unit variant.
     #[darling(default)]
     pub source_empty: bool,
+    /// Type used to convert from and into the target type.
+    #[darling(default)]
+    pub source_try_from: Option<Ident>,
     /// Parses enum value from `i32`.
     #[darling(default)]
     pub enumeration: bool,
