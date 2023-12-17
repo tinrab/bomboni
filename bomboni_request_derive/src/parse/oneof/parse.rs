@@ -162,6 +162,21 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             "wrapper variants cannot be casted",
         ));
     }
+    if variant.keep
+        && (variant.skip
+            || variant.wrapper
+            || variant.enumeration
+            || variant.regex.is_some()
+            || variant.source_try_from.is_some()
+            || variant.with.is_some()
+            || variant.parse_with.is_some()
+            || variant.write_with.is_some())
+    {
+        return Err(syn::Error::new_spanned(
+            &variant.ident,
+            "some of these options cannot be used alongside `keep`",
+        ));
+    }
 
     if variant.fields.len() != 1 {
         return Err(syn::Error::new_spanned(
@@ -186,7 +201,15 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         ));
     }
 
-    let mut parse_source = if variant.with.is_some() || variant.parse_with.is_some() {
+    let mut parse_source = if variant.keep {
+        if is_box || variant.source_box {
+            quote! {
+                let target = *target;
+            }
+        } else {
+            quote!()
+        }
+    } else if variant.with.is_some() || variant.parse_with.is_some() {
         let parse_with = if let Some(with) = variant.with.as_ref() {
             quote! {
                 #with::parse

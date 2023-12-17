@@ -85,9 +85,11 @@ mod tests {
             nested: Option<NestedItem>,
             optional_nested: Option<NestedItem>,
             default_nested: Option<NestedItem>,
+            default_default_nested: Option<NestedItem>,
             custom_parse: String,
             enum_value: i32,
             oneof: Option<OneofKind>,
+            kept_nested: Option<NestedItem>,
         }
 
         impl Default for Item {
@@ -100,9 +102,11 @@ mod tests {
                     nested: Some(NestedItem {}),
                     optional_nested: Some(NestedItem {}),
                     default_nested: Some(NestedItem {}),
+                    default_default_nested: Some(NestedItem {}),
                     custom_parse: "42".into(),
                     enum_value: 1,
                     oneof: Some(OneofKind::String("abc".into())),
+                    kept_nested: Some(NestedItem {}),
                 }
             }
         }
@@ -124,12 +128,16 @@ mod tests {
             optional_nested: Option<ParsedNestedItem>,
             #[parse(default = NestedItem::default())]
             default_nested: ParsedNestedItem,
+            #[parse(default)]
+            default_default_nested: ParsedNestedItem,
             #[parse(with = custom_parse)]
             custom_parse: u64,
             #[parse(enumeration)]
             enum_value: Enum,
             #[parse(oneof)]
             oneof: ParsedOneofKind,
+            #[parse(keep)]
+            kept_nested: Option<NestedItem>,
             #[parse(skip)]
             extra: i32,
         }
@@ -292,9 +300,11 @@ mod tests {
                 nested: Some(NestedItem {}),
                 optional_nested: Some(NestedItem {}),
                 default_nested: None,
+                default_default_nested: None,
                 custom_parse: "42".into(),
                 enum_value: 1,
                 oneof: Some(OneofKind::String("abc".into())),
+                kept_nested: Some(NestedItem {}),
             })
             .unwrap(),
             ParsedItem {
@@ -305,9 +315,11 @@ mod tests {
                 nested: ParsedNestedItem {},
                 optional_nested: Some(ParsedNestedItem {}),
                 default_nested: ParsedNestedItem {},
+                default_default_nested: ParsedNestedItem {},
                 custom_parse: 42,
                 enum_value: Enum::A,
                 oneof: ParsedOneofKind::String("abc".into()),
+                kept_nested: Some(NestedItem {}),
                 extra: 0,
             }
         );
@@ -321,9 +333,11 @@ mod tests {
                 nested: ParsedNestedItem {},
                 optional_nested: Some(ParsedNestedItem {}),
                 default_nested: ParsedNestedItem {},
+                default_default_nested: ParsedNestedItem {},
                 custom_parse: 1337,
                 enum_value: Enum::B,
                 oneof: ParsedOneofKind::String("abc".into()),
+                kept_nested: Some(NestedItem {}),
                 extra: 0,
             }),
             Item {
@@ -334,9 +348,11 @@ mod tests {
                 nested: Some(NestedItem {}),
                 optional_nested: Some(NestedItem {}),
                 default_nested: Some(NestedItem {}),
+                default_default_nested: Some(NestedItem {}),
                 custom_parse: "1337".into(),
                 enum_value: 2,
                 oneof: Some(OneofKind::String("abc".into())),
+                kept_nested: Some(NestedItem {}),
             }
         );
     }
@@ -1180,5 +1196,61 @@ mod tests {
         assert_eq!(Union::from(ParsedUnion::A(42)), Union::A(42));
         assert_eq!(Union::from(ParsedUnion::B(Some(42))), Union::B(Some(42)));
         assert_eq!(Union::from(ParsedUnion::B(None)), Union::B(None));
+    }
+
+    #[test]
+    fn parse_keep() {
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Item {
+            item: Option<NestedItem>,
+            default_item: Option<NestedItem>,
+            default_item_custom: Option<NestedItem>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct NestedItem {
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(keep)]
+            item: NestedItem,
+            #[parse(keep, default)]
+            default_item: NestedItem,
+            #[parse(keep, default = get_default_item())]
+            default_item_custom: NestedItem,
+        }
+
+        fn get_default_item() -> NestedItem {
+            NestedItem { value: 42 }
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                item: Some(NestedItem { value: 42 }),
+                default_item: None,
+                default_item_custom: None,
+            })
+            .unwrap(),
+            ParsedItem {
+                item: NestedItem { value: 42 },
+                default_item: NestedItem { value: 0 },
+                default_item_custom: NestedItem { value: 42 },
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                item: NestedItem { value: 42 },
+                default_item: NestedItem { value: 0 },
+                default_item_custom: NestedItem { value: 42 },
+            }),
+            Item {
+                item: Some(NestedItem { value: 42 }),
+                default_item: Some(NestedItem { value: 0 }),
+                default_item_custom: Some(NestedItem { value: 42 }),
+            }
+        );
     }
 }

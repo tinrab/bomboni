@@ -120,7 +120,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
     if field.regex.is_some() && !is_string {
         return Err(syn::Error::new_spanned(
             &field.ident,
-            "regex can only be used with string fields",
+            "`regex` can only be used with string fields",
         ));
     }
     if field.with.is_some() && (field.parse_with.is_some() || field.write_with.is_some()) {
@@ -135,8 +135,33 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
             "wrapper fields cannot be casted",
         ));
     }
+    if field.keep
+        && (field.skip
+            || field.wrapper
+            || field.enumeration
+            || field.oneof
+            || field.regex.is_some()
+            || field.source_try_from.is_some()
+            || field.with.is_some()
+            || field.parse_with.is_some()
+            || field.write_with.is_some()
+            || field.resource.is_some())
+    {
+        return Err(syn::Error::new_spanned(
+            &field.ident,
+            "some of these options cannot be used alongside `keep`",
+        ));
+    }
 
-    let mut parse_source = if field.with.is_some() || field.parse_with.is_some() {
+    let mut parse_source = if field.keep {
+        if is_box || field.source_box {
+            quote! {
+                let target = *target;
+            }
+        } else {
+            quote!()
+        }
+    } else if field.with.is_some() || field.parse_with.is_some() {
         let parse_with = if let Some(with) = field.with.as_ref() {
             quote! {
                 #with::parse

@@ -141,7 +141,15 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
         ..
     } = get_proto_type_info(variant_type);
 
-    let mut write_target = if variant.with.is_some() || variant.write_with.is_some() {
+    let mut write_target = if variant.keep {
+        if is_box {
+            quote! {
+                let source = *source;
+            }
+        } else {
+            quote!()
+        }
+    } else if variant.with.is_some() || variant.write_with.is_some() {
         let write_with = if let Some(with) = variant.with.as_ref() {
             quote! {
                 #with::write

@@ -54,7 +54,15 @@ fn expand_write_field(field: &ParseField) -> TokenStream {
         ..
     } = get_proto_type_info(field_type);
 
-    let mut write_target = if field.with.is_some() || field.write_with.is_some() {
+    let mut write_target = if field.keep {
+        if is_box {
+            quote! {
+                let source = *source;
+            }
+        } else {
+            quote!()
+        }
+    } else if field.with.is_some() || field.write_with.is_some() {
         let write_with = if let Some(with) = field.with.as_ref() {
             quote! {
                 #with::write

@@ -1,6 +1,7 @@
 use darling::util::parse_expr;
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
 use proc_macro2::{Ident, TokenStream};
+use quote::quote;
 use syn::{self, DeriveInput, Expr, ExprArray, ExprPath, Meta, MetaNameValue, Path, Type};
 
 mod message;
@@ -61,11 +62,14 @@ pub struct ParseField {
     /// Parses Protobuf's well-known wrapper type.
     #[darling(default)]
     pub wrapper: bool,
+    /// True if the source and target types are the same.
+    #[darling(default)]
+    pub keep: bool,
     /// Parse resource fields into this field.
     #[darling(default)]
     pub resource: Option<ResourceOptions>,
     /// Custom expression that returns the default value.
-    #[darling(with = parse_expr::parse_str_literal, map = Some)]
+    #[darling(with = parse_default_expr, map = Some)]
     pub default: Option<Expr>,
     /// String value will be checked against this regex.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
@@ -114,8 +118,11 @@ pub struct ParseVariant {
     /// Parses Protobuf's well-known wrapper type.
     #[darling(default)]
     pub wrapper: bool,
+    /// True if the source and target use the same nested type.
+    #[darling(default)]
+    pub keep: bool,
     /// Custom expression that returns the default value.
-    #[darling(with = parse_expr::parse_str_literal, map = Some)]
+    #[darling(with = parse_default_expr, map = Some)]
     pub default: Option<Expr>,
     /// String value will be checked against this regex.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
@@ -169,6 +176,26 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     match &options.data {
         ast::Data::Struct(fields) => message::expand(&options, &fields.fields),
         ast::Data::Enum(variants) => oneof::expand(&options, variants),
+    }
+}
+
+pub fn parse_default_expr(meta: &Meta) -> darling::Result<Expr> {
+    match meta {
+        Meta::Path(path) => {
+            if matches!(path.get_ident(), Some(ident) if ident == "default") {
+                Ok(syn::parse2(quote! { Default::default() })?)
+            } else {
+                Err(darling::Error::unsupported_format("path").with_span(meta))
+            }
+        }
+        Meta::List(_) => Err(darling::Error::unsupported_format("list").with_span(meta)),
+        Meta::NameValue(nv) => {
+            if let Expr::Lit(expr_lit) = &nv.value {
+                Expr::from_value(&expr_lit.lit)
+            } else {
+                Ok(nv.value.clone())
+            }
+        }
     }
 }
 
