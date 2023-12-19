@@ -2,6 +2,7 @@ use std::{
     cmp,
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
+    ops::{Deref, DerefMut},
 };
 
 use itertools::Itertools;
@@ -15,9 +16,7 @@ use super::schema::SchemaMapped;
 pub mod error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Ordering {
-    pub terms: Vec<OrderingTerm>,
-}
+pub struct Ordering(Vec<OrderingTerm>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderingTerm {
@@ -33,7 +32,7 @@ pub enum OrderingDirection {
 
 impl Ordering {
     pub fn new(terms: Vec<OrderingTerm>) -> Self {
-        Self { terms }
+        Self(terms)
     }
 
     pub fn parse(source: &str) -> OrderingResult<Self> {
@@ -65,14 +64,14 @@ impl Ordering {
 
             terms.push(OrderingTerm { name, direction });
         }
-        Ok(Self { terms })
+        Ok(Self(terms))
     }
 
     pub fn evaluate<T>(&self, lhs: &T, rhs: &T) -> Option<cmp::Ordering>
     where
         T: SchemaMapped,
     {
-        for term in &self.terms {
+        for term in self.iter() {
             let a = lhs.get_field(&term.name);
             let b = rhs.get_field(&term.name);
             match a.partial_cmp(&b)? {
@@ -95,7 +94,7 @@ impl Ordering {
     }
 
     pub fn is_valid(&self, schema: &Schema) -> bool {
-        for term in &self.terms {
+        for term in self.iter() {
             if let Some(field) = schema.get_field(&term.name) {
                 if !field.ordered {
                     return false;
@@ -108,9 +107,23 @@ impl Ordering {
     }
 }
 
+impl Deref for Ordering {
+    type Target = Vec<OrderingTerm>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Ordering {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl Display for Ordering {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.terms.iter().map(ToString::to_string).join(", "))
+        f.write_str(&self.iter().map(ToString::to_string).join(", "))
     }
 }
 
@@ -141,18 +154,16 @@ mod tests {
         let ordering = Ordering::parse(" , user.displayName, task .userId desc").unwrap();
         assert_eq!(
             ordering,
-            Ordering {
-                terms: vec![
-                    OrderingTerm {
-                        name: "user.displayName".into(),
-                        direction: Ascending,
-                    },
-                    OrderingTerm {
-                        name: "task.userId".into(),
-                        direction: Descending,
-                    },
-                ]
-            }
+            Ordering(vec![
+                OrderingTerm {
+                    name: "user.displayName".into(),
+                    direction: Ascending,
+                },
+                OrderingTerm {
+                    name: "task.userId".into(),
+                    direction: Descending,
+                },
+            ])
         );
     }
 

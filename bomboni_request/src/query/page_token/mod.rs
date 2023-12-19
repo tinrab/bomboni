@@ -5,6 +5,8 @@
 //! To ensure that a valid token is used, we can encrypt it along with the query parameters and decrypt it before use.
 //! Encryption is also desirable to prevent users from guessing the next page of results, or to hide sensitive information.
 
+use std::fmt::{self, Display, Formatter};
+
 use crate::{filter::Filter, ordering::Ordering, schema::SchemaMapped};
 
 use super::error::QueryResult;
@@ -15,13 +17,13 @@ pub mod rsa;
 mod utility;
 
 /// A page token containing a filter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FilterPageToken {
     pub filter: Filter,
 }
 
 pub trait PageTokenBuilder {
-    type PageToken: Clone;
+    type PageToken: Clone + ToString;
 
     /// Parse a page token.
     /// [`QueryError::InvalidPageToken`] is returned if the page token is invalid for any reason.
@@ -43,4 +45,10 @@ pub trait PageTokenBuilder {
         ordering: &Ordering,
         next_item: &T,
     ) -> QueryResult<String>;
+}
+
+impl Display for FilterPageToken {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.filter)
+    }
 }

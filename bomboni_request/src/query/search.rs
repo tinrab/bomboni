@@ -14,13 +14,13 @@ use super::{
     utility::{parse_query_filter, parse_query_ordering},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SearchQuery<T = FilterPageToken> {
     pub query: String,
-    pub filter: Filter,
-    pub ordering: Ordering,
     pub page_size: i32,
     pub page_token: Option<T>,
+    pub filter: Filter,
+    pub ordering: Ordering,
 }
 
 /// Config for search query builder.
@@ -28,10 +28,10 @@ pub struct SearchQuery<T = FilterPageToken> {
 /// `primary_ordering_term` should probably never be `None`.
 #[derive(Debug, Clone)]
 pub struct SearchQueryConfig {
+    pub max_query_length: Option<usize>,
     pub max_page_size: Option<i32>,
     pub default_page_size: i32,
     pub primary_ordering_term: Option<OrderingTerm>,
-    pub max_query_length: Option<usize>,
     pub max_filter_length: Option<usize>,
     pub max_ordering_length: Option<usize>,
 }
@@ -45,10 +45,10 @@ pub struct SearchQueryBuilder<P: PageTokenBuilder> {
 impl Default for SearchQueryConfig {
     fn default() -> Self {
         Self {
+            max_query_length: None,
             max_page_size: None,
             default_page_size: 20,
             primary_ordering_term: None,
-            max_query_length: None,
             max_filter_length: None,
             max_ordering_length: None,
         }
@@ -84,11 +84,10 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
         // This is needed for page tokens to work.
         if let Some(primary_ordering_term) = self.options.primary_ordering_term.as_ref() {
             if ordering
-                .terms
                 .iter()
                 .all(|term| term.name != primary_ordering_term.name)
             {
-                ordering.terms.insert(0, primary_ordering_term.clone());
+                ordering.insert(0, primary_ordering_term.clone());
             }
         }
 

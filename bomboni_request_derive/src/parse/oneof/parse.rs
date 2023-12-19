@@ -16,8 +16,20 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<
 fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
     let source = &options.source;
     let ident = &options.ident;
+    let type_params = {
+        let type_params = options.generics.type_params().map(|param| &param.ident);
+        quote! {
+            <#(#type_params),*>
+        }
+    };
+    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
+        quote! { #where_clause }
+    } else {
+        quote!()
+    };
 
     let mut parse_variants = quote!();
+
     for variant in variants {
         if variant.skip {
             continue;
@@ -45,7 +57,7 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
                 }
             });
         } else {
-            let parse_variant = expand_parse_variant(variant)?;
+            let parse_variant = expand_parse_variant(options, variant)?;
             parse_variants.extend(quote! {
                 #source::#source_variant_ident(source) => {
                     #ident::#target_variant_ident({
@@ -57,10 +69,8 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
     }
 
     Ok(quote! {
-        impl RequestParse<#source> for #ident {
-            type Error = RequestError;
-
-            fn parse(source: #source) -> Result<Self, Self::Error> {
+        impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
+            fn parse(source: #source) -> RequestResult<Self> {
                 let variant_name = source.get_variant_name();
                 Ok(match source {
                     #parse_variants
@@ -78,11 +88,8 @@ fn expand_tagged_union(
     variants: &[ParseVariant],
     tagged_union: &ParseTaggedUnion,
 ) -> syn::Result<TokenStream> {
-    let source = &options.source;
     let ident = &options.ident;
     let oneof_ident = &tagged_union.oneof;
-    let field_ident = &tagged_union.field;
-    let field_literal = Literal::string(&tagged_union.field.to_string());
 
     let mut parse_variants = quote!();
     for variant in variants {
@@ -112,7 +119,7 @@ fn expand_tagged_union(
                 }
             });
         } else {
-            let parse_variant = expand_parse_variant(variant)?;
+            let parse_variant = expand_parse_variant(options, variant)?;
             parse_variants.extend(quote! {
                 #oneof_ident::#source_variant_ident(source) => {
                     #ident::#target_variant_ident({
@@ -123,12 +130,25 @@ fn expand_tagged_union(
         }
     }
 
-    Ok(quote! {
-        impl RequestParse<#source> for #ident {
-            type Error = RequestError;
+    let field_ident = &tagged_union.field;
+    let field_literal = Literal::string(&tagged_union.field.to_string());
+    let source = &options.source;
+    let type_params = {
+        let type_params = options.generics.type_params().map(|param| &param.ident);
+        quote! {
+            <#(#type_params),*>
+        }
+    };
+    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
+        quote! { #where_clause }
+    } else {
+        quote!()
+    };
 
+    Ok(quote! {
+        impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
             #[allow(ignored_unit_patterns)]
-            fn parse(source: #source) -> Result<Self, Self::Error> {
+            fn parse(source: #source) -> RequestResult<Self> {
                 let source = source.#field_ident
                     .ok_or_else(|| RequestError::field(#field_literal, CommonError::RequiredFieldMissing))?;
                 let variant_name = source.get_variant_name();
@@ -143,7 +163,10 @@ fn expand_tagged_union(
     })
 }
 
-fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
+fn expand_parse_variant(
+    options: &ParseOptions,
+    variant: &ParseVariant,
+) -> syn::Result<TokenStream> {
     if (variant.with.is_some() || variant.parse_with.is_some()) && variant.regex.is_some() {
         return Err(syn::Error::new_spanned(
             &variant.ident,
@@ -191,8 +214,9 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         is_nested,
         is_string,
         is_box,
+        is_generic,
         ..
-    } = get_proto_type_info(variant_type);
+    } = get_proto_type_info(options, variant_type);
 
     if variant.regex.is_some() && !is_string {
         return Err(syn::Error::new_spanned(
@@ -201,6 +225,7 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         ));
     }
 
+    let custom_parse = variant.with.is_some() || variant.parse_with.is_some();
     let mut parse_source = if variant.keep {
         if is_box || variant.source_box {
             quote! {
@@ -209,7 +234,7 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         } else {
             quote!()
         }
-    } else if variant.with.is_some() || variant.parse_with.is_some() {
+    } else if custom_parse {
         let parse_with = if let Some(with) = variant.with.as_ref() {
             quote! {
                 #with::parse
@@ -226,7 +251,7 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             let target = target.try_into()
                 .map_err(|_| RequestError::field(variant_name, CommonError::InvalidEnumValue))?;
         }
-    } else if is_nested {
+    } else if is_nested || is_generic {
         let parse_source = if is_box || variant.source_box {
             quote! {
                 let target = *target;
@@ -306,36 +331,36 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
 
     if is_option {
         if source_option {
-            if is_string {
-                parse.extend(quote! {
+            parse.extend(if is_string && !custom_parse {
+                quote! {
                     let target = if let Some(target) = target.filter(|target| !target.is_empty()) {
                         #parse_source
                         Some(target)
                     } else {
                         None
                     };
-                });
-            } else if variant.enumeration {
-                parse.extend(quote! {
+                }
+            } else if variant.enumeration && !custom_parse {
+                quote! {
                     let target = if let Some(target) = target.filter(|e| *e != 0) {
                         #parse_source
                         Some(target)
                     } else {
                         None
                     };
-                });
+                }
             } else {
-                parse.extend(quote! {
+                quote! {
                     let target = if let Some(target) = target {
                         #parse_source
                         Some(target)
                     } else {
                         None
                     };
-                });
-            }
+                }
+            });
         } else {
-            parse.extend(if is_string {
+            parse.extend(if is_string && !custom_parse {
                 quote! {
                     let target = if target.is_empty() {
                         None
@@ -344,7 +369,7 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
                         Some(target)
                     };
                 }
-            } else if variant.enumeration {
+            } else if variant.enumeration && !custom_parse {
                 quote! {
                     let target = if target == 0 {
                         None

@@ -2,7 +2,10 @@ use darling::util::parse_expr;
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{self, DeriveInput, Expr, ExprArray, ExprPath, Meta, MetaNameValue, Path, Type};
+use syn::{
+    self, DeriveInput, Expr, ExprArray, ExprPath, Generics, Meta, MetaNameValue, Path, Type,
+    WhereClause,
+};
 
 mod message;
 mod oneof;
@@ -13,6 +16,8 @@ pub mod parse_resource_name;
 #[darling(attributes(parse))]
 pub struct ParseOptions {
     pub ident: Ident,
+    pub generics: Generics,
+    pub where_clause: Option<WhereClause>,
     pub data: ast::Data<ParseVariant, ParseField>,
     /// Source proto type.
     pub source: Path,
@@ -22,6 +27,12 @@ pub struct ParseOptions {
     /// Used to create tagged unions.
     #[darling(default)]
     pub tagged_union: Option<ParseTaggedUnion>,
+    /// Parse list query fields.
+    #[darling(default)]
+    pub list_query: Option<QueryOptions>,
+    /// Parse search query fields.
+    #[darling(default)]
+    pub search_query: Option<QueryOptions>,
 }
 
 #[derive(FromMeta, Debug)]
@@ -40,6 +51,7 @@ pub struct ParseField {
     #[darling(with = parse_expr::parse_str_literal, map = Some)]
     pub name: Option<Expr>,
     /// Source field name.
+    /// Can be a path to a nested field.
     pub source_name: Option<String>,
     /// Skip parsing field.
     #[darling(default)]
@@ -154,6 +166,22 @@ pub struct ResourceFields {
     pub delete_time: bool,
     pub deleted: bool,
     pub etag: bool,
+}
+
+#[derive(Debug)]
+pub struct QueryOptions {
+    pub field: Ident,
+    pub query: QueryFieldOptions,
+    pub page_size: QueryFieldOptions,
+    pub page_token: QueryFieldOptions,
+    pub filter: QueryFieldOptions,
+    pub ordering: QueryFieldOptions,
+}
+
+#[derive(Debug)]
+pub struct QueryFieldOptions {
+    pub parse: bool,
+    pub source_name: Ident,
 }
 
 #[derive(Debug)]
@@ -301,5 +329,96 @@ impl FromMeta for ResourceFields {
             return Err(darling::Error::custom("expected array of idents").with_span(item));
         }
         Ok(fields)
+    }
+}
+
+impl Default for QueryOptions {
+    fn default() -> Self {
+        Self {
+            field: Ident::from_string("query").unwrap(),
+            query: QueryFieldOptions {
+                parse: true,
+                source_name: Ident::from_string("query").unwrap(),
+            },
+            page_size: QueryFieldOptions {
+                parse: true,
+                source_name: Ident::from_string("page_size").unwrap(),
+            },
+            page_token: QueryFieldOptions {
+                parse: true,
+                source_name: Ident::from_string("page_token").unwrap(),
+            },
+            filter: QueryFieldOptions {
+                parse: true,
+                source_name: Ident::from_string("filter").unwrap(),
+            },
+            ordering: QueryFieldOptions {
+                parse: true,
+                source_name: Ident::from_string("order_by").unwrap(),
+            },
+        }
+    }
+}
+
+impl FromMeta for QueryOptions {
+    fn from_list(items: &[ast::NestedMeta]) -> darling::Result<Self> {
+        let mut options = Self::default();
+
+        macro_rules! impl_field_option {
+            ($ident:ident, $meta:ident) => {
+                if let Ok(parse) = bool::from_meta($meta) {
+                    options.$ident.parse = parse;
+                } else if let Ok(source_name) = Ident::from_meta($meta) {
+                    options.$ident.source_name = source_name;
+                } else {
+                    return Err(darling::Error::custom(format!(
+                        "invalid query `{}` option value",
+                        stringify!($ident)
+                    ))
+                    .with_span($meta));
+                }
+            };
+        }
+
+        for item in items {
+            match item {
+                ast::NestedMeta::Meta(meta) => {
+                    let ident = meta.path().get_ident().unwrap();
+                    match ident.to_string().as_str() {
+                        "field" => {
+                            options.field = Ident::from_meta(meta)?;
+                        }
+                        "query" => {
+                            if let Ok(source_name) = Ident::from_meta(meta) {
+                                options.query.source_name = source_name;
+                            } else {
+                                return Err(darling::Error::custom(
+                                    "invalid query `query` option value",
+                                )
+                                .with_span(meta));
+                            }
+                        }
+                        "page_size" => impl_field_option!(page_size, meta),
+                        "page_token" => impl_field_option!(page_token, meta),
+                        "filter" => impl_field_option!(filter, meta),
+                        "ordering" => impl_field_option!(ordering, meta),
+                        _ => {
+                            return Err(
+                                darling::Error::custom("unknown query option").with_span(ident)
+                            );
+                        }
+                    }
+                }
+                ast::NestedMeta::Lit(lit) => {
+                    return Err(darling::Error::custom("unexpected literal").with_span(lit));
+                }
+            }
+        }
+
+        Ok(options)
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Self::default())
     }
 }

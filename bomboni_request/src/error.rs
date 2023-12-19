@@ -38,8 +38,6 @@ pub struct FieldError {
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum CommonError {
-    #[error(transparent)]
-    Query(#[from] QueryError),
     #[error("requested entity was not found")]
     ResourceNotFound,
     #[error("unauthorized")]
@@ -193,7 +191,21 @@ impl RequestError {
     pub fn wrap_request(self, name: &str) -> Self {
         match self {
             Self::Field(error) => Self::bad_request(name, [(error.field, error.error)]),
-            err => err,
+            Self::Domain(error) => {
+                if let Some(error) = error.as_any().downcast_ref::<QueryError>() {
+                    #[allow(trivial_casts)]
+                    Self::bad_request(
+                        name,
+                        [(
+                            error.get_violating_field_name(),
+                            Box::new(error.clone()) as DomainErrorBox,
+                        )],
+                    )
+                } else {
+                    RequestError::Domain(error)
+                }
+            }
+            error => error,
         }
     }
 
@@ -215,21 +227,39 @@ impl RequestError {
                     error.error,
                 )],
             ),
-            err => err,
+            Self::Domain(error) => {
+                if let Some(error) = error.as_any().downcast_ref::<QueryError>() {
+                    #[allow(trivial_casts)]
+                    Self::bad_request(
+                        name,
+                        [(
+                            format!(
+                                "{}.{}",
+                                root_path.into_iter().map(|step| step.to_string()).join("."),
+                                error.get_violating_field_name()
+                            ),
+                            Box::new(error.clone()) as DomainErrorBox,
+                        )],
+                    )
+                } else {
+                    RequestError::Domain(error)
+                }
+            }
+            error => error,
         }
     }
 
     pub fn downcast_domain_ref<T: std::any::Any>(&self) -> Option<&T> {
-        if let Self::Domain(err) = self {
-            err.as_any().downcast_ref::<T>()
+        if let Self::Domain(error) = self {
+            error.as_any().downcast_ref::<T>()
         } else {
             None
         }
     }
 
     pub fn downcast_domain<T: 'static + Clone>(&self) -> Option<T> {
-        if let Self::Domain(err) = self {
-            err.as_any().downcast_ref::<T>().cloned()
+        if let Self::Domain(error) = self {
+            error.as_any().downcast_ref::<T>().cloned()
         } else {
             None
         }
@@ -367,6 +397,34 @@ mod tests {
                     description: "invalid ID format".into(),
                 }]
             }
+        );
+    }
+
+    #[test]
+    fn query_error_metadata() {
+        assert_eq!(
+            serde_json::to_value(Status::from(
+                RequestError::from(QueryError::InvalidPageSize).wrap_request("List"),
+            ))
+            .unwrap(),
+            serde_json::from_str::<serde_json::Value>(
+                r#"{
+                "code": "INVALID_ARGUMENT",
+                "message": "invalid `List` request",
+                "details": [
+                    {
+                        "@type": "type.googleapis.com/google.rpc.BadRequest",
+                        "fieldViolations": [
+                            {
+                                "field": "page_size",
+                                "description": "page size specified is invalid"
+                            }
+                        ]
+                    }
+                ]
+            }"#
+            )
+            .unwrap()
         );
     }
 }

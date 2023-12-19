@@ -1,26 +1,22 @@
+use crate::error::RequestResult;
 use bomboni_common::id::Id;
 use time::OffsetDateTime;
+
 pub mod helpers;
 
 pub trait RequestParse<T>: Sized {
-    type Error;
-
-    fn parse(value: T) -> Result<Self, Self::Error>;
+    fn parse(value: T) -> RequestResult<Self>;
 }
 
 pub trait RequestParseInto<T>: Sized {
-    type Error;
-
-    fn parse_into(self) -> Result<T, Self::Error>;
+    fn parse_into(self) -> RequestResult<T>;
 }
 
-impl<T, U, E> RequestParseInto<U> for T
+impl<T, U> RequestParseInto<U> for T
 where
-    U: RequestParse<T, Error = E>,
+    U: RequestParse<T>,
 {
-    type Error = U::Error;
-
-    fn parse_into(self) -> Result<U, Self::Error> {
+    fn parse_into(self) -> RequestResult<U> {
         U::parse(self)
     }
 }
@@ -41,13 +37,24 @@ pub struct ParsedResource {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
+    use crate::ordering::Ordering;
+    use crate::query::page_token::PageTokenBuilder;
+    use crate::query::search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig};
+    use crate::{
+        error::{CommonError, FieldError, RequestError, RequestResult},
+        filter::Filter,
+        ordering::{OrderingDirection, OrderingTerm},
+        query::{
+            list::{ListQuery, ListQueryBuilder, ListQueryConfig},
+            page_token::{plain::PlainPageTokenBuilder, FilterPageToken},
+        },
+        testing::schema::UserItem,
+    };
     use bomboni_common::{btree_map, btree_map_into, hash_map_into};
     use bomboni_proto::google::protobuf::{
         Int32Value, Int64Value, StringValue, Timestamp, UInt32Value,
     };
     use bomboni_request_derive::{impl_parse_into_map, parse_resource_name, Parse};
-
-    use crate::error::{CommonError, FieldError, RequestError, RequestResult};
 
     use super::*;
 
@@ -1252,5 +1259,548 @@ mod tests {
                 default_item_custom: Some(NestedItem { value: 42 }),
             }
         );
+    }
+
+    #[test]
+    fn parse_optional_vec() {
+        use values_parse::ItemValues;
+
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Item {
+            values: Option<ItemValues>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(with = values_parse)]
+            values: Option<Vec<i32>>,
+        }
+
+        mod values_parse {
+            use super::*;
+
+            #[derive(Debug, Clone, PartialEq, Default)]
+            pub struct ItemValues {
+                pub values: Vec<i32>,
+            }
+
+            #[allow(clippy::unnecessary_wraps)]
+            pub fn parse(values: ItemValues) -> RequestResult<Vec<i32>> {
+                Ok(values.values)
+            }
+
+            pub fn write(values: Vec<i32>) -> ItemValues {
+                ItemValues { values }
+            }
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                values: Some(ItemValues {
+                    values: vec![1, 2, 3],
+                }),
+            })
+            .unwrap(),
+            ParsedItem {
+                values: Some(vec![1, 2, 3]),
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                values: Some(vec![1, 2, 3]),
+            }),
+            Item {
+                values: Some(ItemValues {
+                    values: vec![1, 2, 3],
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_generics() {
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Item {
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem<T, S = String>
+        where
+            T: Clone + Default + RequestParse<i32> + Into<i32>,
+            S: ToString + Default,
+        {
+            value: T,
+            #[parse(skip)]
+            skipped: S,
+        }
+
+        #[derive(Debug, Clone, PartialEq)]
+        struct Union {
+            kind: Option<UnionKind>,
+        }
+
+        #[derive(Debug, Clone, PartialEq)]
+        enum UnionKind {
+            String(String),
+            Generic(i32),
+        }
+
+        impl UnionKind {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::String(_) => "string",
+                    Self::Generic(_) => "generic",
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = UnionKind, write)]
+        enum ParsedUnionKind<T>
+        where
+            T: Clone + Default + RequestParse<i32> + Into<i32>,
+        {
+            String(String),
+            Generic(T),
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = Union, tagged_union { oneof = UnionKind, field = kind }, write)]
+        enum ParsedTaggedUnionKind<T>
+        where
+            T: Clone + Default + RequestParse<i32> + Into<i32>,
+        {
+            String(String),
+            Generic(T),
+        }
+
+        impl RequestParse<i32> for i32 {
+            fn parse(value: i32) -> RequestResult<Self> {
+                Ok(value)
+            }
+        }
+
+        assert_eq!(
+            ParsedItem::<i32, String>::parse(Item { value: 42 }).unwrap(),
+            ParsedItem::<i32, String> {
+                value: 42,
+                skipped: String::new(),
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem::<i32, String> {
+                value: 42,
+                skipped: String::new(),
+            }),
+            Item { value: 42 }
+        );
+
+        assert_eq!(
+            ParsedUnionKind::<i32>::parse(UnionKind::Generic(42)).unwrap(),
+            ParsedUnionKind::<i32>::Generic(42)
+        );
+        assert_eq!(
+            UnionKind::from(ParsedUnionKind::<i32>::Generic(42)),
+            UnionKind::Generic(42)
+        );
+
+        assert_eq!(
+            ParsedTaggedUnionKind::<i32>::parse(Union {
+                kind: Some(UnionKind::Generic(42)),
+            })
+            .unwrap(),
+            ParsedTaggedUnionKind::<i32>::Generic(42)
+        );
+        assert_eq!(
+            Union::from(ParsedTaggedUnionKind::<i32>::Generic(42)),
+            Union {
+                kind: Some(UnionKind::Generic(42)),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_query() {
+        #[derive(Debug, PartialEq, Default, Clone)]
+        struct Item {
+            query: String,
+            page_size: Option<u32>,
+            page_token: Option<String>,
+            filter: Option<String>,
+            order_by: Option<String>,
+            order: Option<String>,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, list_query { field = list_query }, write)]
+        struct ParsedListQuery {
+            list_query: ListQuery,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, list_query { filter = false }, write)]
+        struct ParsedNoFilter {
+            query: ListQuery,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, list_query, write)]
+        struct ParsedCustomToken {
+            query: ListQuery<u64>,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(source = Item, search_query { field = search_query }, write)]
+        struct ParsedSearchQuery {
+            search_query: SearchQuery,
+        }
+
+        fn get_list_query_builder() -> &'static ListQueryBuilder<PlainPageTokenBuilder> {
+            use std::sync::OnceLock;
+            static SINGLETON: OnceLock<ListQueryBuilder<PlainPageTokenBuilder>> = OnceLock::new();
+            SINGLETON.get_or_init(|| {
+                ListQueryBuilder::<PlainPageTokenBuilder>::new(
+                    UserItem::get_schema(),
+                    ListQueryConfig {
+                        max_page_size: Some(20),
+                        default_page_size: 10,
+                        primary_ordering_term: Some(OrderingTerm {
+                            name: "id".into(),
+                            direction: OrderingDirection::Descending,
+                        }),
+                        max_filter_length: Some(50),
+                        max_ordering_length: Some(50),
+                    },
+                    PlainPageTokenBuilder {},
+                )
+            })
+        }
+
+        fn get_search_query_builder() -> &'static SearchQueryBuilder<PlainPageTokenBuilder> {
+            use std::sync::OnceLock;
+            static SINGLETON: OnceLock<SearchQueryBuilder<PlainPageTokenBuilder>> = OnceLock::new();
+            SINGLETON.get_or_init(|| {
+                SearchQueryBuilder::<PlainPageTokenBuilder>::new(
+                    UserItem::get_schema(),
+                    SearchQueryConfig {
+                        max_query_length: Some(50),
+                        max_page_size: Some(20),
+                        default_page_size: 10,
+                        primary_ordering_term: Some(OrderingTerm {
+                            name: "id".into(),
+                            direction: OrderingDirection::Descending,
+                        }),
+                        max_filter_length: Some(50),
+                        max_ordering_length: Some(50),
+                    },
+                    PlainPageTokenBuilder {},
+                )
+            })
+        }
+
+        struct CustomPageTokenBuilder {}
+
+        impl PageTokenBuilder for CustomPageTokenBuilder {
+            type PageToken = u64;
+
+            fn parse(
+                &self,
+                _filter: &Filter,
+                _ordering: &Ordering,
+                page_token: &str,
+            ) -> crate::query::error::QueryResult<Self::PageToken> {
+                Ok(page_token.parse().unwrap())
+            }
+
+            fn build_next<T: crate::schema::SchemaMapped>(
+                &self,
+                _filter: &Filter,
+                _ordering: &Ordering,
+                _next_item: &T,
+            ) -> crate::query::error::QueryResult<String> {
+                Ok("24".into())
+            }
+        }
+
+        let item = Item {
+            query: "hello".into(),
+            page_size: Some(42),
+            page_token: Some("true".into()),
+            filter: Some("true".into()),
+            order_by: Some("id".into()),
+            order: Some("id desc".into()),
+        };
+
+        assert_eq!(
+            ParsedListQuery::parse_list_query(item.clone(), get_list_query_builder()).unwrap(),
+            ParsedListQuery {
+                list_query: ListQuery {
+                    page_size: 20,
+                    page_token: Some(FilterPageToken {
+                        filter: Filter::parse("true").unwrap(),
+                    }),
+                    filter: Filter::parse("true").unwrap(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            },
+        );
+        assert_eq!(
+            Item::from(ParsedListQuery {
+                list_query: ListQuery {
+                    page_size: 20,
+                    page_token: Some(FilterPageToken {
+                        filter: Filter::parse("true").unwrap(),
+                    }),
+                    filter: Filter::parse("true").unwrap(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            }),
+            Item {
+                query: String::new(),
+                page_size: Some(20),
+                page_token: Some("true".into()),
+                filter: Some("true".into()),
+                order_by: Some("id asc".into()),
+                order: None,
+            },
+        );
+
+        assert_eq!(
+            ParsedNoFilter::parse_list_query(item.clone(), get_list_query_builder()).unwrap(),
+            ParsedNoFilter {
+                query: ListQuery {
+                    page_size: 20,
+                    page_token: Some(FilterPageToken {
+                        filter: Filter::parse("true").unwrap(),
+                    }),
+                    filter: Filter::default(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            },
+        );
+        assert_eq!(
+            Item::from(ParsedNoFilter {
+                query: ListQuery {
+                    page_size: 20,
+                    page_token: Some(FilterPageToken {
+                        filter: Filter::parse("true").unwrap(),
+                    }),
+                    filter: Filter::default(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            }),
+            Item {
+                query: String::new(),
+                page_size: Some(20),
+                page_token: Some("true".into()),
+                filter: None,
+                order_by: Some("id asc".into()),
+                order: None,
+            },
+        );
+
+        assert_eq!(
+            ParsedCustomToken::parse_list_query(
+                Item {
+                    page_token: Some("42".into()),
+                    ..item.clone()
+                },
+                &ListQueryBuilder::<CustomPageTokenBuilder>::new(
+                    UserItem::get_schema(),
+                    ListQueryConfig {
+                        max_page_size: Some(20),
+                        default_page_size: 10,
+                        primary_ordering_term: Some(OrderingTerm {
+                            name: "id".into(),
+                            direction: OrderingDirection::Descending,
+                        }),
+                        max_filter_length: Some(50),
+                        max_ordering_length: Some(50),
+                    },
+                    CustomPageTokenBuilder {},
+                )
+            )
+            .unwrap(),
+            ParsedCustomToken {
+                query: ListQuery {
+                    page_size: 20,
+                    page_token: Some(42),
+                    filter: Filter::parse("true").unwrap(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            },
+        );
+        assert_eq!(
+            Item::from(ParsedCustomToken {
+                query: ListQuery {
+                    page_size: 20,
+                    page_token: Some(42),
+                    filter: Filter::parse("true").unwrap(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            }),
+            Item {
+                query: String::new(),
+                page_size: Some(20),
+                page_token: Some("42".into()),
+                filter: Some("true".into()),
+                order_by: Some("id asc".into()),
+                order: None,
+            },
+        );
+
+        assert_eq!(
+            ParsedSearchQuery::parse_search_query(item.clone(), get_search_query_builder())
+                .unwrap(),
+            ParsedSearchQuery {
+                search_query: SearchQuery {
+                    query: "hello".into(),
+                    page_size: 20,
+                    page_token: Some(FilterPageToken {
+                        filter: Filter::parse("true").unwrap(),
+                    }),
+                    filter: Filter::parse("true").unwrap(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            },
+        );
+        assert_eq!(
+            Item::from(ParsedSearchQuery {
+                search_query: SearchQuery {
+                    query: "hello".into(),
+                    page_size: 20,
+                    page_token: Some(FilterPageToken {
+                        filter: Filter::parse("true").unwrap(),
+                    }),
+                    filter: Filter::parse("true").unwrap(),
+                    ordering: Ordering::new(vec![OrderingTerm {
+                        name: "id".into(),
+                        direction: OrderingDirection::Ascending,
+                    }])
+                },
+            }),
+            Item {
+                query: "hello".into(),
+                page_size: Some(20),
+                page_token: Some("true".into()),
+                filter: Some("true".into()),
+                order_by: Some("id asc".into()),
+                order: None,
+            },
+        );
+    }
+
+    #[test]
+    fn parse_source_nested() {
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Item {
+            name: String,
+            item: Option<NestedItem>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct NestedItem {
+            nested_value: Option<NestedValue>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct NestedValue {
+            value: i32,
+            default_value: Option<i32>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(keep)]
+            name: String,
+            #[parse(source_name = "item.nested_value.value")]
+            value: i32,
+            #[parse(source_option, source_name = "item.nested_value.default_value")]
+            default_value: i32,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                name: String::new(),
+                item: Some(NestedItem {
+                    nested_value: Some(NestedValue {
+                        value: 42,
+                        default_value: Some(42)
+                    }),
+                }),
+            })
+            .unwrap(),
+            ParsedItem {
+                name: String::new(),
+                value: 42,
+                default_value: 42
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                name: String::new(),
+                value: 42,
+                default_value: 42
+            }),
+            Item {
+                name: String::new(),
+                item: Some(NestedItem {
+                    nested_value: Some(NestedValue {
+                        value: 42,
+                        default_value: Some(42)
+                    }),
+                }),
+            }
+        );
+
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                name: String::new(),
+                item: None,
+            }).unwrap_err(),
+            RequestError::Field(FieldError {
+                error, field, ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing { .. }
+            ) && field == "item"
+        ));
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                name: String::new(),
+                item: Some(NestedItem{ nested_value: None }),
+            }).unwrap_err(),
+            RequestError::Field(FieldError {
+                error, field, ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing { .. }
+            ) && field == "item.nested_value"
+        ));
     }
 }

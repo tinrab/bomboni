@@ -14,7 +14,10 @@ pub mod parse_id {
 
 #[cfg(test)]
 mod tests {
-    use crate::{error::RequestError, parse::RequestParse};
+    use crate::{
+        error::RequestError,
+        parse::{RequestParse, RequestResult},
+    };
     use bomboni_common::id::Id;
     use bomboni_request_derive::Parse;
 

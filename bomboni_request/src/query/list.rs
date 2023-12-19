@@ -18,12 +18,12 @@ use super::{
 
 /// Represents a list query.
 /// List queries list paged, filtered and ordered items.
-#[derive(Debug, Clone)]
-pub struct ListQuery<T = FilterPageToken> {
-    pub filter: Filter,
-    pub ordering: Ordering,
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListQuery<T: Clone + ToString = FilterPageToken> {
     pub page_size: i32,
     pub page_token: Option<T>,
+    pub filter: Filter,
+    pub ordering: Ordering,
 }
 
 /// Config for list query builder.
@@ -83,11 +83,10 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
         // This is needed for page tokens to work.
         if let Some(primary_ordering_term) = self.options.primary_ordering_term.as_ref() {
             if ordering
-                .terms
                 .iter()
                 .all(|term| term.name != primary_ordering_term.name)
             {
-                ordering.terms.insert(0, primary_ordering_term.clone());
+                ordering.insert(0, primary_ordering_term.clone());
             }
         }
 
@@ -114,10 +113,10 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
             };
 
         Ok(ListQuery {
-            filter,
-            ordering,
             page_size,
             page_token,
+            filter,
+            ordering,
         })
     }
 }

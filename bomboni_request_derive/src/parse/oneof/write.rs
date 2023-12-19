@@ -16,6 +16,17 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream 
 fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
     let source = &options.source;
     let ident = &options.ident;
+    let type_params = {
+        let type_params = options.generics.type_params().map(|param| &param.ident);
+        quote! {
+            <#(#type_params),*>
+        }
+    };
+    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
+        quote! { #where_clause }
+    } else {
+        quote!()
+    };
 
     let mut write_variants = quote!();
 
@@ -46,7 +57,7 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStrea
                 }
             });
         } else {
-            let write_variant = expand_write_variant(variant);
+            let write_variant = expand_write_variant(options, variant);
             write_variants.extend(quote! {
                 #ident::#target_variant_ident(value) => {
                     #source::#source_variant_ident({
@@ -58,8 +69,8 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStrea
     }
 
     quote! {
-        impl From<#ident> for #source {
-            fn from(value: #ident) -> Self {
+        impl #type_params From<#ident #type_params> for #source #where_clause {
+            fn from(value: #ident #type_params) -> Self {
                 match value {
                     #write_variants
                     _ => panic!("unknown oneof variant"),
@@ -78,6 +89,17 @@ fn expand_write_tagged_union(
     let ident = &options.ident;
     let oneof_ident = &tagged_union.oneof;
     let field_ident = &tagged_union.field;
+    let type_params = {
+        let type_params = options.generics.type_params().map(|param| &param.ident);
+        quote! {
+            <#(#type_params),*>
+        }
+    };
+    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
+        quote! { #where_clause }
+    } else {
+        quote!()
+    };
 
     let mut write_variants = quote!();
     for variant in variants {
@@ -107,7 +129,7 @@ fn expand_write_tagged_union(
                 }
             });
         } else {
-            let write_variant = expand_write_variant(variant);
+            let write_variant = expand_write_variant(options, variant);
             write_variants.extend(quote! {
                 #ident::#target_variant_ident(value) => {
                     #oneof_ident::#source_variant_ident({
@@ -119,8 +141,8 @@ fn expand_write_tagged_union(
     }
 
     quote! {
-        impl From<#ident> for #source {
-            fn from(value: #ident) -> Self {
+        impl #type_params From<#ident #type_params> for #source #where_clause {
+            fn from(value: #ident #type_params) -> Self {
                 #source {
                     #field_ident: Some(match value {
                         #write_variants
@@ -132,14 +154,15 @@ fn expand_write_tagged_union(
     }
 }
 
-fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
+fn expand_write_variant(options: &ParseOptions, variant: &ParseVariant) -> TokenStream {
     let variant_type = variant.fields.iter().next().unwrap();
     let ProtoTypeInfo {
         is_option,
         is_nested,
         is_box,
+        is_generic,
         ..
-    } = get_proto_type_info(variant_type);
+    } = get_proto_type_info(options, variant_type);
 
     let mut write_target = if variant.keep {
         if is_box {
@@ -164,7 +187,7 @@ fn expand_write_variant(variant: &ParseVariant) -> TokenStream {
         quote! {
             let source = source as i32;
         }
-    } else if is_nested {
+    } else if is_nested || is_generic {
         let write_target = if is_box {
             quote! {
                 let source = *source;

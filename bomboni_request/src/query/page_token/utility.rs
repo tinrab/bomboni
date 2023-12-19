@@ -14,7 +14,7 @@ use crate::ordering::Ordering;
 pub fn get_page_filter<T: SchemaMapped>(ordering: &Ordering, next_item: &T) -> Filter {
     let mut filters = Vec::new();
 
-    for term in &ordering.terms {
+    for term in ordering.iter() {
         let term_argument = match next_item.get_field(&term.name) {
             Value::Integer(value) => Filter::Value(value.into()),
             Value::Float(value) => Filter::Value(value.into()),

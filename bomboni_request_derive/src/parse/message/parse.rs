@@ -3,12 +3,16 @@ use itertools::Itertools;
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{quote, ToTokens};
 
-use crate::parse::{DeriveOptions, ParseField, ParseOptions};
-use crate::utility::{get_proto_type_info, ProtoTypeInfo};
+use crate::parse::{DeriveOptions, ParseField, ParseOptions, QueryOptions};
+use crate::utility::{get_proto_type_info, get_query_field_token_type, ProtoTypeInfo};
 
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<TokenStream> {
-    let source = &options.source;
-    let ident = &options.ident;
+    if options.list_query.is_some() && options.search_query.is_some() {
+        return Err(syn::Error::new_spanned(
+            &options.ident,
+            "list and search query cannot be used together",
+        ));
+    }
 
     let mut parse_fields = quote!();
     // Set default for skipped fields
@@ -18,9 +22,10 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
     // This is needed because derived fields may depend on other fields, and we want to avoid unnecessary cloning.
     for field in fields {
         if field.derive.is_some() {
-            parse_fields.extend(expand_parse_field(field)?);
+            parse_fields.extend(expand_parse_field(options, field)?);
         }
     }
+
     // Parse resource fields
     for field in fields {
         if field.resource.is_some() {
@@ -28,9 +33,34 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     }
 
+    // Parse nested fields
     for field in fields {
         if field.derive.is_some() || field.resource.is_some() {
             continue;
+        }
+
+        if matches!(field.source_name.as_ref(), Some(name) if name.contains('.')) {
+            parse_fields.extend(expand_parse_field(options, field)?);
+        }
+    }
+
+    for field in fields {
+        if field.derive.is_some()
+            || field.resource.is_some()
+            || matches!(field.source_name.as_ref(), Some(name) if name.contains('.'))
+        {
+            continue;
+        }
+
+        // Skip query fields
+        if let Some(list_query) = options.list_query.as_ref() {
+            if &list_query.field == field.ident.as_ref().unwrap() {
+                continue;
+            }
+        } else if let Some(search_query) = options.search_query.as_ref() {
+            if &search_query.field == field.ident.as_ref().unwrap() {
+                continue;
+            }
         }
 
         let field_ident = field.ident.as_ref().unwrap();
@@ -41,15 +71,91 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
             continue;
         }
 
-        parse_fields.extend(expand_parse_field(field)?);
+        parse_fields.extend(expand_parse_field(options, field)?);
+    }
+
+    let source = &options.source;
+    let ident = &options.ident;
+    let type_params = {
+        let type_params = options.generics.type_params().map(|param| &param.ident);
+        quote! {
+            <#(#type_params),*>
+        }
+    };
+    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
+        quote! { #where_clause }
+    } else {
+        quote!()
+    };
+
+    if let Some(query_options) = options
+        .list_query
+        .as_ref()
+        .or(options.search_query.as_ref())
+    {
+        let query_field_ident = &query_options.field;
+        let parse_query = expand_parse_query(query_options, options.search_query.is_some());
+
+        let query_field = fields
+            .iter()
+            .find(|field| field.ident.as_ref().unwrap() == query_field_ident)
+            .unwrap();
+        let query_token_type = if let Some(token_type) = get_query_field_token_type(&query_field.ty)
+        {
+            quote! {
+                <PageToken = #token_type>
+            }
+        } else {
+            quote! {
+                <PageToken = FilterPageToken>
+            }
+        };
+
+        return Ok(if options.search_query.is_some() {
+            quote! {
+                impl #ident #type_params #where_clause {
+                    #[allow(clippy::ignored_unit_patterns)]
+                    fn parse_search_query<P: PageTokenBuilder #query_token_type >(
+                        source: #source,
+                        query_builder: &SearchQueryBuilder<P>
+                    ) -> Result<Self, RequestError> {
+                        Ok(Self {
+                            #query_field_ident: {
+                                #parse_query
+                                query
+                            },
+                            #parse_fields
+                            #skipped_fields
+                        })
+                    }
+                }
+            }
+        } else {
+            quote! {
+                impl #ident #type_params #where_clause {
+                    #[allow(clippy::ignored_unit_patterns)]
+                    fn parse_list_query<P: PageTokenBuilder #query_token_type >(
+                        source: #source,
+                        query_builder: &ListQueryBuilder<P>
+                    ) -> Result<Self, RequestError> {
+                        Ok(Self {
+                            #query_field_ident: {
+                                #parse_query
+                                query
+                            },
+                            #parse_fields
+                            #skipped_fields
+                        })
+                    }
+                }
+            }
+        });
     }
 
     Ok(quote! {
-        impl RequestParse<#source> for #ident {
-            type Error = RequestError;
-
+        impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
             #[allow(clippy::ignored_unit_patterns)]
-            fn parse(source: #source) -> Result<Self, Self::Error> {
+            fn parse(source: #source) -> RequestResult<Self> {
                 Ok(Self {
                     #parse_fields
                     #skipped_fields
@@ -59,7 +165,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
     })
 }
 
-fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
+fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result<TokenStream> {
     let target_ident = field.ident.as_ref().unwrap();
 
     if let Some(DeriveOptions { func, source_field }) = field.derive.as_ref() {
@@ -82,22 +188,6 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         });
     }
 
-    let field_name = if let Some(name) = field.name.as_ref() {
-        quote! { #name }
-    } else {
-        field
-            .ident
-            .as_ref()
-            .unwrap()
-            .to_string()
-            .into_token_stream()
-    };
-    let source_ident = if let Some(name) = field.source_name.as_ref() {
-        Ident::from_string(name).unwrap()
-    } else {
-        field.ident.clone().unwrap()
-    };
-
     let field_type = &field.ty;
     let ProtoTypeInfo {
         is_option,
@@ -105,9 +195,10 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         is_string,
         is_box,
         is_vec,
+        is_generic,
         map_ident,
         ..
-    } = get_proto_type_info(field_type);
+    } = get_proto_type_info(options, field_type);
 
     if (field.with.is_some() || field.parse_with.is_some())
         && (field.enumeration || field.oneof || field.regex.is_some())
@@ -153,6 +244,18 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         ));
     }
 
+    let field_name = if let Some(name) = field.name.as_ref() {
+        quote! { #name }
+    } else {
+        field
+            .ident
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .into_token_stream()
+    };
+    let custom_parse = field.with.is_some() || field.parse_with.is_some();
+
     let mut parse_source = if field.keep {
         if is_box || field.source_box {
             quote! {
@@ -161,7 +264,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         } else {
             quote!()
         }
-    } else if field.with.is_some() || field.parse_with.is_some() {
+    } else if custom_parse {
         let parse_with = if let Some(with) = field.with.as_ref() {
             quote! {
                 #with::parse
@@ -197,7 +300,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
                 let target = target.try_into()
                     .map_err(|_| RequestError::field_index(#field_name, i, CommonError::InvalidEnumValue))?;
             });
-        } else if is_nested {
+        } else if is_nested || is_generic {
             parse_item.extend(quote! {
                 let target = target.parse_into()
                     .map_err(|err: RequestError| err.wrap_index(#field_name, i))?;
@@ -235,7 +338,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
                 let target = target.try_into()
                     .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?;
             });
-        } else if is_nested {
+        } else if is_nested || is_generic {
             parse_item.extend(quote! {
                 let target = target.parse_into()
                     .map_err(|err: RequestError| err.wrap(#field_name))?;
@@ -274,7 +377,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
             #parse_source
             let target = target.parse_into()?;
         }
-    } else if is_nested {
+    } else if is_nested || is_generic {
         let parse_source = if is_box || field.source_box {
             quote! {
                 let target = *target;
@@ -326,9 +429,8 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
         });
     }
 
-    let mut parse = quote! {
-        let target = source.#source_ident;
-    };
+    let mut parse = expand_extract_source_field(field);
+
     if field.wrapper {
         match field_type.to_token_stream().to_string().as_str() {
             "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "isize" | "usize" => {
@@ -360,6 +462,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
     let source_option = field.source_option
         || is_option
         || (is_nested
+            && !is_generic
             && (field.with.is_none() && field.parse_with.is_none())
             && !is_vec
             && map_ident.is_none()
@@ -367,36 +470,36 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
 
     if is_option {
         if source_option {
-            if is_vec || is_string {
-                parse.extend(quote! {
+            parse.extend(if (is_vec || is_string) && !custom_parse {
+                quote! {
                     let target = if let Some(target) = target.filter(|target| !target.is_empty()) {
                         #parse_source
                         Some(target)
                     } else {
                         None
                     };
-                });
-            } else if field.enumeration {
-                parse.extend(quote! {
+                }
+            } else if field.enumeration && !custom_parse {
+                quote! {
                     let target = if let Some(target) = target.filter(|e| *e != 0) {
                         #parse_source
                         Some(target)
                     } else {
                         None
                     };
-                });
+                }
             } else {
-                parse.extend(quote! {
+                quote! {
                     let target = if let Some(target) = target {
                         #parse_source
                         Some(target)
                     } else {
                         None
                     };
-                });
-            }
+                }
+            });
         } else {
-            parse.extend(if is_vec || is_string {
+            parse.extend(if (is_vec || is_string) && !custom_parse {
                 quote! {
                     let target = if target.is_empty() {
                         None
@@ -405,7 +508,7 @@ fn expand_parse_field(field: &ParseField) -> syn::Result<TokenStream> {
                         Some(target)
                     };
                 }
-            } else if !is_vec && field.enumeration {
+            } else if (!is_vec && field.enumeration) && !custom_parse {
                 quote! {
                     let target = if target == 0 {
                         None
@@ -467,6 +570,10 @@ fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
         || field.oneof
         || field.regex.is_some()
         || field.source_try_from.is_some()
+        || field.with.is_some()
+        || field.parse_with.is_some()
+        || field.write_with.is_some()
+        || field.keep
     {
         return Err(syn::Error::new_spanned(
             &field.ident,
@@ -548,4 +655,100 @@ fn expand_parse_resource_field(field: &ParseField) -> syn::Result<TokenStream> {
             result
         },
     })
+}
+
+fn expand_parse_query(options: &QueryOptions, is_search: bool) -> TokenStream {
+    let mut parse = quote! {
+        let page_size: Option<i32> = None;
+        let page_token: Option<&str> = None;
+        let filter: Option<&str> = None;
+        let ordering: Option<&str> = None;
+    };
+    if options.query.parse && is_search {
+        let query_source_name = &options.query.source_name;
+        parse.extend(quote! {
+            let query_string = &source.#query_source_name;
+        });
+    }
+    if options.page_size.parse {
+        let source_name = &options.page_size.source_name;
+        parse.extend(quote! {
+            let page_size = source.#source_name.map(|i| i as i32);
+        });
+    }
+    if options.page_token.parse {
+        let source_name = &options.page_token.source_name;
+        parse.extend(quote! {
+            let page_token = source.#source_name.as_ref().map(|s| s.as_str());
+        });
+    }
+    if options.filter.parse {
+        let source_name = &options.filter.source_name;
+        parse.extend(quote! {
+            let filter = source.#source_name.as_ref().map(|s| s.as_str());
+        });
+    }
+    if options.ordering.parse {
+        let source_name = &options.ordering.source_name;
+        parse.extend(quote! {
+            let ordering = source.#source_name.as_ref().map(|s| s.as_str());
+        });
+    }
+
+    if is_search {
+        quote! {
+            #parse
+            let query = query_builder.build(query_string, page_size, page_token, filter, ordering)?;
+        }
+    } else {
+        quote! {
+            #parse
+            let query = query_builder.build(page_size, page_token, filter, ordering)?;
+        }
+    }
+}
+
+fn expand_extract_source_field(field: &ParseField) -> TokenStream {
+    if let Some(source_name) = field.source_name.as_ref() {
+        if source_name.contains('.') {
+            let parts = source_name.split('.').collect::<Vec<_>>();
+
+            let mut extract = quote!();
+            for (i, part) in parts.iter().enumerate() {
+                let part_ident = Ident::from_string(part).unwrap();
+                let part_literal = Literal::string(&parts.iter().take(i + 1).join("."));
+
+                extract.extend(if i < parts.len() - 1 {
+                    quote! {
+                        .#part_ident.ok_or_else(|| {
+                            RequestError::field(
+                                #part_literal,
+                                CommonError::RequiredFieldMissing,
+                            )
+                        })?
+                    }
+                } else {
+                    quote! {
+                        .#part_ident
+                    }
+                });
+            }
+
+            // Purposefully clone source on each parse.
+            // Could be optimized in the future.
+            quote! {
+                let target = source.clone() #extract;
+            }
+        } else {
+            let source_ident = Ident::from_string(source_name).unwrap();
+            quote! {
+                let target = source.#source_ident;
+            }
+        }
+    } else {
+        let source_ident = field.ident.clone().unwrap();
+        quote! {
+            let target = source.#source_ident;
+        }
+    }
 }
