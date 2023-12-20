@@ -1803,4 +1803,58 @@ mod tests {
             ) && field == "item.nested_value"
         ));
     }
+
+    #[test]
+    fn wrap_request_message() {
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Request {
+            value: Option<i32>,
+        }
+
+        impl Request {
+            pub const NAME: &'static str = "Request";
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Request, request, write)]
+        struct ParsedRequest {
+            #[parse(source_option)]
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Request, request { name = "Test" }, write)]
+        struct ParsedCustomNameRequest {
+            #[parse(source_option)]
+            value: i32,
+        }
+
+        assert!(matches!(
+            ParsedRequest::parse(Request { value: None }).unwrap_err(),
+            RequestError::BadRequest { name, violations }
+            if name == Request::NAME && matches!(
+                violations.get(0).unwrap(),
+                FieldError {
+                    error, field, ..
+                } if matches!(
+                    error.as_any().downcast_ref::<CommonError>().unwrap(),
+                    CommonError::RequiredFieldMissing { .. }
+                ) && field == "value"
+            )
+        ));
+
+        assert!(matches!(
+            ParsedCustomNameRequest::parse(Request { value: None }).unwrap_err(),
+            RequestError::BadRequest { name, violations }
+            if name == "Test" && matches!(
+                violations.get(0).unwrap(),
+                FieldError {
+                    error, field, ..
+                } if matches!(
+                    error.as_any().downcast_ref::<CommonError>().unwrap(),
+                    CommonError::RequiredFieldMissing { .. }
+                ) && field == "value"
+            )
+        ));
+    }
 }

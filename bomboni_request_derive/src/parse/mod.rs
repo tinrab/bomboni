@@ -33,12 +33,21 @@ pub struct ParseOptions {
     /// Parse search query fields.
     #[darling(default)]
     pub search_query: Option<QueryOptions>,
+    /// Marks this message as a request message.
+    /// Errors will be wrapped with request's name.
+    #[darling(default)]
+    pub request: Option<RequestOptions>,
 }
 
 #[derive(FromMeta, Debug)]
 pub struct ParseTaggedUnion {
     pub oneof: Path,
     pub field: Ident,
+}
+
+#[derive(Debug)]
+pub struct RequestOptions {
+    pub name: Option<Expr>,
 }
 
 #[derive(Debug, FromField)]
@@ -224,6 +233,43 @@ pub fn parse_default_expr(meta: &Meta) -> darling::Result<Expr> {
                 Ok(nv.value.clone())
             }
         }
+    }
+}
+
+impl FromMeta for RequestOptions {
+    fn from_list(items: &[ast::NestedMeta]) -> darling::Result<Self> {
+        let mut options = Self { name: None };
+        for item in items {
+            match item {
+                ast::NestedMeta::Meta(meta) => {
+                    let ident = meta.path().get_ident().unwrap();
+                    match ident.to_string().as_str() {
+                        "name" => {
+                            if let Meta::NameValue(MetaNameValue { value, .. }) = meta {
+                                options.name = Some(value.clone());
+                            } else {
+                                return Err(
+                                    darling::Error::custom("expected name value").with_span(meta)
+                                );
+                            }
+                        }
+                        _ => {
+                            return Err(
+                                darling::Error::custom("unknown request option").with_span(ident)
+                            );
+                        }
+                    }
+                }
+                ast::NestedMeta::Lit(lit) => {
+                    return Err(darling::Error::custom("unexpected literal").with_span(lit));
+                }
+            }
+        }
+        Ok(options)
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Self { name: None })
     }
 }
 

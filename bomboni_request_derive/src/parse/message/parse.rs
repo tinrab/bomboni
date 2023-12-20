@@ -88,7 +88,8 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         quote!()
     };
 
-    if let Some(query_options) = options
+    let mut query_token_type = quote!();
+    let mut parse = if let Some(query_options) = options
         .list_query
         .as_ref()
         .or(options.search_query.as_ref())
@@ -100,8 +101,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
             .iter()
             .find(|field| field.ident.as_ref().unwrap() == query_field_ident)
             .unwrap();
-        let query_token_type = if let Some(token_type) = get_query_field_token_type(&query_field.ty)
-        {
+        query_token_type = if let Some(token_type) = get_query_field_token_type(&query_field.ty) {
             quote! {
                 <PageToken = #token_type>
             }
@@ -111,55 +111,67 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
             }
         };
 
-        return Ok(if options.search_query.is_some() {
-            quote! {
-                impl #ident #type_params #where_clause {
-                    #[allow(clippy::ignored_unit_patterns)]
-                    fn parse_search_query<P: PageTokenBuilder #query_token_type >(
-                        source: #source,
-                        query_builder: &SearchQueryBuilder<P>
-                    ) -> Result<Self, RequestError> {
-                        Ok(Self {
-                            #query_field_ident: {
-                                #parse_query
-                                query
-                            },
-                            #parse_fields
-                            #skipped_fields
-                        })
-                    }
-                }
-            }
+        quote! {
+            Ok(Self {
+                #query_field_ident: {
+                    #parse_query
+                    query
+                },
+                #parse_fields
+                #skipped_fields
+            })
+        }
+    } else {
+        quote! {
+            Ok(Self {
+                #parse_fields
+                #skipped_fields
+            })
+        }
+    };
+
+    if let Some(request_options) = options.request.as_ref() {
+        let request_name = if let Some(name) = request_options.name.as_ref() {
+            quote! { #name }
         } else {
-            quote! {
-                impl #ident #type_params #where_clause {
-                    #[allow(clippy::ignored_unit_patterns)]
-                    fn parse_list_query<P: PageTokenBuilder #query_token_type >(
-                        source: #source,
-                        query_builder: &ListQueryBuilder<P>
-                    ) -> Result<Self, RequestError> {
-                        Ok(Self {
-                            #query_field_ident: {
-                                #parse_query
-                                query
-                            },
-                            #parse_fields
-                            #skipped_fields
-                        })
-                    }
-                }
-            }
-        });
+            quote! { #source::NAME }
+        };
+        parse = quote! {
+            (|| { #parse })().map_err(|err: RequestError| err.wrap_request(#request_name))
+        };
     }
 
-    Ok(quote! {
-        impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
-            #[allow(clippy::ignored_unit_patterns)]
-            fn parse(source: #source) -> RequestResult<Self> {
-                Ok(Self {
-                    #parse_fields
-                    #skipped_fields
-                })
+    Ok(if options.search_query.is_some() {
+        quote! {
+            impl #ident #type_params #where_clause {
+                #[allow(clippy::ignored_unit_patterns)]
+                fn parse_search_query<P: PageTokenBuilder #query_token_type >(
+                    source: #source,
+                    query_builder: &SearchQueryBuilder<P>
+                ) -> Result<Self, RequestError> {
+                    #parse
+                }
+            }
+        }
+    } else if options.list_query.is_some() {
+        quote! {
+            impl #ident #type_params #where_clause {
+                #[allow(clippy::ignored_unit_patterns)]
+                fn parse_list_query<P: PageTokenBuilder #query_token_type >(
+                    source: #source,
+                    query_builder: &ListQueryBuilder<P>
+                ) -> Result<Self, RequestError> {
+                    #parse
+                }
+            }
+        }
+    } else {
+        quote! {
+            impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
+                #[allow(clippy::ignored_unit_patterns)]
+                fn parse(source: #source) -> RequestResult<Self> {
+                    #parse
+                }
             }
         }
     })
