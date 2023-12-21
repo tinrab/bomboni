@@ -145,7 +145,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         quote! {
             impl #ident #type_params #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
-                fn parse_search_query<P: PageTokenBuilder #query_token_type >(
+                pub fn parse_search_query<P: PageTokenBuilder #query_token_type >(
                     source: #source,
                     query_builder: &SearchQueryBuilder<P>
                 ) -> Result<Self, RequestError> {
@@ -157,7 +157,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         quote! {
             impl #ident #type_params #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
-                fn parse_list_query<P: PageTokenBuilder #query_token_type >(
+                pub fn parse_list_query<P: PageTokenBuilder #query_token_type >(
                     source: #source,
                     query_builder: &ListQueryBuilder<P>
                 ) -> Result<Self, RequestError> {
@@ -746,7 +746,7 @@ fn expand_extract_source_field(field: &ParseField) -> TokenStream {
                 });
             }
 
-            // Purposefully clone source on each parse.
+            // Intentionally clone source on each parse.
             // Could be optimized in the future.
             quote! {
                 let target = source.clone() #extract;

@@ -1,5 +1,4 @@
-use base64ct::{Base64, Base64Url, Encoding};
-
+use super::{FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
@@ -8,10 +7,11 @@ use crate::{
         page_token::utility::get_page_filter,
     },
 };
-
-use super::{FilterPageToken, PageTokenBuilder};
+use base64ct::{Base64, Base64Url, Encoding};
+use std::fmt::{self, Debug, Formatter};
 
 /// Page token builder for Base64-encoded tokens.
+#[derive(Clone)]
 pub struct Base64PageTokenBuilder {
     url_safe: bool,
 }
@@ -58,6 +58,12 @@ impl PageTokenBuilder for Base64PageTokenBuilder {
         } else {
             Ok(Base64::encode_string(page_filter.to_string().as_bytes()))
         }
+    }
+}
+
+impl Debug for Base64PageTokenBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Base64PageTokenBuilder").finish()
     }
 }
 

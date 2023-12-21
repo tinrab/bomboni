@@ -1,3 +1,4 @@
+use super::{utility::make_page_key, FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
@@ -6,14 +7,14 @@ use crate::{
         page_token::utility::get_page_filter,
     },
 };
-
-use super::{utility::make_page_key, FilterPageToken, PageTokenBuilder};
 use base64ct::{Base64, Base64Url, Encoding};
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use std::fmt::{self, Debug, Formatter};
 
 const PARAMS_KEY_LENGTH: usize = 32;
 
 /// Page token builder for RSA-encrypted tokens.
+#[derive(Clone)]
 pub struct RsaPageTokenBuilder {
     private_key: RsaPrivateKey,
     public_key: RsaPublicKey,
@@ -93,6 +94,12 @@ impl PageTokenBuilder for RsaPageTokenBuilder {
         } else {
             Ok(Base64::encode_string(&encrypted))
         }
+    }
+}
+
+impl Debug for RsaPageTokenBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RsaPageTokenBuilder").finish()
     }
 }
 

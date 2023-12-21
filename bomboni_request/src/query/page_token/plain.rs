@@ -1,14 +1,15 @@
+use super::{utility::get_page_filter, FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
     query::error::{QueryError, QueryResult},
     schema::SchemaMapped,
 };
-
-use super::{utility::get_page_filter, FilterPageToken, PageTokenBuilder};
+use std::fmt::{self, Debug, Formatter};
 
 /// Plain text page token builder.
 /// Used only for testing.
+#[derive(Clone)]
 pub struct PlainPageTokenBuilder {}
 
 impl PageTokenBuilder for PlainPageTokenBuilder {
@@ -37,5 +38,11 @@ impl PageTokenBuilder for PlainPageTokenBuilder {
             return Err(QueryError::PageTokenFailure);
         }
         Ok(format!("{page_filter}"))
+    }
+}
+
+impl Debug for PlainPageTokenBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PlainPageTokenBuilder").finish()
     }
 }

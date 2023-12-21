@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request"
-version = "0.1.40"
+version = "0.1.43"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -19,23 +19,23 @@ testing = []
 tonic = ["bomboni_proto/tonic", "dep:tonic"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.40" }
-bomboni_proto = { path = "../bomboni_proto", version = "0.1.40" }
-thiserror = "1.0.50"
+bomboni_common = { path = "../bomboni_common", version = "0.1.43" }
+bomboni_proto = { path = "../bomboni_proto", version = "0.1.43" }
+thiserror = "1.0.51"
 itertools = "0.12.0"
-time = { version = "0.3.30", features = ["formatting", "parsing"] }
+time = { version = "0.3.31", features = ["formatting", "parsing"] }
 prost = "0.12.3"
 pest = "2.7.5"
 pest_derive = "2.7.5"
 base64ct = { version = "1.6.0", features = ["alloc"] }
 aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
-rsa = "0.9.5"
+rsa = "0.9.6"
 rand = "0.8.5"
 regex = "1.10.2"
 
 tonic = { version = "0.10.2", optional = true }
-bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.40", optional = true }
+bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.43", optional = true }
 
 [dev-dependencies]
 serde = { version = "1.0.193", features = ["derive"] }

@@ -1501,6 +1501,7 @@ mod tests {
             })
         }
 
+        #[derive(Clone)]
         struct CustomPageTokenBuilder {}
 
         impl PageTokenBuilder for CustomPageTokenBuilder {

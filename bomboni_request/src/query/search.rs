@@ -36,6 +36,7 @@ pub struct SearchQueryConfig {
     pub max_ordering_length: Option<usize>,
 }
 
+#[derive(Debug, Clone)]
 pub struct SearchQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
     options: SearchQueryConfig,

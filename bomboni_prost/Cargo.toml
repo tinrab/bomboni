@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_prost"
-version = "0.1.40"
+version = "0.1.43"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with prost. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -19,6 +19,6 @@ convert_case = "0.6.0"
 prost = "0.12.3"
 prost-types = "0.12.3"
 proc-macro2 = "1.0.70"
-syn = { version = "2.0.39", features = ["full"] }
+syn = { version = "2.0.42", features = ["full"] }
 quote = "1.0.33"
 prettyplease = "0.2.15"

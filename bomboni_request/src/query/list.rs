@@ -41,6 +41,7 @@ pub struct ListQueryConfig {
     pub max_ordering_length: Option<usize>,
 }
 
+#[derive(Debug, Clone)]
 pub struct ListQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
     options: ListQueryConfig,

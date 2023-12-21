@@ -1,9 +1,4 @@
-use aes_gcm::{
-    aead::{Aead, OsRng},
-    AeadCore, Aes256Gcm, Key, KeyInit,
-};
-use base64ct::{Base64, Base64Url, Encoding};
-
+use super::{utility::make_page_key, FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
@@ -13,14 +8,19 @@ use crate::{
     },
     schema::SchemaMapped,
 };
-
-use super::{utility::make_page_key, FilterPageToken, PageTokenBuilder};
+use aes_gcm::{
+    aead::{Aead, OsRng},
+    AeadCore, Aes256Gcm, Key, KeyInit,
+};
+use base64ct::{Base64, Base64Url, Encoding};
+use std::fmt::{self, Debug, Formatter};
 
 const NONCE_LENGTH: usize = 12;
 
 /// AES-256-GCM page token builder.
 /// The page token is encrypted using the query parameters as the key.
 /// This is useful for ensuring that the page token was generated for the same paging rules.
+#[derive(Clone)]
 pub struct Aes256PageTokenBuilder {
     url_safe: bool,
 }
@@ -98,6 +98,12 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         } else {
             Ok(Base64::encode_string(&encrypted))
         }
+    }
+}
+
+impl Debug for Aes256PageTokenBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Aes256PageTokenBuilder").finish()
     }
 }
 
