@@ -105,14 +105,15 @@ pub type DomainErrorBox = Box<dyn DomainError + Send + Sync>;
 
 impl RequestError {
     #[must_use]
-    pub fn bad_request<V, F, E>(name: &str, violations: V) -> Self
+    pub fn bad_request<N, V, F, E>(name: N, violations: V) -> Self
     where
+        N: Display,
         V: IntoIterator<Item = (F, E)>,
-        F: ToString,
+        F: Display,
         E: Into<DomainErrorBox>,
     {
         Self::BadRequest {
-            name: name.into(),
+            name: name.to_string(),
             violations: violations
                 .into_iter()
                 .map(|(field, error)| FieldError {
@@ -132,7 +133,7 @@ impl RequestError {
     #[must_use]
     pub fn field<F, E>(field: F, error: E) -> Self
     where
-        F: ToString,
+        F: Display,
         E: Into<DomainErrorBox>,
     {
         FieldError {
@@ -144,21 +145,22 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn field_index<F, E>(field: F, index: usize, error: E) -> Self
+    pub fn field_index<F, I, E>(field: F, index: I, error: E) -> Self
     where
-        F: ToString,
+        F: Display,
+        I: Into<usize>,
         E: Into<DomainErrorBox>,
     {
         FieldError {
             field: field.to_string(),
             error: error.into(),
-            index: Some(index),
+            index: Some(index.into()),
         }
         .into()
     }
 
     #[must_use]
-    pub fn wrap(self, root_field: &str) -> Self {
+    pub fn wrap<F: Display>(self, root_field: F) -> Self {
         match self {
             Self::Field(error) => FieldError {
                 field: format!("{}.{}", root_field, error.field),
@@ -173,7 +175,11 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_index(self, root_field: &str, root_index: usize) -> Self {
+    pub fn wrap_index<F, I>(self, root_field: F, root_index: I) -> Self
+    where
+        F: Display,
+        I: Display + Into<usize>,
+    {
         match self {
             Self::Field(error) => FieldError {
                 field: format!("{}[{}].{}", root_field, root_index, error.field),
@@ -188,7 +194,7 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_request(self, name: &str) -> Self {
+    pub fn wrap_request<N: Display>(self, name: N) -> Self {
         match self {
             Self::Field(error) => Self::bad_request(name, [(error.field, error.error)]),
             Self::Domain(error) => {
@@ -210,10 +216,11 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_request_nested<P, F>(self, name: &str, root_path: P) -> Self
+    pub fn wrap_request_nested<N, P, F>(self, name: N, root_path: P) -> Self
     where
+        N: Display,
         P: IntoIterator<Item = F>,
-        F: ToString,
+        F: Display,
     {
         match self {
             Self::Field(error) => Self::bad_request(
