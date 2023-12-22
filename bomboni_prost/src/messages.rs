@@ -1,10 +1,10 @@
-use crate::utility::str_to_case;
 use convert_case::Case;
 use proc_macro2::{Literal, TokenStream};
 use prost_types::DescriptorProto;
 use quote::{format_ident, quote};
 
 use crate::{context::Context, oneofs::write_message_oneofs, utility::macros::format_comment};
+use crate::{enums::write_enum, utility::str_to_case};
 
 pub fn write_message(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if context.config.api.names {
@@ -20,35 +20,35 @@ pub fn write_message(context: &Context, s: &mut TokenStream, message: &Descripto
         write_message_oneofs(context, s, message);
     }
 
-    if !message.nested_type.is_empty() {
-        let mut path = context.path.clone();
-        path.push(message.name.clone().unwrap());
-        for nested_message in &message.nested_type {
-            // Skip map entries
-            if nested_message
-                .options
-                .as_ref()
-                .and_then(|o| o.map_entry)
-                .unwrap_or(false)
-            {
-                continue;
-            }
+    let mut path = context.path.clone();
+    path.push(message.name.clone().unwrap());
+    let nested_context = Context {
+        path: path.clone(),
+        package_name: context.package_name.clone(),
+        ..*context
+    };
 
-            write_message(
-                &Context {
-                    path: path.clone(),
-                    package_name: context.package_name.clone(),
-                    ..*context
-                },
-                s,
-                nested_message,
-            );
+    for nested_enum in &message.enum_type {
+        write_enum(&nested_context, s, nested_enum);
+    }
+
+    for nested_message in &message.nested_type {
+        // Skip map entries
+        if nested_message
+            .options
+            .as_ref()
+            .and_then(|o| o.map_entry)
+            .unwrap_or(false)
+        {
+            continue;
         }
+
+        write_message(&nested_context, s, nested_message);
     }
 }
 
 fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    let message_ident = context.get_type_ident(message.name());
+    let message_ident = context.get_type_expr_path(message.name());
     let message_proto_name = context.get_proto_type_name(message.name());
     let package_proto_name = Literal::string(&context.package_name);
 
@@ -78,7 +78,7 @@ fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto)
 }
 
 fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    let message_ident = context.get_type_ident(message.name());
+    let message_ident = context.get_type_expr_path(message.name());
     let message_proto_name = context.get_proto_type_name(message.name());
 
     let type_url = if let Some(domain) = context.config.api.domain.as_ref() {
@@ -115,7 +115,7 @@ fn write_field_names(context: &Context, s: &mut TokenStream, message: &Descripto
             pub const #field_name_ident: &'static str = #field_name;
         });
     }
-    let message_ident = context.get_type_ident(message.name());
+    let message_ident = context.get_type_expr_path(message.name());
     s.extend(quote! {
         impl #message_ident {
             #names

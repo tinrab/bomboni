@@ -53,7 +53,7 @@ fn write_name(
     message: &DescriptorProto,
     oneof: &OneofDescriptorProto,
 ) {
-    let message_ident = context.get_type_ident(message.name());
+    let message_ident = context.get_type_expr_path(message.name());
     let oneof_name_ident = format_ident!(
         "{}_ONEOF_NAME",
         str_to_case(oneof.name(), Case::ScreamingSnake)
@@ -176,7 +176,7 @@ fn write_variant_from(
                 .iter()
                 .all(|field| field.oneof_index.is_some())
         {
-            let message_ident = context.get_type_ident(message.name());
+            let message_ident = context.get_type_expr_path(message.name());
             let variant_ident = format_ident!("{}", str_to_case(oneof.name(), Case::Snake));
             s.extend(quote! {
                 /// From source variant type to owner message type.
@@ -238,7 +238,7 @@ fn write_into_owner(context: &Context, s: &mut TokenStream, message: &Descriptor
     {
         return;
     }
-    let message_ident = context.get_type_ident(message.name());
+    let message_ident = context.get_type_expr_path(message.name());
     let oneof = message.oneof_decl.first().unwrap();
     let oneof_ident = context.get_oneof_ident(message, oneof);
     let variant_ident = format_ident!("{}", str_to_case(oneof.name(), Case::Snake));

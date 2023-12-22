@@ -1,14 +1,15 @@
-use crate::tools::serving_status_serde;
 use prost::Name;
 use serde::{Deserialize, Serialize};
 
 use crate::tools::{
     command::v1::{
-        command::Kind as CommandKind,
-        command::{status::Kind as StatusKind, Status},
+        command::{
+            status::Kind as CommandStatusKind, Kind as CommandKind, Status as CommandStatus,
+        },
         Command,
     },
-    CommandRequest, ServingStatus,
+    command_response::Status as CommandResponseStatus,
+    helpers, CommandRequest, Status,
 };
 
 #[allow(unused_qualifications, clippy::all, clippy::pedantic)]
@@ -41,24 +42,27 @@ fn names() {
     assert_eq!(Command::ETAG_FIELD_NAME, "etag");
     assert_eq!(CommandKind::STATUS_VARIANT_NAME, "status");
 
-    assert_eq!(Status::NAME, "Command.Status");
-    assert_eq!(Status::PACKAGE, "tools.command.v1");
+    assert_eq!(CommandStatus::NAME, "Command.Status");
+    assert_eq!(CommandStatus::PACKAGE, "tools.command.v1");
+
+    assert_eq!(Status::NAME, "Status");
+    assert_eq!(CommandResponseStatus::NAME, "CommandResponse.Status");
 }
 
 #[test]
 fn converts() {
     assert!(matches!(
-        CommandKind::from(Status {
+        CommandKind::from(CommandStatus {
             ..Default::default()
         }),
         CommandKind::Status(_)
     ));
     assert!(matches!(
-        Status::from("error".to_string()),
-        Status { kind: Some(StatusKind::Error(err)), .. } if err == "error"
+        CommandStatus::from("error".to_string()),
+        CommandStatus { kind: Some(CommandStatusKind::Error(err)), .. } if err == "error"
     ));
     assert_eq!(
-        Status::from("err".to_string())
+        CommandStatus::from("err".to_string())
             .kind
             .unwrap()
             .get_variant_name(),
@@ -70,27 +74,36 @@ fn converts() {
 fn serialization() {
     #[derive(Serialize, Deserialize)]
     struct StatusObj {
-        #[serde(with = "serving_status_serde")]
+        #[serde(with = "helpers::status_serde")]
         status: i32,
+        #[serde(with = "helpers::command_response::status_serde")]
+        command_response_status: i32,
     }
 
     assert_eq!(
-        serde_json::from_str::<ServingStatus>(
-            &serde_json::to_string(&ServingStatus::Serving).unwrap()
-        )
-        .unwrap(),
-        ServingStatus::Serving,
+        serde_json::from_str::<Status>(&serde_json::to_string(&Status::Ok).unwrap()).unwrap(),
+        Status::Ok,
     );
 
     let serialized = serde_json::to_string(&StatusObj {
-        status: ServingStatus::Serving as i32,
+        status: Status::Ok as i32,
+        command_response_status: CommandResponseStatus::Success as i32,
     })
     .unwrap();
-    assert_eq!(serialized, r#"{"status":"SERVING"}"#);
+    assert_eq!(
+        serialized,
+        r#"{"status":"OK","command_response_status":"SUCCESS"}"#
+    );
     assert_eq!(
         serde_json::from_str::<StatusObj>(&serialized)
             .unwrap()
             .status,
-        ServingStatus::Serving as i32,
+        Status::Ok as i32,
+    );
+    assert_eq!(
+        serde_json::from_str::<StatusObj>(&serialized)
+            .unwrap()
+            .command_response_status,
+        CommandResponseStatus::Success as i32,
     );
 }

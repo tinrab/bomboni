@@ -5,7 +5,6 @@ use bomboni_proto::google::protobuf::Any;
 use bomboni_proto::google::rpc::bad_request::FieldViolation;
 use bomboni_proto::google::rpc::BadRequest;
 use bomboni_proto::google::rpc::{Code, Status};
-use itertools::Itertools;
 use prost::{DecodeError, EncodeError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -15,12 +14,12 @@ pub enum RequestError {
     #[error("invalid `{name}` request")]
     BadRequest {
         name: String,
-        violations: Vec<FieldError>,
+        violations: Vec<PathError>,
     },
     #[error(transparent)]
-    Field(FieldError),
+    Path(PathError),
     #[error("{0}")]
-    Domain(DomainErrorBox),
+    Generic(GenericErrorBox),
     #[error("encode error: {0}")]
     Encode(#[from] EncodeError),
     #[error("decode error: {0}")]
@@ -30,10 +29,16 @@ pub enum RequestError {
 pub type RequestResult<T> = Result<T, RequestError>;
 
 #[derive(Debug)]
-pub struct FieldError {
-    pub field: String,
-    pub error: DomainErrorBox,
-    pub index: Option<usize>,
+pub struct PathError {
+    pub path: Vec<PathErrorStep>,
+    pub error: GenericErrorBox,
+}
+
+#[derive(Debug)]
+pub enum PathErrorStep {
+    Field(String),
+    Index(usize),
+    Key(String),
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
@@ -89,7 +94,7 @@ pub enum CommonError {
     TypeMismatch,
 }
 
-pub trait DomainError: Error {
+pub trait GenericError: Error {
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn code(&self) -> Code {
@@ -101,7 +106,7 @@ pub trait DomainError: Error {
     }
 }
 
-pub type DomainErrorBox = Box<dyn DomainError + Send + Sync>;
+pub type GenericErrorBox = Box<dyn GenericError + Send + Sync>;
 
 impl RequestError {
     #[must_use]
@@ -110,64 +115,110 @@ impl RequestError {
         N: Display,
         V: IntoIterator<Item = (F, E)>,
         F: Display,
-        E: Into<DomainErrorBox>,
+        E: Into<GenericErrorBox>,
     {
         Self::BadRequest {
             name: name.to_string(),
             violations: violations
                 .into_iter()
-                .map(|(field, error)| FieldError {
-                    field: field.to_string(),
+                .map(|(field, error)| PathError {
+                    path: vec![PathErrorStep::Field(field.to_string())],
                     error: error.into(),
-                    index: None,
                 })
                 .collect(),
         }
     }
 
     #[must_use]
-    pub fn domain<E: Into<DomainErrorBox>>(error: E) -> Self {
-        Self::Domain(error.into())
+    pub fn generic<E: Into<GenericErrorBox>>(error: E) -> Self {
+        Self::Generic(error.into())
     }
 
     #[must_use]
     pub fn field<F, E>(field: F, error: E) -> Self
     where
         F: Display,
-        E: Into<DomainErrorBox>,
+        E: Into<GenericErrorBox>,
     {
-        FieldError {
-            field: field.to_string(),
+        PathError {
+            path: vec![PathErrorStep::Field(field.to_string())],
             error: error.into(),
-            index: None,
         }
         .into()
     }
 
     #[must_use]
-    pub fn field_index<F, I, E>(field: F, index: I, error: E) -> Self
+    pub fn index<E>(index: usize, error: E) -> Self
+    where
+        E: Into<GenericErrorBox>,
+    {
+        PathError {
+            path: vec![PathErrorStep::Index(index)],
+            error: error.into(),
+        }
+        .into()
+    }
+
+    #[must_use]
+    pub fn key<K, E>(key: K, error: E) -> Self
+    where
+        K: Display,
+        E: Into<GenericErrorBox>,
+    {
+        PathError {
+            path: vec![PathErrorStep::Key(key.to_string())],
+            error: error.into(),
+        }
+        .into()
+    }
+
+    #[must_use]
+    pub fn field_index<F, E>(field: F, index: usize, error: E) -> Self
     where
         F: Display,
-        I: Into<usize>,
-        E: Into<DomainErrorBox>,
+        E: Into<GenericErrorBox>,
     {
-        FieldError {
-            field: field.to_string(),
+        PathError {
+            path: vec![
+                PathErrorStep::Field(field.to_string()),
+                PathErrorStep::Index(index),
+            ],
             error: error.into(),
-            index: Some(index.into()),
         }
         .into()
     }
 
     #[must_use]
-    pub fn wrap<F: Display>(self, root_field: F) -> Self {
+    pub fn field_key<F, K, E>(field: F, key: K, error: E) -> Self
+    where
+        F: Display,
+        K: Display,
+        E: Into<GenericErrorBox>,
+    {
+        PathError {
+            path: vec![
+                PathErrorStep::Field(field.to_string()),
+                PathErrorStep::Key(key.to_string()),
+            ],
+            error: error.into(),
+        }
+        .into()
+    }
+
+    #[must_use]
+    pub fn wrap<F: Display>(self, field: F) -> Self {
         match self {
-            Self::Field(error) => FieldError {
-                field: format!("{}.{}", root_field, error.field),
-                ..error
+            Self::Path(mut error) => PathError {
+                path: {
+                    error
+                        .path
+                        .insert(0, PathErrorStep::Field(field.to_string()));
+                    error.path
+                },
+                error: error.error,
             }
             .into(),
-            Self::Domain(error) => Self::field(root_field, error),
+            Self::Generic(error) => Self::field(field, error),
             // TODO: skip or panic?
             err => err,
             // _ => unreachable!(),
@@ -175,108 +226,111 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_index<F, I>(self, root_field: F, root_index: I) -> Self
-    where
-        F: Display,
-        I: Display + Into<usize>,
-    {
+    pub fn wrap_index(self, index: usize) -> Self {
         match self {
-            Self::Field(error) => FieldError {
-                field: format!("{}[{}].{}", root_field, root_index, error.field),
-                ..error
+            Self::Path(mut error) => PathError {
+                path: {
+                    error.path.insert(0, PathErrorStep::Index(index));
+                    error.path
+                },
+                error: error.error,
             }
             .into(),
-            Self::Domain(error) => Self::field_index(root_field, root_index, error),
-            // TODO: skip or panic?
+            Self::Generic(error) => Self::index(index, error),
             err => err,
-            // _ => unreachable!(),
+        }
+    }
+
+    #[must_use]
+    pub fn wrap_key<K: Display>(self, key: K) -> Self {
+        match self {
+            Self::Path(mut error) => PathError {
+                path: {
+                    error.path.insert(0, PathErrorStep::Key(key.to_string()));
+                    error.path
+                },
+                error: error.error,
+            }
+            .into(),
+            Self::Generic(error) => Self::key(key, error),
+            err => err,
+        }
+    }
+
+    #[must_use]
+    pub fn wrap_field_index<F>(self, field: F, index: usize) -> Self
+    where
+        F: Display,
+    {
+        match self {
+            Self::Path(error) => PathError {
+                path: {
+                    let mut path = vec![
+                        PathErrorStep::Field(field.to_string()),
+                        PathErrorStep::Index(index),
+                    ];
+                    path.extend(error.path);
+                    path
+                },
+                error: error.error,
+            }
+            .into(),
+            Self::Generic(error) => Self::field_index(field, index, error),
+            err => err,
+        }
+    }
+
+    #[must_use]
+    pub fn wrap_field_key<F, K>(self, field: F, key: K) -> Self
+    where
+        F: Display,
+        K: Display,
+    {
+        match self {
+            Self::Path(error) => PathError {
+                path: {
+                    let mut path = vec![
+                        PathErrorStep::Field(field.to_string()),
+                        PathErrorStep::Key(key.to_string()),
+                    ];
+                    path.extend(error.path);
+                    path
+                },
+                error: error.error,
+            }
+            .into(),
+            Self::Generic(error) => Self::field_key(field, key, error),
+            err => err,
         }
     }
 
     #[must_use]
     pub fn wrap_request<N: Display>(self, name: N) -> Self {
         match self {
-            Self::Field(error) => Self::bad_request(name, [(error.field, error.error)]),
-            Self::Domain(error) => {
+            Self::Path(error) => Self::bad_request(name, [(error.path_to_string(), error.error)]),
+            Self::Generic(error) => {
                 if let Some(error) = error.as_any().downcast_ref::<QueryError>() {
                     #[allow(trivial_casts)]
                     Self::bad_request(
                         name,
                         [(
                             error.get_violating_field_name(),
-                            Box::new(error.clone()) as DomainErrorBox,
+                            Box::new(error.clone()) as GenericErrorBox,
                         )],
                     )
                 } else {
-                    RequestError::Domain(error)
+                    RequestError::Generic(error)
                 }
             }
             error => error,
-        }
-    }
-
-    #[must_use]
-    pub fn wrap_request_nested<N, P, F>(self, name: N, root_path: P) -> Self
-    where
-        N: Display,
-        P: IntoIterator<Item = F>,
-        F: Display,
-    {
-        match self {
-            Self::Field(error) => Self::bad_request(
-                name,
-                [(
-                    format!(
-                        "{}.{}",
-                        root_path.into_iter().map(|step| step.to_string()).join("."),
-                        error.field
-                    ),
-                    error.error,
-                )],
-            ),
-            Self::Domain(error) => {
-                if let Some(error) = error.as_any().downcast_ref::<QueryError>() {
-                    #[allow(trivial_casts)]
-                    Self::bad_request(
-                        name,
-                        [(
-                            format!(
-                                "{}.{}",
-                                root_path.into_iter().map(|step| step.to_string()).join("."),
-                                error.get_violating_field_name()
-                            ),
-                            Box::new(error.clone()) as DomainErrorBox,
-                        )],
-                    )
-                } else {
-                    RequestError::Domain(error)
-                }
-            }
-            error => error,
-        }
-    }
-
-    pub fn downcast_domain_ref<T: std::any::Any>(&self) -> Option<&T> {
-        if let Self::Domain(error) = self {
-            error.as_any().downcast_ref::<T>()
-        } else {
-            None
-        }
-    }
-
-    pub fn downcast_domain<T: 'static + Clone>(&self) -> Option<T> {
-        if let Self::Domain(error) = self {
-            error.as_any().downcast_ref::<T>().cloned()
-        } else {
-            None
         }
     }
 
     pub fn code(&self) -> Code {
         match self {
             Self::Encode(_) | Self::Decode(_) | Self::BadRequest { .. } => Code::InvalidArgument,
-            Self::Field(error) => error.code(),
-            Self::Domain(error) => error.code(),
+            Self::Path(error) => error.code(),
+            Self::Generic(error) => error.code(),
         }
     }
 
@@ -286,15 +340,15 @@ impl RequestError {
                 field_violations: violations
                     .iter()
                     .map(|error| FieldViolation {
-                        field: error.field.clone(),
+                        field: error.path_to_string(),
                         description: error.error.to_string(),
                     })
                     .collect(),
             }
             .try_into()
             .unwrap()],
-            Self::Field(error) => error.details(),
-            Self::Domain(error) => error.details(),
+            Self::Path(error) => error.details(),
+            Self::Generic(error) => error.details(),
             _ => Vec::new(),
         }
     }
@@ -326,7 +380,7 @@ impl From<&RequestError> for tonic::Status {
     }
 }
 
-impl FieldError {
+impl PathError {
     pub fn code(&self) -> Code {
         self.error.code()
     }
@@ -334,31 +388,56 @@ impl FieldError {
     pub fn details(&self) -> Vec<Any> {
         self.error.details()
     }
+
+    pub fn path_to_string(&self) -> String {
+        let mut path = String::new();
+        for (i, step) in self.path.iter().enumerate() {
+            match step {
+                PathErrorStep::Field(field) => {
+                    if i == 0 {
+                        path.push_str(field);
+                    } else {
+                        path.push_str(&format!(".{field}"));
+                    }
+                }
+                PathErrorStep::Index(index) => path.push_str(&format!("[{index}]")),
+                PathErrorStep::Key(key) => path.push_str(&format!("{{{key}}}")),
+            }
+        }
+        path
+    }
 }
 
-impl Error for FieldError {}
+impl Error for PathError {}
 
-impl Display for FieldError {
+impl From<PathError> for RequestError {
+    fn from(err: PathError) -> Self {
+        Self::Path(err)
+    }
+}
+
+impl Display for PathError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Some(index) = self.index {
-            write!(
-                f,
-                "field `{}[{}]` error: `{}`",
-                self.field, index, self.error
-            )
-        } else {
-            write!(f, "field `{}` error: `{}`", self.field, self.error)
+        write!(
+            f,
+            "field `{}` error: `{}`",
+            self.path_to_string(),
+            self.error
+        )
+    }
+}
+
+impl Display for PathErrorStep {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Field(field) => write!(f, "{field}"),
+            Self::Index(index) => write!(f, "[{index}]"),
+            Self::Key(key) => write!(f, "{{{key}}}"),
         }
     }
 }
 
-impl From<FieldError> for RequestError {
-    fn from(err: FieldError) -> Self {
-        RequestError::Field(err)
-    }
-}
-
-impl DomainError for CommonError {
+impl GenericError for CommonError {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -373,18 +452,61 @@ impl DomainError for CommonError {
     }
 }
 
-impl<T> From<T> for DomainErrorBox
+impl<T> From<T> for GenericErrorBox
 where
-    T: 'static + DomainError + Send + Sync,
+    T: 'static + GenericError + Send + Sync,
 {
     fn from(err: T) -> Self {
         Box::new(err)
     }
 }
 
-impl<T: 'static + DomainError + Send + Sync> From<T> for RequestError {
+impl<T: 'static + GenericError + Send + Sync> From<T> for RequestError {
     fn from(err: T) -> Self {
-        RequestError::Domain(Box::new(err))
+        RequestError::Generic(Box::new(err))
+    }
+}
+
+pub trait RequestErrorExt {
+    fn wrap<F: Display>(self, field: F) -> RequestError;
+
+    fn wrap_index(self, index: usize) -> RequestError;
+
+    fn wrap_key<K: Display>(self, key: K) -> RequestError;
+
+    fn wrap_field_index<F: Display>(self, field: F, index: usize) -> RequestError;
+
+    fn wrap_field_key<F: Display, K: Display>(self, field: F, key: K) -> RequestError;
+
+    fn wrap_request<N: Display>(self, name: N) -> RequestError;
+}
+
+impl<T> RequestErrorExt for T
+where
+    T: 'static + GenericError + Send + Sync,
+{
+    fn wrap<F: Display>(self, field: F) -> RequestError {
+        RequestError::generic(self).wrap(field)
+    }
+
+    fn wrap_index(self, index: usize) -> RequestError {
+        RequestError::generic(self).wrap_index(index)
+    }
+
+    fn wrap_key<K: Display>(self, key: K) -> RequestError {
+        RequestError::generic(self).wrap_key(key)
+    }
+
+    fn wrap_field_index<F: Display>(self, field: F, index: usize) -> RequestError {
+        RequestError::generic(self).wrap_field_index(field, index)
+    }
+
+    fn wrap_field_key<F: Display, K: Display>(self, field: F, key: K) -> RequestError {
+        RequestError::generic(self).wrap_field_key(field, key)
+    }
+
+    fn wrap_request<N: Display>(self, name: N) -> RequestError {
+        RequestError::generic(self).wrap_request(name)
     }
 }
 
@@ -433,5 +555,32 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    fn field_paths() {
+        assert_eq!(
+            RequestError::generic(CommonError::NotFound)
+                .wrap("value")
+                .wrap_index(42)
+                .wrap("root")
+                .to_string(),
+            "field `root[42].value` error: `not found`"
+        );
+        assert!(matches!(
+            RequestError::generic(CommonError::NotFound)
+                .wrap_index(42)
+                .wrap("value")
+                .wrap_request("Test"),
+            RequestError::BadRequest { name, violations }
+            if name == "Test" && violations.len() == 1
+                && violations[0].to_string() == "field `value[42]` error: `not found`"
+        ));
+        assert!(matches!(
+            CommonError::InvalidId.wrap("id").wrap_request("Test"),
+            RequestError::BadRequest { name, violations }
+            if name == "Test" && violations.len() == 1
+                && violations[0].to_string() == "field `id` error: `invalid ID format`"
+        ));
     }
 }

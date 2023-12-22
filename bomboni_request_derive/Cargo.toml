@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request_derive"
-version = "0.1.44"
+version = "0.1.47"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Provides derive implementations for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -16,7 +16,7 @@ proc-macro = true
 
 [dependencies]
 itertools = "0.12.0"
-proc-macro2 = { version = "1.0.70", features = ["proc-macro"] }
+proc-macro2 = { version = "1.0.71", features = ["proc-macro"] }
 syn = "2.0.42"
 quote = "1.0.33"
 darling = "0.20.3"

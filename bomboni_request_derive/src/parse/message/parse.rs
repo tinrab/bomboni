@@ -315,7 +315,7 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
         } else if is_nested || is_generic {
             parse_item.extend(quote! {
                 let target = target.parse_into()
-                    .map_err(|err: RequestError| err.wrap_index(#field_name, i))?;
+                    .map_err(|err: RequestError| err.wrap_field_index(#field_name, i))?;
             });
         }
         quote! {
@@ -337,8 +337,9 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
             });
             parse_item.extend(quote! {
                 if !re.is_match(&target) {
-                    return Err(RequestError::field(
+                    return Err(RequestError::field_key(
                         #field_name,
+                        &key,
                         CommonError::InvalidStringFormat {
                             expected: #regex.into(),
                         },
@@ -348,21 +349,20 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
         } else if field.enumeration {
             parse_item.extend(quote! {
                 let target = target.try_into()
-                    .map_err(|_| RequestError::field(#field_name, CommonError::InvalidEnumValue))?;
+                    .map_err(|_| RequestError::field_key(#field_name, &key, CommonError::InvalidEnumValue))?;
             });
         } else if is_nested || is_generic {
             parse_item.extend(quote! {
                 let target = target.parse_into()
-                    .map_err(|err: RequestError| err.wrap(#field_name))?;
+                    .map_err(|err: RequestError| err.wrap_field_key(#field_name, &key))?;
             });
         }
-        // TODO: add map key to RequestError?
         quote! {
             #parse_source
             let mut m = #map_ident::new();
-            for (k, target) in target.into_iter() {
+            for (key, target) in target.into_iter() {
                 #parse_item
-                m.insert(k, target);
+                m.insert(key, target);
             }
             let target = m;
         }

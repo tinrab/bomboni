@@ -19,6 +19,7 @@ pub struct ApiConfig {
     pub oneof_utility: bool,
     pub domain: Option<String>,
     pub serde: bool,
+    pub helpers_mod: Option<String>,
 }
 
 impl Default for CompileConfig {
@@ -43,6 +44,7 @@ impl Default for ApiConfig {
             oneof_utility: true,
             domain: None,
             serde: true,
+            helpers_mod: None,
         }
     }
 }

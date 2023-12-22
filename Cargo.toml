@@ -1,6 +1,6 @@
 [package]
 name = "bomboni"
-version = "0.1.44"
+version = "0.1.47"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utility Library for Rust"
 repository = "https://github.com/tinrab/bomboni"
@@ -38,9 +38,9 @@ tokio = ["bomboni_common/tokio"]
 tonic = ["bomboni_proto/tonic", "bomboni_request/tonic"]
 
 [dependencies]
-bomboni_common = { path = "bomboni_common", version = "0.1.44" }
+bomboni_common = { path = "bomboni_common", version = "0.1.47" }
 
-bomboni_prost = { path = "bomboni_prost", version = "0.1.44", optional = true }
-bomboni_proto = { path = "bomboni_proto", version = "0.1.44", optional = true }
-bomboni_request = { path = "bomboni_request", version = "0.1.44", optional = true }
-bomboni_template = { path = "bomboni_template", version = "0.1.44", optional = true }
+bomboni_prost = { path = "bomboni_prost", version = "0.1.47", optional = true }
+bomboni_proto = { path = "bomboni_proto", version = "0.1.47", optional = true }
+bomboni_request = { path = "bomboni_request", version = "0.1.47", optional = true }
+bomboni_template = { path = "bomboni_template", version = "0.1.47", optional = true }

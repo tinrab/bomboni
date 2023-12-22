@@ -15,15 +15,23 @@ message CommandRequest {
 }
 
 message CommandResponse {
+  enum Status {
+    UNKNOWN = 0;
+    SUCCESS = 1;
+    FAILURE = 2;
+  }
+
   string result = 1;
 
   google.protobuf.Timestamp time = 2;
+
+  Status status = 3;
 }
 
-enum ServingStatus {
+enum Status {
   UNKNOWN = 0;
-  SERVING = 1;
-  NOT_SERVING = 2;
+  OK = 1;
+  ERROR = 2;
 }
 
 message Value {
@@ -41,17 +49,16 @@ message Value {
 }
 
 message ValueType {
-  oneof kind {
-    InnerValueType inner = 1;
+  message InnerValueType {
+    bool optional = 1;
 
-    google.protobuf.Empty unit = 2;
+    bool reference = 2;
+
+    ValueType value_type = 3;
   }
-}
 
-message InnerValueType {
-  bool optional = 1;
-
-  bool reference = 2;
-
-  ValueType value_type = 3;
+  oneof kind {
+    google.protobuf.Empty unit = 1;
+    InnerValueType inner = 2;
+  }
 }

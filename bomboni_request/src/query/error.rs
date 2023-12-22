@@ -1,7 +1,7 @@
 use bomboni_proto::google::rpc::Code;
 use thiserror::Error;
 
-use crate::{error::DomainError, filter::error::FilterError, ordering::error::OrderingError};
+use crate::{error::GenericError, filter::error::FilterError, ordering::error::OrderingError};
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum QueryError {
@@ -55,7 +55,7 @@ impl From<OrderingError> for QueryError {
     }
 }
 
-impl DomainError for QueryError {
+impl GenericError for QueryError {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

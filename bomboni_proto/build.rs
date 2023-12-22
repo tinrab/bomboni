@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         compile(CompileConfig {
             api: ApiConfig {
                 domain: Some("tests".into()),
+                helpers_mod: Some("helpers".into()),
                 ..Default::default()
             },
             file_descriptor_set_path: out_dir.join(fd_path),
@@ -92,7 +93,16 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     );
     config.field_attribute(
         ".google.rpc.Status.code",
-        r#"#[serde(with = "crate::google::rpc::code_serde")]"#,
+        r#"#[serde(with = "crate::google::rpc::helpers::code_serde")]"#,
+    );
+
+    config.field_attribute(
+        ".tools.Status",
+        r#"#[serde(with = "crate::tools::helpers::status_serde")]"#,
+    );
+    config.field_attribute(
+        ".tools.CommandResponse.Status",
+        r#"#[serde(with = "crate::tools::helpers::command_response::status_serde")]"#,
     );
 
     config.compile_protos(&proto_paths, &["./proto"])?;
@@ -100,6 +110,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     compile(CompileConfig {
         api: ApiConfig {
             domain: Some("type.googleapis.com".into()),
+            helpers_mod: Some("helpers".into()),
             ..Default::default()
         },
         file_descriptor_set_path: out_dir.join(fd_path),

@@ -1,10 +1,10 @@
-use crate::utility::str_to_case;
 use convert_case::Case;
 use proc_macro2::{Literal, TokenStream};
 use prost_types::EnumDescriptorProto;
 use quote::{format_ident, quote};
 
 use crate::context::Context;
+use crate::utility::str_to_case;
 
 pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
     if context.config.api.names {
@@ -19,7 +19,7 @@ pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescri
 }
 
 fn write_name(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
-    let enum_ident = context.get_type_ident(enum_type.name());
+    let enum_ident = context.get_type_expr_path(enum_type.name());
     let enum_proto_name = context.get_proto_type_name(enum_type.name());
     let package_proto_name = Literal::string(&context.package_name);
 
@@ -31,7 +31,7 @@ fn write_name(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptor
 }
 
 fn write_value_names(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
-    let enum_ident = context.get_type_ident(enum_type.name());
+    let enum_ident = context.get_type_expr_path(enum_type.name());
 
     let mut value_names = TokenStream::new();
     let mut value_names_array = TokenStream::new();
@@ -62,7 +62,7 @@ fn write_value_names(context: &Context, s: &mut TokenStream, enum_type: &EnumDes
 }
 
 fn write_serde(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
-    let enum_ident = context.get_type_ident(enum_type.name());
+    let enum_ident = context.get_type_expr_path(enum_type.name());
 
     // Serialize as string
     s.extend(quote! {
@@ -125,35 +125,6 @@ fn write_serde(context: &Context, s: &mut TokenStream, enum_type: &EnumDescripto
                     }
                 }
                 deserializer.deserialize_any(Visitor)
-            }
-        }
-    });
-
-    let mod_ident = format_ident!("{}_serde", str_to_case(enum_type.name(), Case::Snake));
-    s.extend(quote! {
-        /// Utility for working with i32s in message fields.
-        /// Usable with #[serde(with = "...")]
-        pub mod #mod_ident {
-            use super::*;
-            use ::serde::{Serialize, Deserialize};
-
-            pub fn serialize<S>(
-                value: &i32,
-                serializer: S,
-            ) -> Result<<S as ::serde::Serializer>::Ok, <S as ::serde::Serializer>::Error>
-            where
-                S: ::serde::Serializer,
-            {
-                let value = #enum_ident::try_from(*value).unwrap();
-                value.serialize(serializer)
-            }
-
-            pub fn deserialize<'de, D>(deserializer: D) -> Result<i32, D::Error>
-            where
-                D: ::serde::Deserializer<'de>,
-            {
-                let value = #enum_ident::deserialize(deserializer)?;
-                Ok(value as i32)
             }
         }
     });

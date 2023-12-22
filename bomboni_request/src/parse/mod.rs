@@ -37,11 +37,12 @@ pub struct ParsedResource {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
+    use crate::error::PathError;
     use crate::ordering::Ordering;
     use crate::query::page_token::PageTokenBuilder;
     use crate::query::search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig};
     use crate::{
-        error::{CommonError, FieldError, RequestError, RequestResult},
+        error::{CommonError, RequestError, RequestResult},
         filter::Filter,
         ordering::{OrderingDirection, OrderingTerm},
         query::{
@@ -224,11 +225,14 @@ mod tests {
         macro_rules! assert_parse_field_err {
             ($item:expr, $field:expr, $err:expr) => {{
                 let err = ParsedItem::parse($item).unwrap_err();
-                if let RequestError::Field(FieldError { error, field, .. }) = err {
-                    assert_eq!(field, $field);
-                    assert_eq!(error.as_any().downcast_ref::<CommonError>().unwrap(), $err);
+                if let RequestError::Path(error) = err {
+                    assert_eq!(
+                        error.error.as_any().downcast_ref::<CommonError>().unwrap(),
+                        $err
+                    );
+                    assert_eq!(error.path_to_string(), $field);
                 } else {
-                    panic!("expected FieldError, got {:?}", err);
+                    panic!("expected PathError, got {:?}", err);
                 }
             }};
         }
@@ -386,8 +390,8 @@ mod tests {
                 value: "123".into(),
             })
             .unwrap_err(),
-            RequestError::Field(FieldError {
-                error,..
+            RequestError::Path(PathError {
+                error, ..
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidStringFormat { .. }
@@ -466,8 +470,8 @@ mod tests {
                 ..Default::default()
             })
             .unwrap_err(),
-            RequestError::Field(FieldError {
-                error,..
+            RequestError::Path(PathError {
+                error, ..
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidName { .. }
@@ -554,8 +558,8 @@ mod tests {
                 values: vec![(1, 2), (1, 4)],
             })
             .unwrap_err(),
-            RequestError::Field(FieldError {
-                error,..
+            RequestError::Path(PathError {
+                error, ..
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::DuplicateValue
@@ -756,6 +760,7 @@ mod tests {
             values_map: BTreeMap<String, i32>,
             items_map: HashMap<i32, NestedItem>,
             enums: Vec<i32>,
+            enum_map: BTreeMap<i32, i32>,
         }
 
         #[derive(Debug, PartialEq, Default)]
@@ -774,6 +779,8 @@ mod tests {
             items_map: HashMap<i32, ParsedNestedItem>,
             #[parse(enumeration)]
             enums: Vec<DataTypeEnum>,
+            #[parse(enumeration)]
+            enum_map: BTreeMap<i32, DataTypeEnum>,
         }
 
         #[derive(Debug, PartialEq, Parse)]
@@ -796,6 +803,9 @@ mod tests {
                     2 => NestedItem { value: 2 },
                 },
                 enums: vec![1],
+                enum_map: btree_map_into! {
+                    1 => 1,
+                },
             })
             .unwrap(),
             ParsedItem {
@@ -811,6 +821,9 @@ mod tests {
                     2 => ParsedNestedItem { value: 2 },
                 },
                 enums: vec![DataTypeEnum::String],
+                enum_map: btree_map_into! {
+                    1 => DataTypeEnum::String,
+                },
             }
         );
         assert!(matches!(
@@ -818,24 +831,33 @@ mod tests {
                 strings: vec!["Hello".into()],
                 ..Default::default()
             }).unwrap_err(),
-            RequestError::Field(FieldError {
-                error, field, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
+            RequestError::Path(error) if matches!(
+                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidStringFormat { .. }
-            ) && field == "strings"
+            ) && error.path_to_string() == "strings[0]"
         ));
         assert!(matches!(ParsedItem::parse(Item {
                 enums: vec![99i32],
                 ..Default::default()
             })
             .unwrap_err(),
-            RequestError::Field(FieldError {
-                error, field, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
+            RequestError::Path(error) if matches!(
+                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::InvalidEnumValue
-            ) && field == "enums"
+            ) && error.path_to_string() == "enums[0]"
+        ));
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                enum_map: btree_map_into! {
+                    99 => 99,
+                },
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Path(error) if matches!(
+                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::InvalidEnumValue
+            ) && error.path_to_string() == "enum_map{99}"
         ));
 
         assert_eq!(
@@ -852,6 +874,9 @@ mod tests {
                     2 => ParsedNestedItem { value: 2 },
                 },
                 enums: vec![DataTypeEnum::String],
+                enum_map: btree_map_into! {
+                    1 => DataTypeEnum::String,
+                },
             }),
             Item {
                 values: vec![1, 2, 3],
@@ -866,6 +891,9 @@ mod tests {
                     2 => NestedItem { value: 2 },
                 },
                 enums: vec![1],
+                enum_map: btree_map_into! {
+                    1 => 1,
+                },
             }
         );
     }
@@ -1784,24 +1812,20 @@ mod tests {
                 name: String::new(),
                 item: None,
             }).unwrap_err(),
-            RequestError::Field(FieldError {
-                error, field, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
+            RequestError::Path(error) if matches!(
+                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::RequiredFieldMissing { .. }
-            ) && field == "item"
+            ) && error.path_to_string() == "item"
         ));
         assert!(matches!(
             ParsedItem::parse(Item {
                 name: String::new(),
                 item: Some(NestedItem{ nested_value: None }),
             }).unwrap_err(),
-            RequestError::Field(FieldError {
-                error, field, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
+            RequestError::Path(error) if matches!(
+                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::RequiredFieldMissing { .. }
-            ) && field == "item.nested_value"
+            ) && error.path_to_string() == "item.nested_value"
         ));
     }
 
@@ -1835,12 +1859,10 @@ mod tests {
             RequestError::BadRequest { name, violations }
             if name == Request::NAME && matches!(
                 violations.get(0).unwrap(),
-                FieldError {
-                    error, field, ..
-                } if matches!(
-                    error.as_any().downcast_ref::<CommonError>().unwrap(),
+                error if matches!(
+                    error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                     CommonError::RequiredFieldMissing { .. }
-                ) && field == "value"
+                ) && error.path_to_string() == "value"
             )
         ));
 
@@ -1849,12 +1871,10 @@ mod tests {
             RequestError::BadRequest { name, violations }
             if name == "Test" && matches!(
                 violations.get(0).unwrap(),
-                FieldError {
-                    error, field, ..
-                } if matches!(
-                    error.as_any().downcast_ref::<CommonError>().unwrap(),
+                error if matches!(
+                    error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                     CommonError::RequiredFieldMissing { .. }
-                ) && field == "value"
+                ) && error.path_to_string() == "value"
             )
         ));
     }

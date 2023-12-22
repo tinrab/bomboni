@@ -75,7 +75,7 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
                 Ok(match source {
                     #parse_variants
                     _ => {
-                        return Err(RequestError::domain(CommonError::UnknownOneofVariant));
+                        return Err(RequestError::generic(CommonError::UnknownOneofVariant));
                     }
                 })
             }
@@ -155,7 +155,7 @@ fn expand_tagged_union(
                 Ok(match source {
                     #parse_variants
                     _ => {
-                        return Err(RequestError::domain(CommonError::UnknownOneofVariant));
+                        return Err(RequestError::generic(CommonError::UnknownOneofVariant));
                     }
                 })
             }
