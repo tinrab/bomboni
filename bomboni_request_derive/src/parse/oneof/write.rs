@@ -223,12 +223,6 @@ fn expand_write_variant(options: &ParseOptions, variant: &ParseVariant) -> Token
         let source = value;
     };
 
-    let default_expr = if let Some(default) = variant.default.as_ref() {
-        quote! { #default }
-    } else {
-        quote! { Default::default() }
-    };
-
     let source_option = variant.source_option || is_option;
 
     if is_option {
@@ -243,8 +237,12 @@ fn expand_write_variant(options: &ParseOptions, variant: &ParseVariant) -> Token
             }
         } else {
             quote! {
-                let source = source.unwrap_or_else(|| #default_expr);
-                #write_target
+                let source = if let Some(source) = source {
+                    #write_target
+                    source
+                } else {
+                    Default::default()
+                };
             }
         });
     } else {

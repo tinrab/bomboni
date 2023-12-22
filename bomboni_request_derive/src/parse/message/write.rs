@@ -175,12 +175,6 @@ fn expand_write_field(options: &ParseOptions, field: &ParseField) -> TokenStream
         let source = value.#target_ident;
     };
 
-    let default_expr = if let Some(default) = field.default.as_ref() {
-        quote! { #default }
-    } else {
-        quote! { Default::default() }
-    };
-
     let source_option = field.source_option
         || is_option
         || (is_nested
@@ -202,8 +196,12 @@ fn expand_write_field(options: &ParseOptions, field: &ParseField) -> TokenStream
             }
         } else {
             quote! {
-                let source = source.unwrap_or_else(|| #default_expr);
-                #write_target
+                let source = if let Some(source) = source {
+                    #write_target
+                    source
+                } else {
+                    Default::default()
+                };
             }
         });
     } else {

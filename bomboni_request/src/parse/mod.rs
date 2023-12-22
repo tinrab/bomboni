@@ -134,7 +134,7 @@ mod tests {
             required_string_optional: String,
             nested: ParsedNestedItem,
             optional_nested: Option<ParsedNestedItem>,
-            #[parse(default = NestedItem::default())]
+            #[parse(default = ParsedNestedItem::default())]
             default_nested: ParsedNestedItem,
             #[parse(default)]
             default_default_nested: ParsedNestedItem,
@@ -1877,5 +1877,59 @@ mod tests {
                 ) && error.path_to_string() == "value"
             )
         ));
+    }
+
+    #[test]
+    fn custom_default_field() {
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Item {
+            part: Option<Part>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct Part {
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(default = get_default_part())]
+            part: ParsedPart,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = Part, write)]
+        struct ParsedPart {
+            value: i32,
+        }
+
+        fn get_default_part() -> ParsedPart {
+            ParsedPart { value: 42 }
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                part: Some(Part { value: 1337 }),
+            })
+            .unwrap(),
+            ParsedItem {
+                part: ParsedPart { value: 1337 },
+            }
+        );
+        assert_eq!(
+            ParsedItem::parse(Item { part: None }).unwrap(),
+            ParsedItem {
+                part: ParsedPart { value: 42 },
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                part: ParsedPart { value: 1337 },
+            }),
+            Item {
+                part: Some(Part { value: 1337 }),
+            }
+        );
     }
 }

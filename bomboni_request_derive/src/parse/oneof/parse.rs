@@ -321,12 +321,6 @@ fn expand_parse_variant(
         }
     }
 
-    let default_expr = if let Some(default) = variant.default.as_ref() {
-        quote! { #default }
-    } else {
-        quote! { Default::default() }
-    };
-
     let source_option = variant.source_option || is_option;
 
     if is_option {
@@ -386,23 +380,30 @@ fn expand_parse_variant(
             });
         }
     } else {
-        if source_option {
-            if variant.default.is_some() {
-                parse.extend(quote! {
-                    let target = target.unwrap_or_else(|| #default_expr);
-                });
+        parse.extend(if source_option {
+            if let Some(default) = variant.default.as_ref() {
+                quote! {
+                    let target = if let Some(target) = target {
+                        #parse_source
+                        target
+                    } else {
+                        #default
+                    };
+                }
             } else {
-                parse.extend(quote! {
+                quote! {
                     let target = target.ok_or_else(|| {
                         RequestError::field(
                             variant_name,
                             CommonError::RequiredFieldMissing,
                         )
                     })?;
-                });
+                    #parse_source
+                }
             }
-        }
-        parse.extend(parse_source);
+        } else {
+            parse_source
+        });
     }
 
     if is_box {

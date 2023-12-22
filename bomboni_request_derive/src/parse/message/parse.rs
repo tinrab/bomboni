@@ -464,12 +464,6 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
         }
     }
 
-    let default_expr = if let Some(default) = field.default.as_ref() {
-        quote! { #default }
-    } else {
-        quote! { Default::default() }
-    };
-
     // Source field for nested messages is always wrapped in `Option`
     let source_option = field.source_option
         || is_option
@@ -537,23 +531,30 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
             });
         }
     } else {
-        if source_option {
-            if field.default.is_some() {
-                parse.extend(quote! {
-                    let target = target.unwrap_or_else(|| #default_expr);
-                });
+        parse.extend(if source_option {
+            if let Some(default) = field.default.as_ref() {
+                quote! {
+                    let target = if let Some(target) = target {
+                        #parse_source
+                        target
+                    } else {
+                        #default
+                    };
+                }
             } else {
-                parse.extend(quote! {
+                quote! {
                     let target = target.ok_or_else(|| {
                         RequestError::field(
                             #field_name,
                             CommonError::RequiredFieldMissing,
                         )
                     })?;
-                });
+                    #parse_source
+                }
             }
-        }
-        parse.extend(parse_source);
+        } else {
+            parse_source
+        });
     }
 
     if is_box {
