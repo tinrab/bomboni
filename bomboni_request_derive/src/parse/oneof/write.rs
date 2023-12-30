@@ -100,6 +100,8 @@ fn expand_write_tagged_union(
     } else {
         quote!()
     };
+    todo!();
+    // let (a, b, where_clause) = options.generics.split_for_impl();
 
     let mut write_variants = quote!();
     for variant in variants {

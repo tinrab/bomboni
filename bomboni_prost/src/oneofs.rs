@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::utility::str_to_case;
-use convert_case::Case;
+use bomboni_core::string::{str_to_case, Case};
 use proc_macro2::{Ident, Literal, TokenStream};
 use prost_types::{field_descriptor_proto, DescriptorProto, OneofDescriptorProto};
 use quote::{format_ident, quote};

@@ -1,10 +1,9 @@
-use convert_case::Case;
+use bomboni_core::string::{str_to_case, Case};
 use proc_macro2::{Literal, TokenStream};
 use prost_types::EnumDescriptorProto;
 use quote::{format_ident, quote};
 
 use crate::context::Context;
-use crate::utility::str_to_case;
 
 pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
     if context.config.api.names {

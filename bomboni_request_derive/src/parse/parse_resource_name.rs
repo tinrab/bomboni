@@ -1,10 +1,9 @@
+use bomboni_core::syn::type_is_option;
 use proc_macro2::{Literal, TokenStream};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{Token, Type};
-
-use crate::utility::is_option_type;
 
 #[derive(Debug)]
 pub struct ParseResourceName {
@@ -23,7 +22,7 @@ pub fn expand(options: ParseResourceName) -> syn::Result<TokenStream> {
     for segment in &options.segments {
         let name = &segment.name;
         let ty = &segment.ty;
-        if is_option_type(ty) {
+        if type_is_option(ty) {
             had_optional = true;
             parse_segments.extend(quote! {{
                 if segments_iter.peek() == Some(&#name) {

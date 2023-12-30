@@ -1,6 +1,15 @@
 use crate::error::RequestResult;
+use bomboni_common::date_time::UtcDateTime;
 use bomboni_common::id::Id;
-use time::OffsetDateTime;
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm"
+))]
+use {
+    serde::{Deserialize, Serialize},
+    wasm_bindgen::prelude::*,
+};
 
 pub mod helpers;
 
@@ -22,16 +31,39 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+// #[cfg_attr(
+//     all(
+//         target_family = "wasm",
+//         not(any(target_os = "emscripten", target_os = "wasi")),
+//         feature = "wasm"
+//     ),
+//     derive(Serialize, Deserialize),
+//     serde(rename_all = "camelCase"),
+//     wasm_bindgen(getter_with_clone, inspectable, skip_typescript)
+// )]
 pub struct ParsedResource {
     pub name: String,
-    pub create_time: Option<OffsetDateTime>,
-    pub update_time: Option<OffsetDateTime>,
-    pub delete_time: Option<OffsetDateTime>,
+    pub create_time: Option<UtcDateTime>,
+    pub update_time: Option<UtcDateTime>,
+    pub delete_time: Option<UtcDateTime>,
     pub deleted: bool,
     pub etag: Option<String>,
     pub revision_id: Option<Id>,
-    pub revision_create_time: Option<OffsetDateTime>,
+    pub revision_create_time: Option<UtcDateTime>,
 }
+
+// #[cfg(all(
+//     target_family = "wasm",
+//     not(any(target_os = "emscripten", target_os = "wasi")),
+//     feature = "wasm"
+// ))]
+// #[wasm_bindgen]
+// impl ParsedResource {
+//     #[wasm_bindgen(constructor)]
+//     pub fn new() -> Self {
+//         Self::default()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -598,7 +630,7 @@ mod tests {
         assert_eq!(
             ParsedItem::parse(Item {
                 name: "items/42".into(),
-                create_time: Some(OffsetDateTime::UNIX_EPOCH.into()),
+                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
                 deleted: true,
                 etag: Some("abc".into()),
                 ..Default::default()
@@ -607,7 +639,7 @@ mod tests {
             ParsedItem {
                 resource: ParsedResource {
                     name: "items/42".into(),
-                    create_time: Some(OffsetDateTime::UNIX_EPOCH),
+                    create_time: Some(UtcDateTime::UNIX_EPOCH),
                     deleted: true,
                     etag: Some("abc".into()),
                     ..Default::default()
@@ -618,14 +650,14 @@ mod tests {
             Item::from(ParsedItem {
                 resource: ParsedResource {
                     name: "items/42".into(),
-                    create_time: Some(OffsetDateTime::UNIX_EPOCH),
+                    create_time: Some(UtcDateTime::UNIX_EPOCH),
                     deleted: true,
                     ..Default::default()
                 },
             }),
             Item {
                 name: "items/42".into(),
-                create_time: Some(OffsetDateTime::UNIX_EPOCH.into()),
+                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
                 deleted: true,
                 ..Default::default()
             }
@@ -634,7 +666,7 @@ mod tests {
         assert_eq!(
             ParsedItemDefaultResource::parse(Item {
                 name: "items/42".into(),
-                create_time: Some(OffsetDateTime::UNIX_EPOCH.into()),
+                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
                 deleted: true,
                 ..Default::default()
             })
@@ -642,7 +674,7 @@ mod tests {
             ParsedItemDefaultResource {
                 resource: ParsedResource {
                     name: "items/42".into(),
-                    create_time: Some(OffsetDateTime::UNIX_EPOCH),
+                    create_time: Some(UtcDateTime::UNIX_EPOCH),
                     deleted: true,
                     ..Default::default()
                 }

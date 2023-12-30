@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_proto"
-version = "0.1.48"
+version = "0.1.53"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with Protobuf/gRPC. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -16,10 +16,14 @@ path = "src/lib.rs"
 [features]
 testing = []
 tonic = ["dep:tonic", "dep:http"]
-chrono = ["dep:chrono"]
+chrono = ["dep:chrono", "bomboni_common/chrono"]
 json = ["dep:serde_json"]
+wasm = ["bomboni_common/wasm"]
 
 [dependencies]
+bomboni_common = { path = "../bomboni_common", features = [
+  "serde",
+], version = "0.1.53" }
 thiserror = "1.0.51"
 itertools = "0.12.0"
 time = { version = "0.3.31", features = ["serde", "formatting", "parsing"] }
@@ -36,5 +40,5 @@ serde_json = { version = "1.0.108", optional = true }
 serde_json = "1.0.108"
 
 [build-dependencies]
-bomboni_prost = { path = "../bomboni_prost", version = "0.1.48" }
+bomboni_prost = { path = "../bomboni_prost", version = "0.1.53" }
 prost-build = "0.12.3"

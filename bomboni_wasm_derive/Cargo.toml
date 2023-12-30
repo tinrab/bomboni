@@ -1,8 +1,8 @@
 [package]
-name = "bomboni_request_derive"
+name = "bomboni_wasm_derive"
 version = "0.1.53"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
-description = "Internal request derive macros for Bomboni library."
+description = "Internal WASM derive macros for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
@@ -10,14 +10,16 @@ readme = "../README.md"
 edition = "2021"
 
 [lib]
-name = "bomboni_request_derive"
+name = "bomboni_wasm_derive"
 path = "src/lib.rs"
 proc-macro = true
 
 [dependencies]
 bomboni_core = { path = "../bomboni_core", version = "0.1.53" }
+bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.53" }
 itertools = "0.12.0"
 proc-macro2 = { version = "1.0.71", features = ["proc-macro"] }
 syn = "2.0.42"
 quote = "1.0.33"
 darling = "0.20.3"
+serde_derive_internals = "0.29.0"

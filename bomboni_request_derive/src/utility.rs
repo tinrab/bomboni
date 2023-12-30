@@ -3,14 +3,6 @@ use syn::{GenericArgument, Path, PathArguments, PathSegment, Type, TypePath};
 
 use crate::parse::ParseOptions;
 
-pub fn is_option_type(ty: &Type) -> bool {
-    if let Type::Path(TypePath { path, .. }) = ty {
-        path.segments.len() == 1 && path.segments[0].ident == "Option"
-    } else {
-        false
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct ProtoTypeInfo {
     pub is_option: bool,

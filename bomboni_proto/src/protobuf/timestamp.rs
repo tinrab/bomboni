@@ -1,25 +1,14 @@
+use bomboni_common::date_time::{UtcDateTime, UtcDateTimeError};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
 use thiserror::Error;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::google::protobuf::Timestamp;
-
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum TimestampError {
-    #[error("invalid nanoseconds")]
-    InvalidNanoseconds,
-    #[error("not a UTC date time")]
-    NotUtc,
-    #[error("invalid timestamp string format `{0}`")]
-    InvalidFormat(String),
-}
 
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 
@@ -84,82 +73,73 @@ impl Timestamp {
     // }
 }
 
-impl From<OffsetDateTime> for Timestamp {
-    fn from(t: OffsetDateTime) -> Self {
-        let seconds = t.unix_timestamp();
-        let nanos = t.nanosecond();
+impl From<UtcDateTime> for Timestamp {
+    fn from(value: UtcDateTime) -> Self {
+        let (seconds, nanoseconds) = value.timestamp();
         Self {
             seconds,
-            nanos: nanos as i32,
+            nanos: nanoseconds as i32,
         }
     }
 }
 
-#[cfg(feature = "chrono")]
-impl From<chrono::NaiveDateTime> for Timestamp {
-    fn from(t: chrono::NaiveDateTime) -> Self {
-        Self {
-            seconds: t.timestamp(),
-            nanos: t.timestamp_subsec_nanos() as i32,
+impl TryFrom<Timestamp> for UtcDateTime {
+    type Error = UtcDateTimeError;
+
+    fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+        if value.nanos < 0 {
+            return Err(UtcDateTimeError::InvalidNanoseconds);
         }
+        UtcDateTime::from_timestamp(value.seconds, value.nanos as u32)
+    }
+}
+
+impl From<OffsetDateTime> for Timestamp {
+    fn from(value: OffsetDateTime) -> Self {
+        UtcDateTime::from(value).into()
     }
 }
 
 impl TryFrom<Timestamp> for OffsetDateTime {
-    type Error = TimestampError;
+    type Error = UtcDateTimeError;
 
-    fn try_from(t: Timestamp) -> Result<Self, Self::Error> {
-        if t.nanos < 0 {
-            return Err(TimestampError::InvalidNanoseconds);
-        }
-        // NaiveDateTime::from_timestamp_opt(t.seconds, t.nanos as u32)
-        Self::from_unix_timestamp_nanos(
-            i128::from(t.seconds) * i128::from(NANOS_PER_SECOND) + i128::from(t.nanos),
-        )
-        .map_err(|_| TimestampError::NotUtc)
+    fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+        UtcDateTime::try_from(value).map(Into::into)
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl TryFrom<chrono::NaiveDateTime> for Timestamp {
+    type Error = UtcDateTimeError;
+
+    fn try_from(value: chrono::NaiveDateTime) -> Result<Self, Self::Error> {
+        UtcDateTime::try_from(value).map(Into::into)
     }
 }
 
 #[cfg(feature = "chrono")]
 impl TryFrom<Timestamp> for chrono::NaiveDateTime {
-    type Error = TimestampError;
+    type Error = UtcDateTimeError;
 
-    fn try_from(t: Timestamp) -> Result<Self, Self::Error> {
-        if t.nanos < 0 {
-            return Err(TimestampError::InvalidNanoseconds);
-        }
-        Self::from_timestamp_opt(t.seconds, t.nanos as u32).ok_or(TimestampError::NotUtc)
+    fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+        UtcDateTime::try_from(value)?.try_into()
     }
 }
 
-impl From<SystemTime> for Timestamp {
-    fn from(system_time: SystemTime) -> Self {
-        let (seconds, nanos) = match system_time.duration_since(UNIX_EPOCH) {
-            Ok(duration) => {
-                let seconds = i64::try_from(duration.as_secs()).unwrap();
-                (seconds, duration.subsec_nanos() as i32)
-            }
-            Err(error) => {
-                let duration = error.duration();
-                let seconds = i64::try_from(duration.as_secs()).unwrap();
-                let nanos = duration.subsec_nanos() as i32;
-                if nanos == 0 {
-                    (-seconds, 0)
-                } else {
-                    (-seconds - 1, NANOS_PER_SECOND - nanos)
-                }
-            }
-        };
-        Self { seconds, nanos }
+impl TryFrom<SystemTime> for Timestamp {
+    type Error = UtcDateTimeError;
+
+    fn try_from(system_time: SystemTime) -> Result<Self, Self::Error> {
+        UtcDateTime::try_from(system_time).map(Into::into)
     }
 }
 
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Could panic if Timestamp is invalid
-        match OffsetDateTime::try_from(*self)
+        match UtcDateTime::try_from(*self)
             .ok()
-            .and_then(|odt| odt.format(&Rfc3339).ok())
+            .and_then(|dt| dt.format_rfc3339().ok())
         {
             Some(odt) => odt.fmt(f),
             None => "INVALID_TIMESTAMP".fmt(f),
@@ -168,12 +148,10 @@ impl Display for Timestamp {
 }
 
 impl FromStr for Timestamp {
-    type Err = TimestampError;
+    type Err = UtcDateTimeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(OffsetDateTime::parse(s, &Rfc3339)
-            .map_err(|_| TimestampError::InvalidFormat(s.into()))?
-            .into())
+        Ok(UtcDateTime::parse_rfc3339(s)?.into())
     }
 }
 

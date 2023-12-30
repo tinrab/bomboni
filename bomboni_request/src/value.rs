@@ -3,9 +3,9 @@ use std::{
     fmt::{self, Display, Formatter, Write},
 };
 
+use bomboni_common::date_time::UtcDateTime;
 use itertools::Itertools;
 use pest::iterators::Pair;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::filter::parser::Rule;
 
@@ -20,7 +20,7 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     String(String),
-    Timestamp(OffsetDateTime),
+    Timestamp(UtcDateTime),
     Repeated(Vec<Value>),
     Any,
 }
@@ -42,7 +42,7 @@ impl Value {
         match pair.as_rule() {
             Rule::string => {
                 let value = pair.as_str();
-                if let Ok(value) = OffsetDateTime::parse(value, &Rfc3339) {
+                if let Ok(value) = UtcDateTime::parse_rfc3339(value) {
                     Ok(value.into())
                 } else {
                     let lexeme = pair.as_str();
@@ -78,7 +78,7 @@ impl Display for Value {
             }
             Self::Timestamp(value) => {
                 f.write_char('"')?;
-                value.format(&Rfc3339).unwrap().fmt(f)?;
+                value.format_rfc3339().unwrap().fmt(f)?;
                 f.write_char('"')
             }
             Self::Repeated(values) => {
@@ -174,8 +174,8 @@ impl From<f64> for Value {
     }
 }
 
-impl From<OffsetDateTime> for Value {
-    fn from(value: OffsetDateTime) -> Self {
+impl From<UtcDateTime> for Value {
+    fn from(value: UtcDateTime) -> Self {
         Self::Timestamp(value)
     }
 }
@@ -194,7 +194,7 @@ mod tests {
     fn display() {
         assert_eq!(Value::String("foo".into()).to_string(), "\"foo\"");
         assert_eq!(
-            Value::Timestamp(OffsetDateTime::UNIX_EPOCH).to_string(),
+            Value::Timestamp(UtcDateTime::UNIX_EPOCH).to_string(),
             "\"1970-01-01T00:00:00Z\""
         );
         assert_eq!(

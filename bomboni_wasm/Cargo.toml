@@ -1,0 +1,31 @@
+[package]
+name = "bomboni_wasm"
+version = "0.1.53"
+authors = ["Tin Rabzelj <tin@flinect.com>"]
+description = "Utilities for working with WASM. Part of Bomboni library."
+repository = "https://github.com/tinrab/bomboni"
+homepage = "https://github.com/tinrab/bomboni"
+license-file = "../LICENSE"
+readme = "../README.md"
+edition = "2021"
+
+[lib]
+name = "bomboni_wasm"
+path = "src/lib.rs"
+
+[features]
+default = ["console_error_panic_hook"]
+derive = ["dep:bomboni_wasm_core", "dep:bomboni_wasm_derive"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2.89"
+serde = "1.0.193"
+serde-wasm-bindgen = "0.6.3"
+
+bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.53", optional = true }
+bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.53", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+[dev-dependencies]
+serde = { version = "1.0.193", features = ["derive"] }

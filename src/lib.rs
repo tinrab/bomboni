@@ -21,3 +21,8 @@ pub mod request {
 pub mod template {
     pub use bomboni_template::*;
 }
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    pub use bomboni_wasm::*;
+}

@@ -1,9 +1,8 @@
 use crate::config::CompileConfig;
-use crate::utility::str_to_case;
-use convert_case::Case;
+use bomboni_core::string::{str_to_case, Case};
 use itertools::Itertools;
 use prost_types::{DescriptorProto, FileDescriptorSet, OneofDescriptorProto};
-use syn::{ExprPath, PathSegment};
+use syn::{parse_quote, ExprPath, PathSegment};
 
 pub struct Context<'a> {
     pub config: &'a CompileConfig,
@@ -25,7 +24,7 @@ impl<'a> Context<'a> {
 
     pub fn get_type_expr_relative_path(&self, name: &str, nesting: usize) -> ExprPath {
         let mut path = self.get_type_expr_path(name);
-        let super_ident: PathSegment = syn::parse_str("super").unwrap();
+        let super_ident: PathSegment = parse_quote!(super);
         for _ in 0..(nesting + self.path.len()) {
             path.path.segments.insert(0, super_ident.clone());
         }

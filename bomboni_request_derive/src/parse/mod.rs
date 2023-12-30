@@ -3,8 +3,8 @@ use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{
-    self, DeriveInput, Expr, ExprArray, ExprPath, Generics, Meta, MetaNameValue, Path, Type,
-    WhereClause,
+    self, parse_quote, DeriveInput, Expr, ExprArray, ExprPath, Generics, Meta, MetaNameValue, Path,
+    Type, WhereClause,
 };
 
 mod message;
@@ -220,7 +220,7 @@ pub fn parse_default_expr(meta: &Meta) -> darling::Result<Expr> {
     match meta {
         Meta::Path(path) => {
             if matches!(path.get_ident(), Some(ident) if ident == "default") {
-                Ok(syn::parse2(quote! { Default::default() })?)
+                Ok(parse_quote!(Default::default()))
             } else {
                 Err(darling::Error::unsupported_format("path").with_span(meta))
             }

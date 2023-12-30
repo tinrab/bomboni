@@ -1,10 +1,11 @@
-use convert_case::Case;
+use bomboni_core::format_comment;
+use bomboni_core::string::{str_to_case, Case};
 use proc_macro2::{Literal, TokenStream};
 use prost_types::DescriptorProto;
 use quote::{format_ident, quote};
 
-use crate::{context::Context, oneofs::write_message_oneofs, utility::macros::format_comment};
-use crate::{enums::write_enum, utility::str_to_case};
+use crate::enums::write_enum;
+use crate::{context::Context, oneofs::write_message_oneofs};
 
 pub fn write_message(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if context.config.api.names {

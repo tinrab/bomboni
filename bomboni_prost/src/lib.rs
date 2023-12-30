@@ -20,7 +20,6 @@ mod helpers;
 mod messages;
 mod oneofs;
 pub mod path_map;
-mod utility;
 
 pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
     let mut buf = Vec::new();

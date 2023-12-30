@@ -48,12 +48,18 @@ function lint() {
 }
 
 function test() {
-	cargo test --workspace --all-targets --all-features -- --nocapture
-	cargo test --workspace --doc --all-features -- --nocapture
+	if [[ "$2" =~ ^(--no-default-features)$ ]]; then
+		cargo test --workspace --all-targets --no-default-features -- --nocapture
+		cargo test --workspace --doc --no-default-features -- --nocapture
+	else
+		cargo test --workspace --all-targets --all-features -- --nocapture
+		cargo test --workspace --doc --all-features -- --nocapture
+	fi
 }
 
 function publish() {
 	if [[ "$2" =~ ^(--actually-do-it)$ ]]; then
+		cargo publish -p bomboni_wasm_derive --allow-dirty
 		cargo publish -p bomboni_common --allow-dirty
 		cargo publish -p bomboni_prost --allow-dirty
 		cargo publish -p bomboni_proto --allow-dirty
@@ -62,6 +68,7 @@ function publish() {
 		cargo publish -p bomboni_template --allow-dirty
 		cargo publish -p bomboni --allow-dirty
 	else
+		cargo publish -p bomboni_wasm_derive --dry-run --allow-dirty
 		cargo publish -p bomboni_common --dry-run --allow-dirty
 		cargo publish -p bomboni_prost --dry-run --allow-dirty
 		cargo publish -p bomboni_proto --dry-run --allow-dirty

@@ -1,11 +1,10 @@
-use convert_case::Case;
+use bomboni_core::string::{str_to_case, Case};
 use proc_macro2::TokenStream;
 use prost_types::DescriptorProto;
 use prost_types::{EnumDescriptorProto, FileDescriptorProto};
 use quote::{format_ident, quote};
 
 use crate::context::Context;
-use crate::utility::str_to_case;
 
 pub fn write_helpers(context: &Context, s: &mut TokenStream, files: &[&FileDescriptorProto]) {
     let mut src = quote!();
