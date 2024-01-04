@@ -7,7 +7,7 @@ use itertools::Itertools;
 use serde_derive_internals::{ast, attr::TagType};
 use std::{
     collections::BTreeSet,
-    fmt::{self, format, Display, Formatter},
+    fmt::{self, Display, Formatter},
 };
 
 pub enum TsDecl {
@@ -85,7 +85,7 @@ impl Display for InterfaceTsDecl {
             write!(
                 f,
                 " extends {}",
-                self.extends.iter().map(|ty| ty.to_string()).join(", ")
+                self.extends.iter().map(ToString::to_string).join(", ")
             )?;
         }
 
@@ -165,15 +165,26 @@ impl<'a> TsDeclParser<'a> {
     }
 
     fn parse_struct(&self, style: ast::Style, fields: &[ast::Field]) -> TsDecl {
-        if let TagType::Internal { tag, .. } = self.options.serde_attrs().tag() {
-            todo!();
-        }
+        match (
+            self.options.serde_attrs().tag(),
+            self.parse_fields(style, fields),
+        ) {
+            (TagType::Internal { tag, .. }, ParsedFields::Named(members, extends)) => {
+                let name = self.options.name();
+                let tag_field = TsTypeElement {
+                    key: tag.clone(),
+                    alias_type: TsType::Literal(name.into()),
+                    optional: false,
+                };
 
-        let fields = self.parse_fields(style, fields);
-        if let ParsedFields::Named(members, extends) = fields {
-            self.make_decl(members, extends)
-        } else {
-            self.make_type_alias(fields.into()).into()
+                let mut vec = Vec::with_capacity(members.len() + 1);
+                vec.push(tag_field);
+                vec.extend(members);
+
+                self.make_named_decl(vec, extends)
+            }
+            (_, ParsedFields::Named(members, extends)) => self.make_named_decl(members, extends),
+            (_, fields) => self.make_type_alias(fields.into()).into(),
         }
     }
 
@@ -201,8 +212,7 @@ impl<'a> TsDeclParser<'a> {
             type_params: self.make_ref_type_params(
                 members
                     .iter()
-                    .map(|member| member.alias_type.get_type_ref_names())
-                    .flatten()
+                    .flat_map(|member| member.alias_type.get_type_ref_names())
                     .collect(),
             ),
             members,
@@ -212,7 +222,7 @@ impl<'a> TsDeclParser<'a> {
     fn parse_fields(&self, style: ast::Style, fields: &[ast::Field]) -> ParsedFields {
         match style {
             ast::Style::Newtype => {
-                return ParsedFields::Transparent(TsType::from_type(&fields[0].ty))
+                return ParsedFields::Transparent(TsType::from_type(fields[0].ty))
             }
             ast::Style::Unit => return ParsedFields::Transparent(TsType::nullish()),
             _ => {}
@@ -282,12 +292,12 @@ impl<'a> TsDeclParser<'a> {
     }
 
     fn parse_field(&self, field: &ast::Field) -> (TsType, Option<&FieldWasm>) {
-        let field_type = TsType::from_type(&field.ty);
+        let field_type = TsType::from_type(field.ty);
         let field_options = self.options.get_field(&field.member);
         (field_type, field_options)
     }
 
-    fn make_decl(&self, members: Vec<TsTypeElement>, extends: Vec<TsType>) -> TsDecl {
+    fn make_named_decl(&self, members: Vec<TsTypeElement>, extends: Vec<TsType>) -> TsDecl {
         if extends.iter().all(TsType::is_ref) {
             InterfaceTsDecl {
                 name: self.options.name().into(),
@@ -295,7 +305,7 @@ impl<'a> TsDeclParser<'a> {
                     members
                         .iter()
                         .map(|member| member.alias_type.get_type_ref_names())
-                        .chain(extends.iter().map(|ty| ty.get_type_ref_names()))
+                        .chain(extends.iter().map(TsType::get_type_ref_names))
                         .flatten()
                         .collect(),
                 ),
@@ -306,19 +316,15 @@ impl<'a> TsDeclParser<'a> {
             .into()
         } else {
             self.make_type_alias(
-                TsType::from(TypeLiteralTsType { members })
-                    .intersection(TsType::Intersection(
-                        extends
-                            .into_iter()
-                            .map(|ty| match ty {
-                                TsType::Option(ty) => {
-                                    TsType::Union(vec![*ty, TsType::empty_type_literal()])
-                                }
-                                _ => ty,
-                            })
-                            .collect(),
-                    ))
-                    .into(),
+                TsType::from(TypeLiteralTsType { members }).intersection(TsType::Intersection(
+                    extends
+                        .into_iter()
+                        .map(|ty| match ty {
+                            TsType::Option(ty) => TsType::Union(vec![*ty, TsType::nullish()]),
+                            _ => ty,
+                        })
+                        .collect(),
+                )),
             )
             .into()
         }
@@ -336,7 +342,6 @@ impl<'a> TsDeclParser<'a> {
         self.options
             .generics()
             .type_params()
-            .into_iter()
             .map(|p| p.ident.to_string())
             .filter(|t| type_ref_names.contains(t))
             .collect()

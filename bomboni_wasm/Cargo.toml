@@ -29,3 +29,4 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
 serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.108"

@@ -3,9 +3,8 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
+    time::SystemTime,
 };
-use thiserror::Error;
 use time::OffsetDateTime;
 
 use crate::google::protobuf::Timestamp;

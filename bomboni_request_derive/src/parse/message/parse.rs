@@ -74,20 +74,6 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         parse_fields.extend(expand_parse_field(options, field)?);
     }
 
-    let source = &options.source;
-    let ident = &options.ident;
-    let type_params = {
-        let type_params = options.generics.type_params().map(|param| &param.ident);
-        quote! {
-            <#(#type_params),*>
-        }
-    };
-    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
-        quote! { #where_clause }
-    } else {
-        quote!()
-    };
-
     let mut query_token_type = quote!();
     let mut parse = if let Some(query_options) = options
         .list_query
@@ -130,6 +116,10 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     };
 
+    let source = &options.source;
+    let ident = &options.ident;
+    let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
+
     if let Some(request_options) = options.request.as_ref() {
         let request_name = if let Some(name) = request_options.name.as_ref() {
             quote! { #name }
@@ -143,7 +133,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
 
     Ok(if options.search_query.is_some() {
         quote! {
-            impl #ident #type_params #where_clause {
+            impl #ident #type_generics #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
                 pub fn parse_search_query<P: PageTokenBuilder #query_token_type >(
                     source: #source,
@@ -155,7 +145,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     } else if options.list_query.is_some() {
         quote! {
-            impl #ident #type_params #where_clause {
+            impl #ident #type_generics #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
                 pub fn parse_list_query<P: PageTokenBuilder #query_token_type >(
                     source: #source,
@@ -167,7 +157,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     } else {
         quote! {
-            impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
+            impl #impl_generics RequestParse<#source> for #ident #type_generics #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
                 fn parse(source: #source) -> RequestResult<Self> {
                     #parse

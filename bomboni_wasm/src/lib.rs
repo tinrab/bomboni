@@ -47,23 +47,52 @@ mod tests {
 
     #[test]
     fn enums() {
-        #[derive(Serialize, Deserialize, WasmTypescript)]
-        pub enum Simple {
-            A,
-            B,
+        #[derive(Serialize, Deserialize, Wasm)]
+        pub enum ExternalTag {
+            String(String),
+            Number(f64),
         }
-        // #[derive(Serialize, Deserialize, WasmTypescript)]
+
+        #[derive(Serialize, Deserialize, Wasm)]
+        #[serde(tag = "kind", content = "data")]
+        pub enum AdjacentTag {
+            String(String),
+            Number(f64),
+        }
+
+        #[derive(Serialize, Deserialize, Wasm)]
+        #[serde(tag = "kind")]
+        pub enum InternalTag {
+            String { value: String },
+            Item(InternalItem),
+        }
+        #[derive(Serialize, Deserialize)]
+        #[serde(tag = "type")]
+        struct InternalItem {
+            value: i32,
+        }
+
+        // #[derive(Serialize, Deserialize, Wasm)]
         // #[repr(i32)]
         // pub enum CStyle {
         //     A = 1,
         //     B = 2,
         // }
-        // #[derive(Serialize, Deserialize, WasmTypescript)]
-        // pub enum UnionKind {
-        //     String(String),
-        //     Number(f64),
-        // }
 
-        assert_eq!(Simple::DECL, r#"export type Simple = "A" | "B";"#);
+        assert_eq!(
+            ExternalTag::DECL,
+            "export type ExternalTag = { String: string } | { Number: number };"
+        );
+        assert_eq!(
+            AdjacentTag::DECL,
+            r#"export type AdjacentTag = { kind: "String"; data: string } | { kind: "Number"; data: number };"#
+        );
+
+        assert_eq!(
+            InternalTag::DECL,
+            r#"export type InternalTag = { kind: "String"; value: string } | ({ kind: "Item" } & InternalItem);"#
+        );
+
+        // println!("{}", serde_json::to_string_pretty(&CStyle::A).unwrap());
     }
 }

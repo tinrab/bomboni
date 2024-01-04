@@ -54,12 +54,9 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
             return Err(QueryError::InvalidPageToken);
         }
         let (nonce_buf, encrypted) = decoded.split_at(NONCE_LENGTH);
-        let nonce = nonce_buf
-            .try_into()
-            .map_err(|_| QueryError::InvalidPageToken)?;
 
         let plaintext = cipher
-            .decrypt(nonce, encrypted)
+            .decrypt(nonce_buf.into(), encrypted)
             .map_err(|_| QueryError::InvalidPageToken)?;
 
         let page_filter =

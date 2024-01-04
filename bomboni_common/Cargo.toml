@@ -19,10 +19,10 @@ serde = ["dep:serde"]
 tokio = ["dep:tokio"]
 chrono = ["dep:chrono"]
 wasm = ["dep:js-sys", "dep:wasm-bindgen", "time/wasm-bindgen"]
+js = []
 
 [dependencies]
-# bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.53" }
-thiserror = "1.0.52"
+thiserror = "1.0.53"
 regex = "1.10.2"
 time = { version = "0.3.31", features = ["formatting", "parsing"] }
 

@@ -44,22 +44,12 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {
 
     let source = &options.source;
     let ident = &options.ident;
-    let type_params = {
-        let type_params = options.generics.type_params().map(|param| &param.ident);
-        quote! {
-            <#(#type_params),*>
-        }
-    };
-    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
-        quote! { #where_clause }
-    } else {
-        quote!()
-    };
+    let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
 
     quote! {
-        impl #type_params From<#ident #type_params> for #source #where_clause {
+        impl #impl_generics From<#ident #type_generics> for #source #where_clause {
             #[allow(clippy::needless_update)]
-            fn from(value: #ident #type_params) -> Self {
+            fn from(value: #ident #type_generics) -> Self {
                 let mut source: #source = Default::default();
                 #write_fields
                 source

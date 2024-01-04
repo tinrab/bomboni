@@ -16,15 +16,10 @@ use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm"
 ))]
-use wasm_bindgen::prelude::*;
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
 use wasm_bindgen::{
     convert::{FromWasmAbi, IntoWasmAbi},
     describe::WasmDescribe,
+    prelude::*,
 };
 
 pub mod generator;
@@ -36,16 +31,6 @@ const WORKER_BITS: i64 = 16;
 const SEQUENCE_BITS: i64 = 16;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// #[cfg_attr(
-//     all(
-//         target_family = "wasm",
-//         not(any(target_os = "emscripten", target_os = "wasi")),
-//         feature = "wasm"
-//     ),
-//     // derive(Wasm),
-//     // wasm(as_string)
-//     wasm_bindgen(inspectable),
-// )]
 pub struct Id(u128);
 
 impl Id {
@@ -149,111 +134,71 @@ impl<'de> Deserialize<'de> for Id {
     }
 }
 
-// #[cfg_attr(
-//     all(
-//         target_family = "wasm",
-//         not(any(target_os = "emscripten", target_os = "wasi")),
-//         feature = "wasm"
-//     ),
-//     wasm_bindgen
-// )]
-// impl Id {
-//     #[wasm_bindgen(constructor)]
-//     pub fn new_wasm(value: String) -> Self {
-//         Self::from_str(&value).unwrap()
-//     }
-
-//     #[wasm_bindgen(getter)]
-//     pub fn value(&self) -> String {
-//         self.to_string()
-//     }
-// }
-
 #[cfg(all(
     target_family = "wasm",
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm"
 ))]
-impl From<Id> for js_sys::JsString {
-    fn from(value: Id) -> Self {
-        value.to_string().into()
+mod wasm {
+    use super::*;
+
+    impl WasmDescribe for Id {
+        fn describe() {
+            <js_sys::JsString as WasmDescribe>::describe()
+        }
     }
-}
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-impl From<js_sys::JsString> for Id {
-    fn from(value: js_sys::JsString) -> Self {
-        Self::from_str(&value.as_string().unwrap()).unwrap()
+    impl From<Id> for js_sys::JsString {
+        fn from(value: Id) -> Self {
+            value.to_string().into()
+        }
     }
-}
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-impl From<&js_sys::JsString> for Id {
-    fn from(value: &js_sys::JsString) -> Self {
-        Self::from_str(&value.as_string().unwrap()).unwrap()
+    impl From<js_sys::JsString> for Id {
+        fn from(value: js_sys::JsString) -> Self {
+            Self::from_str(&value.as_string().unwrap()).unwrap()
+        }
     }
-}
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-impl WasmDescribe for Id {
-    fn describe() {
-        <js_sys::JsString as WasmDescribe>::describe()
+    impl From<&js_sys::JsString> for Id {
+        fn from(value: &js_sys::JsString) -> Self {
+            Self::from_str(&value.as_string().unwrap()).unwrap()
+        }
     }
-}
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-impl IntoWasmAbi for Id {
-    type Abi = <js_sys::JsString as IntoWasmAbi>::Abi;
+    impl IntoWasmAbi for Id {
+        type Abi = <js_sys::JsString as IntoWasmAbi>::Abi;
 
-    fn into_abi(self) -> Self::Abi {
-        js_sys::JsString::from(self.to_string()).into_abi()
+        fn into_abi(self) -> Self::Abi {
+            js_sys::JsString::from(self.to_string()).into_abi()
+        }
     }
-}
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-impl FromWasmAbi for Id {
-    type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
+    impl FromWasmAbi for Id {
+        type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
 
-    unsafe fn from_abi(js_string: Self::Abi) -> Self {
-        Self::from_str(
-            &js_sys::JsString::from_abi(js_string)
+        unsafe fn from_abi(js: Self::Abi) -> Self {
+            match js_sys::JsString::from_abi(js)
                 .as_string()
                 .as_ref()
-                .unwrap(),
-        )
-        .unwrap()
+                .map(|s| Self::from_str(s))
+            {
+                Some(Ok(value)) => value,
+                Some(Err(err)) => {
+                    wasm_bindgen::throw_str(&err.to_string());
+                }
+                None => {
+                    wasm_bindgen::throw_str("expected string");
+                }
+            }
+        }
     }
-}
 
-// #[cfg(all(
-//     target_family = "wasm",
-//     not(any(target_os = "emscripten", target_os = "wasi")),
-//     feature = "wasm"
-// ))]
-// #[wasm_bindgen(typescript_custom_section)]
-// const TS_APPEND_CONTENT: &'static str = r#"
-//     export type Id = string;
-// "#;
+    #[wasm_bindgen(typescript_custom_section)]
+    const TS_APPEND_CONTENT: &'static str = r#"
+        export type Id = string;
+    "#;
+}
 
 #[cfg(test)]
 mod tests {

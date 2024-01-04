@@ -1890,7 +1890,7 @@ mod tests {
             ParsedRequest::parse(Request { value: None }).unwrap_err(),
             RequestError::BadRequest { name, violations }
             if name == Request::NAME && matches!(
-                violations.get(0).unwrap(),
+                violations.first().unwrap(),
                 error if matches!(
                     error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                     CommonError::RequiredFieldMissing { .. }
@@ -1902,7 +1902,7 @@ mod tests {
             ParsedCustomNameRequest::parse(Request { value: None }).unwrap_err(),
             RequestError::BadRequest { name, violations }
             if name == "Test" && matches!(
-                violations.get(0).unwrap(),
+                violations.first().unwrap(),
                 error if matches!(
                     error.error.as_any().downcast_ref::<CommonError>().unwrap(),
                     CommonError::RequiredFieldMissing { .. }

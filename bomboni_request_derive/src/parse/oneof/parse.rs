@@ -16,17 +16,6 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<
 fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
     let source = &options.source;
     let ident = &options.ident;
-    let type_params = {
-        let type_params = options.generics.type_params().map(|param| &param.ident);
-        quote! {
-            <#(#type_params),*>
-        }
-    };
-    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
-        quote! { #where_clause }
-    } else {
-        quote!()
-    };
 
     let mut parse_variants = quote!();
 
@@ -68,8 +57,10 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
         }
     }
 
+    let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
+
     Ok(quote! {
-        impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
+        impl #impl_generics RequestParse<#source> for #ident #type_generics #where_clause {
             fn parse(source: #source) -> RequestResult<Self> {
                 let variant_name = source.get_variant_name();
                 Ok(match source {
@@ -133,20 +124,10 @@ fn expand_tagged_union(
     let field_ident = &tagged_union.field;
     let field_literal = Literal::string(&tagged_union.field.to_string());
     let source = &options.source;
-    let type_params = {
-        let type_params = options.generics.type_params().map(|param| &param.ident);
-        quote! {
-            <#(#type_params),*>
-        }
-    };
-    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
-        quote! { #where_clause }
-    } else {
-        quote!()
-    };
+    let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
 
     Ok(quote! {
-        impl #type_params RequestParse<#source> for #ident #type_params #where_clause {
+        impl #impl_generics RequestParse<#source> for #ident #type_generics #where_clause {
             #[allow(ignored_unit_patterns)]
             fn parse(source: #source) -> RequestResult<Self> {
                 let source = source.#field_ident

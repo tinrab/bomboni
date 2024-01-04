@@ -43,7 +43,8 @@ function lint() {
 		-A clippy::needless_pass_by_value \
 		-A clippy::struct_excessive_bools \
 		-A clippy::missing_errors_doc \
-		-A clippy::missing_panics_doc
+		-A clippy::missing_panics_doc \
+		-A clippy::struct_field_names
 
 }
 

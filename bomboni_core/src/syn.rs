@@ -1,5 +1,4 @@
-use std::{fmt::Display, str::FromStr};
-use syn::{Expr, ExprLit, Lit, Type, TypePath};
+use syn::{Type, TypePath};
 
 #[macro_export]
 macro_rules! format_comment {

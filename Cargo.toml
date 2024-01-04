@@ -17,14 +17,15 @@ path = "src/lib.rs"
 resolver = "2"
 members = [
   "bomboni_common",
+  "bomboni_core",
   "bomboni_prost",
   "bomboni_proto",
-  "bomboni_request_derive",
   "bomboni_request",
+  "bomboni_request_derive",
   "bomboni_template",
   "bomboni_wasm",
+  "bomboni_wasm_core",
   "bomboni_wasm_derive",
-  "wasm", "bomboni_core",
 ]
 
 [features]

@@ -16,17 +16,6 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream 
 fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
     let source = &options.source;
     let ident = &options.ident;
-    let type_params = {
-        let type_params = options.generics.type_params().map(|param| &param.ident);
-        quote! {
-            <#(#type_params),*>
-        }
-    };
-    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
-        quote! { #where_clause }
-    } else {
-        quote!()
-    };
 
     let mut write_variants = quote!();
 
@@ -68,9 +57,11 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStrea
         }
     }
 
+    let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
+
     quote! {
-        impl #type_params From<#ident #type_params> for #source #where_clause {
-            fn from(value: #ident #type_params) -> Self {
+        impl #impl_generics From<#ident #type_generics> for #source #where_clause {
+            fn from(value: #ident #type_generics) -> Self {
                 match value {
                     #write_variants
                     _ => panic!("unknown oneof variant"),
@@ -85,23 +76,8 @@ fn expand_write_tagged_union(
     variants: &[ParseVariant],
     tagged_union: &ParseTaggedUnion,
 ) -> TokenStream {
-    let source = &options.source;
     let ident = &options.ident;
     let oneof_ident = &tagged_union.oneof;
-    let field_ident = &tagged_union.field;
-    let type_params = {
-        let type_params = options.generics.type_params().map(|param| &param.ident);
-        quote! {
-            <#(#type_params),*>
-        }
-    };
-    let where_clause = if let Some(where_clause) = &options.generics.where_clause {
-        quote! { #where_clause }
-    } else {
-        quote!()
-    };
-    todo!();
-    // let (a, b, where_clause) = options.generics.split_for_impl();
 
     let mut write_variants = quote!();
     for variant in variants {
@@ -142,9 +118,13 @@ fn expand_write_tagged_union(
         }
     }
 
+    let source = &options.source;
+    let field_ident = &tagged_union.field;
+    let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
+
     quote! {
-        impl #type_params From<#ident #type_params> for #source #where_clause {
-            fn from(value: #ident #type_params) -> Self {
+        impl #impl_generics From<#ident #type_generics> for #source #where_clause {
+            fn from(value: #ident #type_generics) -> Self {
                 #source {
                     #field_ident: Some(match value {
                         #write_variants

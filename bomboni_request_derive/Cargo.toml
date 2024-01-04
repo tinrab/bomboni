@@ -17,7 +17,7 @@ proc-macro = true
 [dependencies]
 bomboni_core = { path = "../bomboni_core", version = "0.1.53" }
 itertools = "0.12.0"
-proc-macro2 = { version = "1.0.71", features = ["proc-macro"] }
-syn = "2.0.42"
+proc-macro2 = { version = "1.0.72", features = ["proc-macro"] }
+syn = "2.0.43"
 quote = "1.0.33"
 darling = "0.20.3"

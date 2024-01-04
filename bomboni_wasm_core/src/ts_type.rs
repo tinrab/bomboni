@@ -1,17 +1,13 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::fmt::{self, Display, Formatter};
 
 use itertools::Itertools;
-use proc_macro2::{Ident, Literal, TokenStream};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
 use serde_derive_internals::ast::Style;
 use serde_derive_internals::attr::TagType;
 use syn::{
-    parse_macro_input, parse_quote, spanned::Spanned, Attribute, DeriveInput, Expr, ExprLit,
-    Fields, GenericArgument, GenericParam, Generics, Index, Lit, Meta, MetaList, MetaNameValue,
-    Path, PathArguments, PathSegment, ReturnType, Type, TypeArray, TypeBareFn, TypeGroup,
-    TypeImplTrait, TypeParam, TypeParamBound, TypeParen, TypePath, TypeReference, TypeSlice,
-    TypeTraitObject, TypeTuple, Visibility,
+    Expr, ExprLit, GenericArgument, Lit, Path, PathArguments, PathSegment, ReturnType, Type,
+    TypeArray, TypeBareFn, TypeGroup, TypeImplTrait, TypeParamBound, TypeParen, TypePath,
+    TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,7 +116,7 @@ impl TsType {
                     .iter()
                     .filter_map(|t| match t {
                         TypeParamBound::Trait(t) => Self::from_path(&t.path),
-                        _ => None, // skip lifetime etc.
+                        _ => None,
                     })
                     .collect();
 
@@ -141,21 +137,16 @@ impl TsType {
         }
     }
 
-    pub const fn empty_type_literal() -> Self {
-        Self::TypeLiteral(TypeLiteralTsType { members: vec![] })
-    }
-
     pub fn is_ref(&self) -> bool {
         matches!(self, Self::Ref { .. })
     }
 
     pub fn get_type_ref_names(&self) -> BTreeSet<String> {
         let mut names = BTreeSet::new();
-        self.visit(&mut |ty| match ty {
-            Self::Ref { name, .. } => {
+        self.visit(&mut |ty| {
+            if let Self::Ref { name, .. } = ty {
                 names.insert(name.clone());
             }
-            _ => {}
         });
         names
     }
@@ -197,7 +188,7 @@ impl TsType {
     fn from_path_segment(segment: &PathSegment) -> Self {
         let name = segment.ident.to_string();
 
-        let (args, output) = match &segment.arguments {
+        let (args, _) = match &segment.arguments {
             PathArguments::AngleBracketed(path) => {
                 let args = path
                     .args
@@ -237,8 +228,8 @@ impl TsType {
                 Self::from_type(args[0])
             }
             "Vec" | "VecDeque" | "LinkedList" if args.len() == 1 => {
-                let elem = Self::from_type(args[0]);
-                Self::Array(Box::new(elem))
+                let element = Self::from_type(args[0]);
+                Self::Array(Box::new(element))
             }
             "HashMap" | "BTreeMap" if args.len() == 2 => {
                 let type_params = args.iter().map(|arg| Self::from_type(arg)).collect();
@@ -253,8 +244,8 @@ impl TsType {
                 Self::Ref { name, type_params }
             }
             "HashSet" | "BTreeSet" if args.len() == 1 => {
-                let elem = Self::from_type(args[0]);
-                Self::Array(Box::new(elem))
+                let element = Self::from_type(args[0]);
+                Self::Array(Box::new(element))
             }
             "ByteBuf" => {
                 if cfg!(feature = "js") {
@@ -274,6 +265,7 @@ impl TsType {
         }
     }
 
+    #[must_use]
     pub fn with_tag_type(self, tag_type: &TagType, name: &str, style: Style) -> Self {
         match tag_type {
             TagType::External => {
@@ -331,6 +323,7 @@ impl TsType {
         }
     }
 
+    #[must_use]
     pub fn intersection(self, other: Self) -> Self {
         match (self, other) {
             (Self::TypeLiteral(x), Self::TypeLiteral(y)) => x.intersection(y).into(),
@@ -367,49 +360,42 @@ impl Display for TsType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Keyword(kind) => {
-                let ty = format!("{:?}", kind).to_lowercase();
+                let ty = format!("{kind:?}").to_lowercase();
                 write!(f, "{ty}")
             }
             Self::Literal(literal) => {
                 write!(f, "\"{literal}\"")
             }
-            Self::Array(elem) => match elem.as_ref() {
+            Self::Array(element) => match element.as_ref() {
                 Self::Union(_) | Self::Intersection(_) | &Self::Option(_) => {
-                    write!(f, "({elem})[]")
+                    write!(f, "({element})[]")
                 }
-                _ => write!(f, "{elem}[]"),
+                _ => write!(f, "{element}[]"),
             },
             Self::Tuple(elems) => {
-                let elems = elems.iter().map(|elem| elem.to_string()).join(", ");
-
-                write!(f, "[{elems}]")
+                write!(f, "[{}]", elems.iter().map(ToString::to_string).join(", "))
             }
             Self::Ref { name, type_params } => {
-                let params = type_params.iter().map(|param| param.to_string()).join(", ");
-
+                let params = type_params.iter().map(ToString::to_string).join(", ");
                 if params.is_empty() {
                     write!(f, "{name}")
                 } else {
                     write!(f, "{name}<{params}>")
                 }
             }
-            Self::Fn {
-                params,
-                alias_type: alias_type,
-            } => {
+            Self::Fn { params, alias_type } => {
                 let params = params
                     .iter()
                     .enumerate()
                     .map(|(i, param)| format!("arg{i}: {param}"))
                     .join(", ");
-
                 write!(f, "({params}) => {alias_type}")
             }
-            Self::Option(elem) => {
-                write!(f, "{elem} | {}", Self::nullish())
+            Self::Option(element) => {
+                write!(f, "{element} | {}", Self::nullish())
             }
-            Self::TypeLiteral(type_lit) => {
-                write!(f, "{type_lit}")
+            Self::TypeLiteral(type_literal) => {
+                write!(f, "{type_literal}")
             }
             Self::Intersection(types) => {
                 if types.len() == 1 {
@@ -448,31 +434,29 @@ impl Display for TsType {
 }
 
 impl TypeLiteralTsType {
+    #[must_use]
     pub fn intersection(self, other: Self) -> Self {
-        self.members
-            .into_iter()
-            .chain(other.members.into_iter())
-            .fold(
-                TypeLiteralTsType {
-                    members: Vec::new(),
-                },
-                |mut acc, member| {
-                    if let Some(existing) = acc.get_member_mut(&member.key) {
-                        let mut prev = TsType::NULL;
-                        std::mem::swap(&mut existing.alias_type, &mut prev);
-                        existing.alias_type = prev.intersection(member.alias_type);
-                    } else {
-                        acc.members.push(member)
-                    }
-                    acc
-                },
-            )
+        self.members.into_iter().chain(other.members).fold(
+            TypeLiteralTsType {
+                members: Vec::new(),
+            },
+            |mut acc, member| {
+                if let Some(existing) = acc.get_member_mut(&member.key) {
+                    let mut prev = TsType::NULL;
+                    std::mem::swap(&mut existing.alias_type, &mut prev);
+                    existing.alias_type = prev.intersection(member.alias_type);
+                } else {
+                    acc.members.push(member);
+                }
+                acc
+            },
+        )
     }
 
     fn get_member_mut<K: AsRef<str>>(&mut self, key: K) -> Option<&mut TsTypeElement> {
         self.members
             .iter_mut()
-            .find(|member| &member.key == key.as_ref())
+            .find(|member| member.key == key.as_ref())
     }
 }
 
@@ -484,7 +468,7 @@ impl From<TypeLiteralTsType> for TsType {
 
 impl Display for TypeLiteralTsType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let members = self.members.iter().map(|elem| elem.to_string()).join("; ");
+        let members = self.members.iter().map(ToString::to_string).join("; ");
         if members.is_empty() {
             write!(f, "{{}}")
         } else {
@@ -506,10 +490,10 @@ impl Display for TsTypeElement {
         let key = &self.key;
         let alias_type = &self.alias_type;
         let opt = if self.optional { "?" } else { "" };
-        if !key.contains('-') {
-            write!(f, "{key}{opt}: {alias_type}")
-        } else {
+        if key.contains('-') {
             write!(f, "\"{key}\"{opt}: {alias_type}")
+        } else {
+            write!(f, "{key}{opt}: {alias_type}")
         }
     }
 }

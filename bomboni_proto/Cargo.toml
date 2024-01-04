@@ -24,7 +24,7 @@ wasm = ["bomboni_common/wasm"]
 bomboni_common = { path = "../bomboni_common", features = [
   "serde",
 ], version = "0.1.53" }
-thiserror = "1.0.51"
+thiserror = "1.0.53"
 itertools = "0.12.0"
 time = { version = "0.3.31", features = ["serde", "formatting", "parsing"] }
 prost = "0.12.3"

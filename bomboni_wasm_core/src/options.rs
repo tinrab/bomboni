@@ -1,13 +1,11 @@
-use darling::FromMeta;
-use darling::{FromDeriveInput, FromField};
+use darling::FromDeriveInput;
 use itertools::Itertools;
-use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens};
+use proc_macro2::Ident;
 use serde_derive_internals::{
     ast::{self, Container as SerdeContainer},
     attr, Ctxt,
 };
-use syn::{self, DeriveInput, Generics, Member, Path, Type, Visibility};
+use syn::{self, DeriveInput, Generics, Member, Path, Visibility};
 
 pub struct WasmOptions<'a> {
     pub serde_container: SerdeContainer<'a>,
@@ -15,6 +13,7 @@ pub struct WasmOptions<'a> {
     pub decl_type: bool,
     pub into_wasm_abi: bool,
     pub from_wasm_abi: bool,
+    pub wasm_ref: bool,
     pub fields: Vec<FieldWasm>,
 }
 
@@ -40,23 +39,27 @@ struct Attributes {
     into_wasm_abi: Option<bool>,
     #[darling(default)]
     from_wasm_abi: Option<bool>,
+    #[darling(default)]
+    wasm_ref: Option<bool>,
 }
 
 impl<'a> WasmOptions<'a> {
     pub fn from_derive_input(input: &'a DeriveInput) -> syn::Result<Self> {
         let ctx = Ctxt::new();
-        let serde_container =
-            match SerdeContainer::from_ast(&ctx, &input, serde_derive_internals::Derive::Serialize)
-            {
-                Some(container) => {
-                    ctx.check()?;
-                    container
-                }
-                None => {
-                    return Err(ctx.check().expect_err("serde_container is None"));
-                }
-            };
-        let attributes = match Attributes::from_derive_input(&input) {
+        let serde_container = match SerdeContainer::from_ast(
+            &ctx,
+            input,
+            serde_derive_internals::Derive::Serialize,
+        ) {
+            Some(container) => {
+                ctx.check()?;
+                container
+            }
+            None => {
+                return Err(ctx.check().expect_err("serde_container is None"));
+            }
+        };
+        let attributes = match Attributes::from_derive_input(input) {
             Ok(v) => v,
             Err(err) => {
                 return Err(err.into());
@@ -89,11 +92,12 @@ impl<'a> WasmOptions<'a> {
             decl_type: attributes.decl_type.unwrap_or_default(),
             into_wasm_abi: attributes.into_wasm_abi.unwrap_or(wasm_abi),
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
+            wasm_ref: attributes.wasm_ref.unwrap_or_default(),
             fields,
         })
     }
 
-    pub fn ident(&self) -> &syn::Ident {
+    pub fn ident(&self) -> &Ident {
         &self.serde_container.ident
     }
 
@@ -106,7 +110,7 @@ impl<'a> WasmOptions<'a> {
     }
 
     pub fn generics(&self) -> &Generics {
-        &self.serde_container.generics
+        self.serde_container.generics
     }
 
     pub fn serde_attrs(&self) -> &attr::Container {

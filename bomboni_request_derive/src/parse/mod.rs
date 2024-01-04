@@ -1,10 +1,9 @@
 use darling::util::parse_expr;
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
 use proc_macro2::{Ident, TokenStream};
-use quote::quote;
 use syn::{
     self, parse_quote, DeriveInput, Expr, ExprArray, ExprPath, Generics, Meta, MetaNameValue, Path,
-    Type, WhereClause,
+    Type,
 };
 
 mod message;
@@ -17,7 +16,6 @@ pub mod parse_resource_name;
 pub struct ParseOptions {
     pub ident: Ident,
     pub generics: Generics,
-    pub where_clause: Option<WhereClause>,
     pub data: ast::Data<ParseVariant, ParseField>,
     /// Source proto type.
     pub source: Path,

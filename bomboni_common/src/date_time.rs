@@ -1,5 +1,3 @@
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 use std::str::FromStr;
@@ -7,24 +5,22 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use time::convert::{Nanosecond, Second};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 #[cfg(all(
     target_family = "wasm",
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm"
 ))]
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{
+    convert::{FromWasmAbi, IntoWasmAbi},
+    describe::WasmDescribe,
+    prelude::*,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(
-    all(
-        target_family = "wasm",
-        not(any(target_os = "emscripten", target_os = "wasi")),
-        feature = "wasm"
-    ),
-    // derive(WasmNewtype),
-    // wasm(with = js_sys::Date),
-    wasm_bindgen(inspectable),
-)]
 pub struct UtcDateTime(OffsetDateTime);
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
@@ -46,7 +42,7 @@ impl UtcDateTime {
 
     pub fn from_timestamp(seconds: i64, nanoseconds: u32) -> Result<Self, UtcDateTimeError> {
         OffsetDateTime::from_unix_timestamp_nanos(
-            seconds as i128 * Nanosecond::per(Second) as i128 + nanoseconds as i128,
+            i128::from(seconds) * i128::from(Nanosecond::per(Second)) + i128::from(nanoseconds),
         )
         .map_err(|_| UtcDateTimeError::NotUtc)
         .map(Self)
@@ -88,9 +84,7 @@ impl FromStr for UtcDateTime {
     type Err = UtcDateTimeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::parse_rfc3339(s)
-            .map_err(|_| UtcDateTimeError::InvalidFormat(s.into()))?
-            .into())
+        Self::parse_rfc3339(s).map_err(|_| UtcDateTimeError::InvalidFormat(s.into()))
     }
 }
 
@@ -128,7 +122,7 @@ impl TryFrom<SystemTime> for UtcDateTime {
             }
         };
         Ok(OffsetDateTime::from_unix_timestamp_nanos(
-            seconds as i128 * Nanosecond::per(Second) as i128 + nanoseconds as i128,
+            i128::from(seconds) * i128::from(Nanosecond::per(Second)) + i128::from(nanoseconds),
         )
         .map_err(|_| UtcDateTimeError::NotUtc)?
         .into())
@@ -140,12 +134,7 @@ impl TryFrom<chrono::NaiveDateTime> for UtcDateTime {
     type Error = UtcDateTimeError;
 
     fn try_from(value: chrono::NaiveDateTime) -> Result<Self, Self::Error> {
-        let seconds = value.timestamp();
-        let nanoseconds = value.timestamp_subsec_nanos();
-        if nanoseconds < 0 {
-            return Err(UtcDateTimeError::InvalidNanoseconds);
-        }
-        Self::from_timestamp(seconds, nanoseconds as u32)
+        Self::from_timestamp(value.timestamp(), value.timestamp_subsec_nanos())
     }
 }
 
@@ -182,15 +171,81 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     }
 }
 
-// #[cfg(all(
-//     target_family = "wasm",
-//     not(any(target_os = "emscripten", target_os = "wasi")),
-//     feature = "wasm"
-// ))]
-// #[wasm_bindgen(typescript_custom_section)]
-// const TS_APPEND_CONTENT: &'static str = r#"
-//     export type UtcDateTime = Date;
-// "#;
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm",
+    not(feature = "js")
+))]
+mod wasm_as_date {
+    use super::*;
+
+    impl WasmDescribe for UtcDateTime {
+        fn describe() {
+            <js_sys::JsString as WasmDescribe>::describe()
+        }
+    }
+
+    impl IntoWasmAbi for UtcDateTime {
+        type Abi = <js_sys::JsString as IntoWasmAbi>::Abi;
+
+        fn into_abi(self) -> Self::Abi {
+            js_sys::JsString::from(self.format_rfc3339().unwrap()).into_abi()
+        }
+    }
+
+    impl FromWasmAbi for UtcDateTime {
+        type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
+
+        unsafe fn from_abi(js: Self::Abi) -> Self {
+            match js_sys::JsString::from_abi(js)
+                .as_string()
+                .as_ref()
+                .map(|s| Self::parse_rfc3339(s))
+            {
+                Some(Ok(value)) => value,
+                Some(Err(err)) => {
+                    wasm_bindgen::throw_str(&err.to_string());
+                }
+                None => {
+                    wasm_bindgen::throw_str("expected RFC 3339 date string");
+                }
+            }
+        }
+    }
+}
+
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm",
+    feature = "js"
+))]
+mod wasm_as_string {
+    use super::*;
+
+    impl WasmDescribe for UtcDateTime {
+        fn describe() {
+            <js_sys::Date as WasmDescribe>::describe()
+        }
+    }
+
+    impl IntoWasmAbi for UtcDateTime {
+        type Abi = <js_sys::Date as IntoWasmAbi>::Abi;
+
+        fn into_abi(self) -> Self::Abi {
+            js_sys::Date::from(self.0).into_abi()
+        }
+    }
+
+    impl FromWasmAbi for UtcDateTime {
+        type Abi = <js_sys::Date as FromWasmAbi>::Abi;
+
+        unsafe fn from_abi(js: Self::Abi) -> Self {
+            OffsetDateTime::from(js_sys::Date::from_abi(js)).into()
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
