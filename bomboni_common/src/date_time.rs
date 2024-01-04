@@ -48,6 +48,33 @@ impl UtcDateTime {
         .map(Self)
     }
 
+    pub fn from_ymd(year: i32, month: u8, day: u8) -> Result<Self, UtcDateTimeError> {
+        OffsetDateTime::UNIX_EPOCH
+            .replace_year(year)
+            .and_then(|dt| dt.replace_month(month.try_into().unwrap()))
+            .and_then(|dt| dt.replace_day(day))
+            .map_err(|_| UtcDateTimeError::NotUtc)
+            .map(Self)
+    }
+
+    pub fn with_ymd(self, year: i32, month: u8, day: u8) -> Result<Self, UtcDateTimeError> {
+        self.0
+            .replace_year(year)
+            .and_then(|dt| dt.replace_month(month.try_into().unwrap()))
+            .and_then(|dt| dt.replace_day(day))
+            .map_err(|_| UtcDateTimeError::NotUtc)
+            .map(Self)
+    }
+
+    pub fn with_hms(self, hour: u8, minute: u8, second: u8) -> Result<Self, UtcDateTimeError> {
+        self.0
+            .replace_hour(hour)
+            .and_then(|dt| dt.replace_minute(minute))
+            .and_then(|dt| dt.replace_second(second))
+            .map_err(|_| UtcDateTimeError::NotUtc)
+            .map(Self)
+    }
+
     pub fn timestamp(self) -> (i64, u32) {
         (self.0.unix_timestamp(), self.0.nanosecond())
     }
