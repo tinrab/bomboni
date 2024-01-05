@@ -31,55 +31,8 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
         wasm_abi.extend(expand_wasm_ref(&options));
     }
 
-    let wasm_describe = if wasm_abi.is_empty() {
-        quote!()
-    } else {
-        quote! {
-            impl #impl_generics WasmDescribe for #ident #type_generics #where_clause {
-                #[inline]
-                fn describe() {
-                    <Self as Wasm>::JsType::describe()
-                }
-            }
-        }
-    };
-
-    let wasm_mod = options
-        .wasm_bindgen
-        .as_ref()
-        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
-    let use_wasm = if let Some(path) = options.wasm_bindgen.as_ref() {
-        quote! {
-            use #path as _wasm_bindgen;
-        }
-    } else {
-        quote! {
-            extern crate wasm_bindgen as _wasm_bindgen;
-        }
-    };
-    let use_serde = if let Some(path) = options.serde_attrs().custom_serde_path() {
-        quote! {
-            use #path as _serde;
-        }
-    } else {
-        quote! {
-            extern crate serde as _serde;
-        }
-    };
-    Ok(quote! {
-        #[automatically_derived]
-        const _: () = {
-            #use_wasm
-            #use_serde
-            use #wasm_mod::{
-                prelude::*,
-                convert::{IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi},
-                describe::WasmDescribe,
-            };
-
-            #[wasm_bindgen(typescript_custom_section)]
-            const TS_APPEND_CONTENT: &'static str = #ts_decl_literal;
-
+    if !wasm_abi.is_empty() {
+        wasm_abi.extend(quote! {
             #[wasm_bindgen]
             extern "C" {
                 #[wasm_bindgen(typescript_type = #ts_decl_name)]
@@ -88,11 +41,68 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
 
             impl #impl_generics Wasm for #ident #type_generics #where_clause {
                 type JsType = JsType;
+            }
+
+            impl #impl_generics WasmDescribe for #ident #type_generics #where_clause {
+                #[inline]
+                fn describe() {
+                    <Self as Wasm>::JsType::describe()
+                }
+            }
+        });
+    }
+
+    let wasm_mod = options
+        .wasm_bindgen
+        .as_ref()
+        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
+    let mut usage = quote! {
+        use #wasm_mod::{
+            prelude::*,
+            convert::{IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi},
+            describe::WasmDescribe,
+        };
+    };
+
+    usage.extend(if let Some(path) = options.wasm_bindgen.as_ref() {
+        quote! {
+            use #path as _wasm_bindgen;
+        }
+    } else {
+        quote! {
+            extern crate wasm_bindgen as _wasm_bindgen;
+        }
+    });
+    usage.extend(
+        if let Some(path) = options.serde_attrs().custom_serde_path() {
+            quote! {
+                use #path as _serde;
+            }
+        } else {
+            quote! {
+                extern crate serde as _serde;
+            }
+        },
+    );
+    if let Some(bomboni_mod) = options.bomboni_wasm.as_ref() {
+        usage.extend(quote! {
+            use #bomboni_mod::Wasm;
+        });
+    }
+
+    Ok(quote! {
+        #[automatically_derived]
+        const _: () = {
+            #usage
+
+            #[wasm_bindgen(typescript_custom_section)]
+            const TS_APPEND_CONTENT: &'static str = #ts_decl_literal;
+
+            impl #ident #type_generics #where_clause {
                 const DECL: &'static str = #ts_decl_literal;
             }
 
             #wasm_abi
-            #wasm_describe
         };
     })
 }

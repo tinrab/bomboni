@@ -15,7 +15,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
     feature = "wasm"
 ))]
 use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi},
+    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
     describe::WasmDescribe,
     prelude::*,
 };
@@ -204,7 +204,7 @@ impl<'de> Deserialize<'de> for UtcDateTime {
     feature = "wasm",
     not(feature = "js")
 ))]
-mod wasm_as_date {
+mod wasm_as_string {
     use super::*;
 
     impl WasmDescribe for UtcDateTime {
@@ -218,6 +218,13 @@ mod wasm_as_date {
 
         fn into_abi(self) -> Self::Abi {
             js_sys::JsString::from(self.format_rfc3339().unwrap()).into_abi()
+        }
+    }
+
+    impl OptionIntoWasmAbi for UtcDateTime {
+        #[inline]
+        fn none() -> Self::Abi {
+            <js_sys::JsString as OptionIntoWasmAbi>::none()
         }
     }
 
@@ -240,6 +247,13 @@ mod wasm_as_date {
             }
         }
     }
+
+    impl OptionFromWasmAbi for UtcDateTime {
+        #[inline]
+        fn is_none(js: &Self::Abi) -> bool {
+            <js_sys::JsString as OptionFromWasmAbi>::is_none(js)
+        }
+    }
 }
 
 #[cfg(all(
@@ -248,7 +262,7 @@ mod wasm_as_date {
     feature = "wasm",
     feature = "js"
 ))]
-mod wasm_as_string {
+mod wasm_as_date {
     use super::*;
 
     impl WasmDescribe for UtcDateTime {
@@ -265,11 +279,25 @@ mod wasm_as_string {
         }
     }
 
+    impl OptionIntoWasmAbi for UtcDateTime {
+        #[inline]
+        fn none() -> Self::Abi {
+            <js_sys::Date as OptionIntoWasmAbi>::none()
+        }
+    }
+
     impl FromWasmAbi for UtcDateTime {
         type Abi = <js_sys::Date as FromWasmAbi>::Abi;
 
         unsafe fn from_abi(js: Self::Abi) -> Self {
             OffsetDateTime::from(js_sys::Date::from_abi(js)).into()
+        }
+    }
+
+    impl OptionFromWasmAbi for UtcDateTime {
+        #[inline]
+        fn is_none(js: &Self::Abi) -> bool {
+            <js_sys::Date as OptionFromWasmAbi>::is_none(js)
         }
     }
 }

@@ -6,7 +6,7 @@ pub mod utility;
 pub trait Wasm {
     type JsType: JsCast;
 
-    const DECL: &'static str;
+    // const DECL: &'static str;
 
     fn to_js(&self) -> Result<Self::JsType, serde_wasm_bindgen::Error>
     where

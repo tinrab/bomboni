@@ -27,7 +27,6 @@ pub struct InterfaceTsDecl {
     pub type_params: Vec<String>,
     pub extends: Vec<TsType>,
     pub body: Vec<TsTypeElement>,
-    pub decl_type: bool,
 }
 
 pub struct EnumTsDecl {
@@ -70,12 +69,7 @@ impl From<InterfaceTsDecl> for TsDecl {
 
 impl Display for InterfaceTsDecl {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "export {} {}",
-            if self.decl_type { "type" } else { "interface" },
-            self.name
-        )?;
+        write!(f, "export interface {}", self.name)?;
 
         if !self.type_params.is_empty() {
             write!(f, "<{}>", self.type_params.join(", "))?;
@@ -212,7 +206,7 @@ impl<'a> TsDeclParser<'a> {
             type_params: self.make_ref_type_params(
                 members
                     .iter()
-                    .flat_map(|member| member.alias_type.get_type_ref_names())
+                    .flat_map(|member| member.alias_type.get_reference_names())
                     .collect(),
             ),
             members,
@@ -298,20 +292,19 @@ impl<'a> TsDeclParser<'a> {
     }
 
     fn make_named_decl(&self, members: Vec<TsTypeElement>, extends: Vec<TsType>) -> TsDecl {
-        if extends.iter().all(TsType::is_ref) {
+        if extends.iter().all(TsType::is_reference) {
             InterfaceTsDecl {
                 name: self.options.name().into(),
                 type_params: self.make_ref_type_params(
                     members
                         .iter()
-                        .map(|member| member.alias_type.get_type_ref_names())
-                        .chain(extends.iter().map(TsType::get_type_ref_names))
+                        .map(|member| member.alias_type.get_reference_names())
+                        .chain(extends.iter().map(TsType::get_reference_names))
                         .flatten()
                         .collect(),
                 ),
                 extends,
                 body: members,
-                decl_type: self.options.decl_type,
             }
             .into()
         } else {
@@ -333,7 +326,7 @@ impl<'a> TsDeclParser<'a> {
     fn make_type_alias(&self, alias_type: TsType) -> TypeAliasTsDecl {
         TypeAliasTsDecl {
             name: self.options.name().into(),
-            type_params: self.make_ref_type_params(alias_type.get_type_ref_names()),
+            type_params: self.make_ref_type_params(alias_type.get_reference_names()),
             alias_type,
         }
     }

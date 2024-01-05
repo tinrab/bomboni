@@ -10,10 +10,12 @@ use syn::{self, DeriveInput, Generics, Member, Path, Visibility};
 pub struct WasmOptions<'a> {
     pub serde_container: SerdeContainer<'a>,
     pub wasm_bindgen: Option<Path>,
-    pub decl_type: bool,
+    pub bomboni_wasm: Option<Path>,
     pub into_wasm_abi: bool,
     pub from_wasm_abi: bool,
     pub wasm_ref: bool,
+    pub rename: Option<String>,
+    pub interface_type: Option<bool>,
     pub fields: Vec<FieldWasm>,
 }
 
@@ -31,16 +33,13 @@ pub struct FieldWasm {
 #[darling(attributes(wasm))]
 struct Attributes {
     wasm_bindgen: Option<Path>,
-    #[darling(default)]
-    decl_type: Option<bool>,
-    #[darling(default)]
+    bomboni_wasm: Option<Path>,
     wasm_abi: Option<bool>,
-    #[darling(default)]
     into_wasm_abi: Option<bool>,
-    #[darling(default)]
     from_wasm_abi: Option<bool>,
-    #[darling(default)]
     wasm_ref: Option<bool>,
+    rename: Option<String>,
+    interface_type: Option<bool>,
 }
 
 impl<'a> WasmOptions<'a> {
@@ -89,10 +88,12 @@ impl<'a> WasmOptions<'a> {
         Ok(Self {
             serde_container,
             wasm_bindgen: attributes.wasm_bindgen,
-            decl_type: attributes.decl_type.unwrap_or_default(),
+            bomboni_wasm: attributes.bomboni_wasm,
             into_wasm_abi: attributes.into_wasm_abi.unwrap_or(wasm_abi),
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
             wasm_ref: attributes.wasm_ref.unwrap_or_default(),
+            rename: attributes.rename,
+            interface_type: attributes.interface_type,
             fields,
         })
     }
@@ -102,7 +103,10 @@ impl<'a> WasmOptions<'a> {
     }
 
     pub fn name(&self) -> &str {
-        self.serde_attrs().name().serialize_name()
+        self.rename
+            .as_ref()
+            .map(String::as_str)
+            .unwrap_or_else(|| self.serde_attrs().name().serialize_name())
     }
 
     pub fn serde_data(&self) -> &ast::Data {

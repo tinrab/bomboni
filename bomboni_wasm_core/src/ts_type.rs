@@ -17,7 +17,7 @@ pub enum TsType {
     Array(Box<Self>),
     Tuple(Vec<Self>),
     Option(Box<Self>),
-    Ref {
+    Reference {
         name: String,
         type_params: Vec<Self>,
     },
@@ -137,14 +137,14 @@ impl TsType {
         }
     }
 
-    pub fn is_ref(&self) -> bool {
-        matches!(self, Self::Ref { .. })
+    pub fn is_reference(&self) -> bool {
+        matches!(self, Self::Reference { .. })
     }
 
-    pub fn get_type_ref_names(&self) -> BTreeSet<String> {
+    pub fn get_reference_names(&self) -> BTreeSet<String> {
         let mut names = BTreeSet::new();
         self.visit(&mut |ty| {
-            if let Self::Ref { name, .. } = ty {
+            if let Self::Reference { name, .. } = ty {
                 names.insert(name.clone());
             }
         });
@@ -163,7 +163,7 @@ impl TsType {
                 elems.iter().for_each(|t| t.visit(f));
             }
             Self::Option(t) => t.visit(f),
-            Self::Ref { type_params, .. } => {
+            Self::Reference { type_params, .. } => {
                 type_params.iter().for_each(|t| t.visit(f));
             }
             Self::Fn { params, alias_type } => {
@@ -241,7 +241,7 @@ impl TsType {
                 }
                 .to_string();
 
-                Self::Ref { name, type_params }
+                Self::Reference { name, type_params }
             }
             "HashSet" | "BTreeSet" if args.len() == 1 => {
                 let element = Self::from_type(args[0]);
@@ -249,7 +249,7 @@ impl TsType {
             }
             "ByteBuf" => {
                 if cfg!(feature = "js") {
-                    Self::Ref {
+                    Self::Reference {
                         name: String::from("Uint8Array"),
                         type_params: vec![],
                     }
@@ -260,7 +260,7 @@ impl TsType {
             "Option" if args.len() == 1 => Self::Option(Box::new(Self::from_type(args[0]))),
             _ => {
                 let type_params = args.into_iter().map(Self::from_type).collect();
-                Self::Ref { name, type_params }
+                Self::Reference { name, type_params }
             }
         }
     }
@@ -375,7 +375,7 @@ impl Display for TsType {
             Self::Tuple(elems) => {
                 write!(f, "[{}]", elems.iter().map(ToString::to_string).join(", "))
             }
-            Self::Ref { name, type_params } => {
+            Self::Reference { name, type_params } => {
                 let params = type_params.iter().map(ToString::to_string).join(", ");
                 if params.is_empty() {
                     write!(f, "{name}")

@@ -7,6 +7,7 @@ use bomboni_common::id::Id;
     feature = "wasm"
 ))]
 use {
+    bomboni_wasm_derive::Wasm,
     serde::{Deserialize, Serialize},
     wasm_bindgen::prelude::*,
 };
@@ -31,16 +32,16 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// #[cfg_attr(
-//     all(
-//         target_family = "wasm",
-//         not(any(target_os = "emscripten", target_os = "wasi")),
-//         feature = "wasm"
-//     ),
-//     derive(Serialize, Deserialize),
-//     serde(rename_all = "camelCase"),
-//     wasm_bindgen(getter_with_clone, inspectable, skip_typescript)
-// )]
+#[cfg_attr(
+    all(
+        target_family = "wasm",
+        not(any(target_os = "emscripten", target_os = "wasi")),
+        feature = "wasm"
+    ),
+    // derive(Wasm),
+    // wasm(rename = "IParsedResource"),
+    wasm_bindgen(getter_with_clone, inspectable)
+)]
 pub struct ParsedResource {
     pub name: String,
     pub create_time: Option<UtcDateTime>,

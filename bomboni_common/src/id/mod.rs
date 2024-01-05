@@ -17,7 +17,7 @@ use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
     feature = "wasm"
 ))]
 use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi},
+    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
     describe::WasmDescribe,
     prelude::*,
 };
@@ -174,6 +174,13 @@ mod wasm {
         }
     }
 
+    impl OptionIntoWasmAbi for Id {
+        #[inline]
+        fn none() -> Self::Abi {
+            <js_sys::JsString as OptionIntoWasmAbi>::none()
+        }
+    }
+
     impl FromWasmAbi for Id {
         type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
 
@@ -191,6 +198,13 @@ mod wasm {
                     wasm_bindgen::throw_str("expected string");
                 }
             }
+        }
+    }
+
+    impl OptionFromWasmAbi for Id {
+        #[inline]
+        fn is_none(js: &Self::Abi) -> bool {
+            js_sys::JsString::is_none(js)
         }
     }
 
