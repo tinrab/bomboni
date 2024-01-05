@@ -41,11 +41,12 @@ pub fn get_page_filter<T: SchemaMapped>(ordering: &Ordering, next_item: &T) -> F
 
 /// Constructs a page key from a filter and ordering.
 /// The key should be completely different for different filters and orderings.
-pub fn make_page_key<const N: usize>(filter: &Filter, ordering: &Ordering) -> [u8; N] {
+pub fn make_page_key<const N: usize>(filter: &Filter, ordering: &Ordering, salt: &[u8]) -> [u8; N] {
     let mut hasher = Blake2s256::new();
 
     hasher.update(filter.to_string().as_bytes());
     hasher.update(ordering.to_string().as_bytes());
+    hasher.update(salt);
 
     let res = hasher.finalize();
     // TODO: other than 32 bytes?

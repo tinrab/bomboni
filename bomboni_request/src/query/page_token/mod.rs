@@ -31,6 +31,7 @@ pub trait PageTokenBuilder {
         &self,
         filter: &Filter,
         ordering: &Ordering,
+        salt: &[u8],
         page_token: &str,
     ) -> QueryResult<Self::PageToken>;
 
@@ -43,6 +44,7 @@ pub trait PageTokenBuilder {
         &self,
         filter: &Filter,
         ordering: &Ordering,
+        salt: &[u8],
         next_item: &T,
     ) -> QueryResult<String>;
 }

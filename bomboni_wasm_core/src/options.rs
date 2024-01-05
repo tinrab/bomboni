@@ -103,10 +103,10 @@ impl<'a> WasmOptions<'a> {
     }
 
     pub fn name(&self) -> &str {
-        self.rename
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or_else(|| self.serde_attrs().name().serialize_name())
+        self.rename.as_ref().map_or_else(
+            || self.serde_attrs().name().serialize_name(),
+            String::as_str,
+        )
     }
 
     pub fn serde_data(&self) -> &ast::Data {

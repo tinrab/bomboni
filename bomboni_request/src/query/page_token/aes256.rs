@@ -1,10 +1,12 @@
-use super::{utility::make_page_key, FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
     query::{
         error::{QueryError, QueryResult},
-        page_token::utility::get_page_filter,
+        page_token::{
+            utility::{get_page_filter, make_page_key},
+            FilterPageToken, PageTokenBuilder,
+        },
     },
     schema::SchemaMapped,
 };
@@ -38,6 +40,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         &self,
         filter: &Filter,
         ordering: &Ordering,
+        salt: &[u8],
         page_token: &str,
     ) -> QueryResult<Self::PageToken> {
         let decoded = if self.url_safe {
@@ -46,7 +49,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
             Base64::decode_vec(page_token).map_err(|_| QueryError::InvalidPageToken)?
         };
 
-        let key = make_page_key::<32>(filter, ordering);
+        let key = make_page_key::<32>(filter, ordering, salt);
         let key: &Key<Aes256Gcm> = (&key).into();
 
         let cipher = Aes256Gcm::new(key);
@@ -72,6 +75,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         &self,
         filter: &Filter,
         ordering: &Ordering,
+        salt: &[u8],
         next_item: &T,
     ) -> QueryResult<String> {
         let page_filter = get_page_filter(ordering, next_item);
@@ -80,7 +84,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         }
         let plaintext = page_filter.to_string();
 
-        let key = make_page_key::<32>(filter, ordering);
+        let key = make_page_key::<32>(filter, ordering, salt);
         let key: &Key<Aes256Gcm> = (&key).into();
 
         let cipher = Aes256Gcm::new(key);
@@ -119,6 +123,7 @@ mod tests {
             .build_next(
                 &filter,
                 &ordering,
+                &[],
                 &UserItem {
                     id: "1337".into(),
                     display_name: "John".into(),
@@ -128,7 +133,7 @@ mod tests {
             .unwrap();
         assert!(page_token.trim().len() > NONCE_LENGTH);
         assert!(!page_token.contains(r#"id <= "1337""#));
-        let parsed = b.parse(&filter, &ordering, &page_token).unwrap();
+        let parsed = b.parse(&filter, &ordering, &[], &page_token).unwrap();
         assert_eq!(
             parsed.filter.to_string(),
             r#"id <= "1337" AND age <= 14000"#
@@ -142,10 +147,12 @@ mod tests {
         // Generate key for different parameters
         let filter = Filter::parse("id=1").unwrap();
         let ordering = Ordering::parse("age desc").unwrap();
+        let salt = "salt".as_bytes();
         let page_token = b
             .build_next(
                 &filter,
                 &ordering,
+                salt,
                 &UserItem {
                     id: "1337".into(),
                     display_name: "John".into(),
@@ -153,12 +160,13 @@ mod tests {
                 },
             )
             .unwrap();
-        let parsed = b.parse(&filter, &ordering, &page_token).unwrap();
+        let parsed = b.parse(&filter, &ordering, salt, &page_token).unwrap();
         assert_eq!(parsed.filter.to_string(), "age <= 14000");
         assert_eq!(
             b.parse(
                 &Filter::parse("id=2").unwrap(),
                 &Ordering::parse("age desc").unwrap(),
+                salt,
                 &page_token
             )
             .unwrap_err(),
@@ -168,9 +176,14 @@ mod tests {
             b.parse(
                 &Filter::parse("id=1").unwrap(),
                 &Ordering::parse("age asc").unwrap(),
+                salt,
                 &page_token
             )
             .unwrap_err(),
+            QueryError::InvalidPageToken
+        );
+        assert_eq!(
+            b.parse(&filter, &ordering, &[], &page_token).unwrap_err(),
             QueryError::InvalidPageToken
         );
     }

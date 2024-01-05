@@ -37,11 +37,13 @@ mod tests {
         pub struct Simple {
             a: String,
             b: i32,
+            #[serde(default)]
+            optional: Option<i32>,
         }
 
         assert_eq!(
             Simple::DECL,
-            "export interface Simple {\n  a: string;\n  b: number;\n}"
+            "export interface Simple {\n  a: string;\n  b: number;\n  optional?: number | null;\n}"
         );
     }
 

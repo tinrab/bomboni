@@ -1,16 +1,16 @@
-use super::{FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
     query::{
         error::{QueryError, QueryResult},
-        page_token::utility::get_page_filter,
+        page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
     },
 };
 use base64ct::{Base64, Base64Url, Encoding};
 use std::fmt::{self, Debug, Formatter};
 
 /// Page token builder for Base64-encoded tokens.
+/// Used only in insecure environments.
 #[derive(Clone)]
 pub struct Base64PageTokenBuilder {
     url_safe: bool,
@@ -29,6 +29,7 @@ impl PageTokenBuilder for Base64PageTokenBuilder {
         &self,
         _filter: &Filter,
         _ordering: &Ordering,
+        _salt: &[u8],
         page_token: &str,
     ) -> QueryResult<Self::PageToken> {
         let decoded = if self.url_safe {
@@ -47,6 +48,7 @@ impl PageTokenBuilder for Base64PageTokenBuilder {
         &self,
         _filter: &Filter,
         ordering: &Ordering,
+        _salt: &[u8],
         next_item: &T,
     ) -> QueryResult<String> {
         let page_filter = get_page_filter(ordering, next_item);
@@ -82,6 +84,7 @@ mod tests {
             .build_next(
                 &filter,
                 &ordering,
+                &[],
                 &UserItem {
                     id: "1337".into(),
                     display_name: "John".into(),
@@ -90,7 +93,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(page_token, "aWQgPD0gIjEzMzciIEFORCBhZ2UgPD0gMTQwMDA=");
-        let parsed = b.parse(&filter, &ordering, &page_token).unwrap();
+        let parsed = b.parse(&filter, &ordering, &[], &page_token).unwrap();
         assert_eq!(
             parsed.filter.to_string(),
             r#"id <= "1337" AND age <= 14000"#

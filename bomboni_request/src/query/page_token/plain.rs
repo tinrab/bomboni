@@ -1,14 +1,16 @@
-use super::{utility::get_page_filter, FilterPageToken, PageTokenBuilder};
 use crate::{
     filter::Filter,
     ordering::Ordering,
-    query::error::{QueryError, QueryResult},
+    query::{
+        error::{QueryError, QueryResult},
+        page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
+    },
     schema::SchemaMapped,
 };
 use std::fmt::{self, Debug, Formatter};
 
 /// Plain text page token builder.
-/// Used only for testing.
+/// Used only in insecure environments.
 #[derive(Clone)]
 pub struct PlainPageTokenBuilder {}
 
@@ -19,6 +21,7 @@ impl PageTokenBuilder for PlainPageTokenBuilder {
         &self,
         _filter: &Filter,
         _ordering: &Ordering,
+        _salt: &[u8],
         page_token: &str,
     ) -> QueryResult<Self::PageToken> {
         let page_filter = Filter::parse(page_token)?;
@@ -31,6 +34,7 @@ impl PageTokenBuilder for PlainPageTokenBuilder {
         &self,
         _filter: &Filter,
         ordering: &Ordering,
+        _salt: &[u8],
         next_item: &T,
     ) -> QueryResult<String> {
         let page_filter = get_page_filter(ordering, next_item);

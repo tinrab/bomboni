@@ -5,13 +5,16 @@
 use crate::{
     filter::Filter,
     ordering::{Ordering, OrderingTerm},
-    schema::Schema,
-};
-
-use super::{
-    error::{QueryError, QueryResult},
-    page_token::{FilterPageToken, PageTokenBuilder},
-    utility::{parse_query_filter, parse_query_ordering},
+    query::{
+        error::{QueryError, QueryResult},
+        page_token::{
+            aes256::Aes256PageTokenBuilder, base64::Base64PageTokenBuilder,
+            plain::PlainPageTokenBuilder, rsa::RsaPageTokenBuilder, FilterPageToken,
+            PageTokenBuilder,
+        },
+        utility::{parse_query_filter, parse_query_ordering},
+    },
+    schema::{Schema, SchemaMapped},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +44,19 @@ pub struct SearchQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
     options: SearchQueryConfig,
     page_token_builder: P,
+}
+
+pub type PlainSearchQueryBuilder = SearchQueryBuilder<PlainPageTokenBuilder>;
+pub type Aes256SearchQueryBuilder = SearchQueryBuilder<Aes256PageTokenBuilder>;
+pub type Base64SearchQueryBuilder = SearchQueryBuilder<Base64PageTokenBuilder>;
+pub type RsaSearchQueryBuilder = SearchQueryBuilder<RsaPageTokenBuilder>;
+
+impl SearchQuery {
+    pub fn make_salt(query: &str, page_size: i32) -> Vec<u8> {
+        let mut salt = page_size.to_be_bytes().to_vec();
+        salt.extend(query.as_bytes());
+        salt
+    }
 }
 
 impl Default for SearchQueryConfig {
@@ -106,10 +122,12 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
 
         let page_token =
             if let Some(page_token) = page_token.filter(|page_token| !page_token.is_empty()) {
-                Some(
-                    self.page_token_builder
-                        .parse(&filter, &ordering, page_token)?,
-                )
+                Some(self.page_token_builder.parse(
+                    &filter,
+                    &ordering,
+                    &SearchQuery::make_salt(query, page_size),
+                    page_token,
+                )?)
             } else {
                 None
             };
@@ -121,6 +139,23 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
             page_size,
             page_token,
         })
+    }
+
+    pub fn build_next_page_token<T: SchemaMapped>(
+        &self,
+        query: &SearchQuery<P::PageToken>,
+        next_item: &T,
+    ) -> QueryResult<String> {
+        self.page_token_builder.build_next(
+            &query.filter,
+            &query.ordering,
+            &SearchQuery::make_salt(&query.query, query.page_size),
+            next_item,
+        )
+    }
+
+    pub fn page_token_builder(&self) -> &P {
+        &self.page_token_builder
     }
 }
 

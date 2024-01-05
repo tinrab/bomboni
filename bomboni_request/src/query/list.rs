@@ -7,13 +7,16 @@
 use crate::{
     filter::Filter,
     ordering::{Ordering, OrderingTerm},
-    schema::Schema,
-};
-
-use super::{
-    error::{QueryError, QueryResult},
-    page_token::{FilterPageToken, PageTokenBuilder},
-    utility::{parse_query_filter, parse_query_ordering},
+    query::{
+        error::{QueryError, QueryResult},
+        page_token::{
+            aes256::Aes256PageTokenBuilder, base64::Base64PageTokenBuilder,
+            plain::PlainPageTokenBuilder, rsa::RsaPageTokenBuilder, FilterPageToken,
+            PageTokenBuilder,
+        },
+        utility::{parse_query_filter, parse_query_ordering},
+    },
+    schema::{Schema, SchemaMapped},
 };
 
 /// Represents a list query.
@@ -46,6 +49,17 @@ pub struct ListQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
     options: ListQueryConfig,
     page_token_builder: P,
+}
+
+pub type PlainListQueryBuilder = ListQueryBuilder<PlainPageTokenBuilder>;
+pub type Aes256ListQueryBuilder = ListQueryBuilder<Aes256PageTokenBuilder>;
+pub type Base64ListQueryBuilder = ListQueryBuilder<Base64PageTokenBuilder>;
+pub type RsaListQueryBuilder = ListQueryBuilder<RsaPageTokenBuilder>;
+
+impl ListQuery {
+    pub fn make_salt(page_size: i32) -> Vec<u8> {
+        page_size.to_be_bytes().to_vec()
+    }
 }
 
 impl Default for ListQueryConfig {
@@ -105,10 +119,12 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
 
         let page_token =
             if let Some(page_token) = page_token.filter(|page_token| !page_token.is_empty()) {
-                Some(
-                    self.page_token_builder
-                        .parse(&filter, &ordering, page_token)?,
-                )
+                Some(self.page_token_builder.parse(
+                    &filter,
+                    &ordering,
+                    &ListQuery::make_salt(page_size),
+                    page_token,
+                )?)
             } else {
                 None
             };
@@ -119,6 +135,23 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
             filter,
             ordering,
         })
+    }
+
+    pub fn build_next_page_token<T: SchemaMapped>(
+        &self,
+        query: &ListQuery<P::PageToken>,
+        next_item: &T,
+    ) -> QueryResult<String> {
+        self.page_token_builder.build_next(
+            &query.filter,
+            &query.ordering,
+            &ListQuery::make_salt(query.page_size),
+            next_item,
+        )
+    }
+
+    pub fn page_token_builder(&self) -> &P {
+        &self.page_token_builder
     }
 }
 
@@ -197,7 +230,7 @@ mod tests {
                 let first_page = qb.build(Some(3), None, $filter1, $ordering1).unwrap();
                 let next_page_token = qb
                     .page_token_builder
-                    .build_next(&first_page.filter, &first_page.ordering, &last_item)
+                    .build_next(&first_page.filter, &first_page.ordering, &[], &last_item)
                     .unwrap();
                 let next_page: ListQuery = qb
                     .build(Some(3), Some(&next_page_token), $filter2, $ordering2)

@@ -9,7 +9,7 @@ use pest::iterators::Pair;
 
 use crate::filter::parser::Rule;
 
-use super::{
+use crate::{
     filter::error::{FilterError, FilterResult},
     schema::ValueType,
 };

@@ -1572,6 +1572,7 @@ mod tests {
                 &self,
                 _filter: &Filter,
                 _ordering: &Ordering,
+                _salt: &[u8],
                 page_token: &str,
             ) -> crate::query::error::QueryResult<Self::PageToken> {
                 Ok(page_token.parse().unwrap())
@@ -1581,6 +1582,7 @@ mod tests {
                 &self,
                 _filter: &Filter,
                 _ordering: &Ordering,
+                _salt: &[u8],
                 _next_item: &T,
             ) -> crate::query::error::QueryResult<String> {
                 Ok("24".into())
