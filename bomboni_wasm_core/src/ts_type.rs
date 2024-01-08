@@ -10,6 +10,8 @@ use syn::{
     TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
 };
 
+use crate::options::TypeRenameMap;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TsType {
     Keyword(KeywordTsType),
@@ -105,14 +107,14 @@ impl TsType {
                 if elems.is_empty() {
                     Self::nullish()
                 } else {
-                    let elems = elems.iter().map(Self::from_type).collect();
-                    Self::Tuple(elems)
+                    let elements = elems.iter().map(Self::from_type).collect();
+                    Self::Tuple(elements)
                 }
             }
             Type::Path(TypePath { path, .. }) => Self::from_path(path).unwrap_or(Self::NEVER),
             Type::TraitObject(TypeTraitObject { bounds, .. })
             | Type::ImplTrait(TypeImplTrait { bounds, .. }) => {
-                let elems = bounds
+                let elements = bounds
                     .iter()
                     .filter_map(|t| match t {
                         TypeParamBound::Trait(t) => Self::from_path(&t.path),
@@ -120,7 +122,7 @@ impl TsType {
                     })
                     .collect();
 
-                Self::Intersection(elems)
+                Self::Intersection(elements)
             }
             Type::Ptr(_) | Type::Infer(_) | Type::Macro(_) | Type::Never(_) | Type::Verbatim(_) => {
                 Self::NEVER
@@ -158,9 +160,9 @@ impl TsType {
         f(self);
         match self {
             Self::Keyword(_) | Self::Literal(_) => (),
-            Self::Array(elem) => elem.visit(f),
-            Self::Tuple(elems) => {
-                elems.iter().for_each(|t| t.visit(f));
+            Self::Array(element) => element.visit(f),
+            Self::Tuple(elements) => {
+                elements.iter().for_each(|t| t.visit(f));
             }
             Self::Option(t) => t.visit(f),
             Self::Reference { type_params, .. } => {
@@ -175,8 +177,8 @@ impl TsType {
             Self::TypeLiteral(TypeLiteralTsType { members }) => {
                 members.iter().for_each(|m| m.alias_type.visit(f));
             }
-            Self::Intersection(tys) | Self::Union(tys) => {
-                tys.iter().for_each(|t| t.visit(f));
+            Self::Intersection(types) | Self::Union(types) => {
+                types.iter().for_each(|t| t.visit(f));
             }
         }
     }
@@ -348,6 +350,63 @@ impl TsType {
             (x, y) => Self::Intersection(vec![x, y]),
         }
     }
+
+    #[must_use]
+    pub fn rename_reference(self, type_rename: &TypeRenameMap) -> Self {
+        if type_rename.new_name.is_none() && type_rename.name_map.is_empty() {
+            return self;
+        }
+        match self {
+            Self::Reference { name, type_params } => Self::Reference {
+                name: type_rename
+                    .new_name
+                    .clone()
+                    .or(type_rename.name_map.get(&name).cloned())
+                    .unwrap_or(name),
+                type_params: type_params
+                    .into_iter()
+                    .map(|param| param.rename_reference(type_rename))
+                    .collect(),
+            },
+
+            Self::Array(element) => Self::Array(Box::new(element.rename_reference(type_rename))),
+            Self::Tuple(elements) => Self::Tuple(
+                elements
+                    .into_iter()
+                    .map(|element| element.rename_reference(type_rename))
+                    .collect(),
+            ),
+            Self::Option(element) => Self::Option(Box::new(element.rename_reference(type_rename))),
+            Self::Fn { params, alias_type } => Self::Fn {
+                params,
+                alias_type: Box::new(alias_type.rename_reference(type_rename)),
+            },
+            Self::TypeLiteral(TypeLiteralTsType { members }) => {
+                let members = members
+                    .into_iter()
+                    .map(|member| TsTypeElement {
+                        key: member.key,
+                        alias_type: member.alias_type.rename_reference(type_rename),
+                        optional: member.optional,
+                    })
+                    .collect();
+                Self::TypeLiteral(TypeLiteralTsType { members })
+            }
+            Self::Intersection(types) => Self::Intersection(
+                types
+                    .into_iter()
+                    .map(|ty| ty.rename_reference(type_rename))
+                    .collect(),
+            ),
+            Self::Union(types) => Self::Union(
+                types
+                    .into_iter()
+                    .map(|ty| ty.rename_reference(type_rename))
+                    .collect(),
+            ),
+            _ => self,
+        }
+    }
 }
 
 impl From<&Type> for TsType {
@@ -372,8 +431,12 @@ impl Display for TsType {
                 }
                 _ => write!(f, "{element}[]"),
             },
-            Self::Tuple(elems) => {
-                write!(f, "[{}]", elems.iter().map(ToString::to_string).join(", "))
+            Self::Tuple(elements) => {
+                write!(
+                    f,
+                    "[{}]",
+                    elements.iter().map(ToString::to_string).join(", ")
+                )
             }
             Self::Reference { name, type_params } => {
                 let params = type_params.iter().map(ToString::to_string).join(", ");
@@ -468,11 +531,15 @@ impl From<TypeLiteralTsType> for TsType {
 
 impl Display for TypeLiteralTsType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let members = self.members.iter().map(ToString::to_string).join("; ");
+        let members = self
+            .members
+            .iter()
+            .map(|member| format!("\n  {member};"))
+            .join("");
         if members.is_empty() {
             write!(f, "{{}}")
         } else {
-            write!(f, "{{ {members} }}")
+            write!(f, "{{{members}\n}}")
         }
     }
 }

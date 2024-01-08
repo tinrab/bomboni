@@ -1,4 +1,6 @@
-use darling::FromDeriveInput;
+use std::collections::BTreeMap;
+
+use darling::{ast::Fields, util, FromDeriveInput, FromField, FromMeta};
 use itertools::Itertools;
 use proc_macro2::Ident;
 use serde_derive_internals::{
@@ -27,6 +29,13 @@ pub struct DeclConstWasm {
 pub struct FieldWasm {
     pub member: Member,
     pub optional: bool,
+    pub type_rename: TypeRenameMap,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TypeRenameMap {
+    pub new_name: Option<String>,
+    pub name_map: BTreeMap<String, String>,
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -40,6 +49,14 @@ struct Attributes {
     wasm_ref: Option<bool>,
     rename: Option<String>,
     interface_type: Option<bool>,
+    data: darling::ast::Data<util::Ignored, FieldAttributes>,
+}
+
+#[derive(Debug, FromField)]
+#[darling(attributes(wasm))]
+struct FieldAttributes {
+    pub rename_type: Option<TypeRenameMap>,
+    pub rename_types: Option<TypeRenameMap>,
 }
 
 impl<'a> WasmOptions<'a> {
@@ -66,7 +83,7 @@ impl<'a> WasmOptions<'a> {
         };
 
         let mut fields = Vec::new();
-        for field in serde_container.data.all_fields() {
+        for (i, field) in serde_container.data.all_fields().enumerate() {
             let mut optional = false;
             if let Some(expr) = field.attrs.skip_serializing_if() {
                 let path = expr
@@ -77,9 +94,24 @@ impl<'a> WasmOptions<'a> {
                     .join("::");
                 optional |= path == "Option::is_none";
             }
+
+            let mut type_rename = TypeRenameMap::default();
+            if let Some(Fields { fields, .. }) = attributes.data.as_ref().take_struct() {
+                let Some(field) = fields.get(i) else {
+                    continue;
+                };
+                type_rename = field
+                    .rename_type
+                    .as_ref()
+                    .or(field.rename_types.as_ref())
+                    .cloned()
+                    .unwrap_or_default();
+            }
+
             fields.push(FieldWasm {
                 member: field.member.clone(),
                 optional,
+                type_rename,
             });
         }
 
@@ -123,5 +155,72 @@ impl<'a> WasmOptions<'a> {
 
     pub fn get_field(&self, member: &Member) -> Option<&FieldWasm> {
         self.fields.iter().find(|field| &field.member == member)
+    }
+}
+
+impl FromMeta for TypeRenameMap {
+    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
+        match expr {
+            syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(name),
+                ..
+            }) => Ok(Self {
+                new_name: Some(name.value()),
+                name_map: BTreeMap::default(),
+            }),
+            syn::Expr::Array(syn::ExprArray { elems, .. }) => {
+                let mut name_map = BTreeMap::new();
+                for elem in elems {
+                    if let syn::Expr::Tuple(syn::ExprTuple { elems, .. }) = elem {
+                        if elems.len() != 2 {
+                            return Err(darling::Error::custom(
+                                "expected tuple of length 2 containing source and target names",
+                            )
+                            .with_span(elem));
+                        }
+                        if let (
+                            syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(source),
+                                ..
+                            }),
+                            syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(target),
+                                ..
+                            }),
+                        ) = (&elems[0], &elems[1])
+                        {
+                            name_map.insert(source.value(), target.value());
+                        } else {
+                            return Err(darling::Error::custom(
+                                "expected tuple of length 2 containing source and target names",
+                            ));
+                        }
+                    } else {
+                        return Err(darling::Error::custom(
+                            "expected tuple of length 2 containing source and target names",
+                        )
+                        .with_span(elem));
+                    }
+                }
+                Ok(Self {
+                    new_name: None,
+                    name_map,
+                })
+            }
+            _ => Err(darling::Error::custom("expected string literal")),
+        }
+
+        // if let syn::Expr::Lit(syn::ExprLit {
+        //     lit: syn::Lit::Str(name),
+        //     ..
+        // }) = expr
+        // {
+        //     Ok(Self {
+        //         new_name: Some(name.value()),
+        //         name_map: Default::default(),
+        //     })
+        // } else {
+        //     Err(darling::Error::custom("expected string literal"))
+        // }
     }
 }

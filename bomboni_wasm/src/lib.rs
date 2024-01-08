@@ -83,16 +83,16 @@ mod tests {
 
         assert_eq!(
             ExternalTag::DECL,
-            "export type ExternalTag = { String: string } | { Number: number };"
+            "export type ExternalTag = {\n  String: string;\n} | {\n  Number: number;\n};"
         );
         assert_eq!(
             AdjacentTag::DECL,
-            r#"export type AdjacentTag = { kind: "String"; data: string } | { kind: "Number"; data: number };"#
+            "export type AdjacentTag = {\n  kind: \"String\";\n  data: string;\n} | {\n  kind: \"Number\";\n  data: number;\n};"
         );
 
         assert_eq!(
             InternalTag::DECL,
-            r#"export type InternalTag = { kind: "String"; value: string } | ({ kind: "Item" } & InternalItem);"#
+            "export type InternalTag = {\n  kind: \"String\";\n  value: string;\n} | ({\n  kind: \"Item\";\n} & InternalItem);"
         );
 
         // println!("{}", serde_json::to_string_pretty(&CStyle::A).unwrap());

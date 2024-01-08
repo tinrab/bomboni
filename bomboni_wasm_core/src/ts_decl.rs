@@ -247,8 +247,7 @@ impl<'a> TsDeclParser<'a> {
                         let (field_type, field_options) = self.parse_field(field);
 
                         let optional = field_options.map_or(false, |options| options.optional);
-
-                        let alias_type = if optional {
+                        let mut alias_type = if optional {
                             if let TsType::Option(t) = field_type {
                                 *t
                             } else {
@@ -257,6 +256,12 @@ impl<'a> TsDeclParser<'a> {
                         } else {
                             field_type
                         };
+
+                        if let Some(type_rename) =
+                            field_options.map(|field_options| &field_options.type_rename)
+                        {
+                            alias_type = alias_type.rename_reference(type_rename);
+                        }
 
                         TsTypeElement {
                             key,
@@ -270,7 +275,17 @@ impl<'a> TsDeclParser<'a> {
 
                 let flatten_fields = flatten_fields
                     .into_iter()
-                    .map(|field| self.parse_field(field).0)
+                    .map(|field| {
+                        let (mut field_type, field_options) = self.parse_field(field);
+
+                        if let Some(type_rename) =
+                            field_options.map(|field_options| &field_options.type_rename)
+                        {
+                            field_type = field_type.rename_reference(type_rename);
+                        }
+
+                        field_type
+                    })
                     .collect();
 
                 ParsedFields::Named(members, flatten_fields)
