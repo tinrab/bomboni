@@ -41,6 +41,7 @@ chrono = ["bomboni_proto/chrono"]
 tokio = ["bomboni_common/tokio"]
 tonic = ["bomboni_proto/tonic", "bomboni_request/tonic"]
 wasm = ["dep:bomboni_wasm", "bomboni_common/wasm", "bomboni_request/wasm"]
+js = ["bomboni_common/js", "bomboni_wasm/js"]
 
 [dependencies]
 bomboni_common = { path = "bomboni_common", version = "0.1.53" }

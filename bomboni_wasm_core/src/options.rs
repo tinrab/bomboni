@@ -1,13 +1,15 @@
 use std::collections::BTreeMap;
 
-use darling::{ast::Fields, util, FromDeriveInput, FromField, FromMeta};
+use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta, FromVariant};
 use itertools::Itertools;
 use proc_macro2::Ident;
 use serde_derive_internals::{
     ast::{self, Container as SerdeContainer},
     attr, Ctxt,
 };
-use syn::{self, DeriveInput, Generics, Member, Path, Visibility};
+use syn::{self, DeriveInput, Generics, Member, Path};
+
+use crate::ts_type::TsType;
 
 pub struct WasmOptions<'a> {
     pub serde_container: SerdeContainer<'a>,
@@ -17,25 +19,32 @@ pub struct WasmOptions<'a> {
     pub from_wasm_abi: bool,
     pub wasm_ref: bool,
     pub rename: Option<String>,
-    pub interface_type: Option<bool>,
     pub fields: Vec<FieldWasm>,
+    pub variants: Vec<VariantWasm>,
 }
 
-pub struct DeclConstWasm {
-    pub name: Option<Ident>,
-    pub vis: Visibility,
-}
-
+#[derive(Debug)]
 pub struct FieldWasm {
     pub member: Member,
     pub optional: bool,
-    pub type_rename: TypeRenameMap,
+    pub as_string: bool,
+    pub reference_rename: ReferenceRenameMap,
+    pub rename_wrapper: Option<bool>,
+}
+
+#[derive(Debug)]
+pub struct VariantWasm {
+    pub ident: Ident,
+    pub as_string: bool,
+    pub reference_rename: ReferenceRenameMap,
+    pub rename_wrapper: Option<bool>,
+    pub fields: Vec<FieldWasm>,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct TypeRenameMap {
-    pub new_name: Option<String>,
-    pub name_map: BTreeMap<String, String>,
+pub struct ReferenceRenameMap {
+    pub name: Option<String>,
+    pub types: BTreeMap<String, TsType>,
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -48,15 +57,26 @@ struct Attributes {
     from_wasm_abi: Option<bool>,
     wasm_ref: Option<bool>,
     rename: Option<String>,
-    interface_type: Option<bool>,
-    data: darling::ast::Data<util::Ignored, FieldAttributes>,
+    data: darling::ast::Data<VariantAttributes, FieldAttributes>,
 }
 
 #[derive(Debug, FromField)]
 #[darling(attributes(wasm))]
 struct FieldAttributes {
-    pub rename_type: Option<TypeRenameMap>,
-    pub rename_types: Option<TypeRenameMap>,
+    ident: Option<Ident>,
+    rename_ref: Option<ReferenceRenameMap>,
+    rename_refs: Option<ReferenceRenameMap>,
+    rename_wrapper: Option<bool>,
+}
+
+#[derive(Debug, FromVariant)]
+#[darling(attributes(wasm))]
+struct VariantAttributes {
+    ident: Ident,
+    rename_ref: Option<ReferenceRenameMap>,
+    rename_refs: Option<ReferenceRenameMap>,
+    rename_wrapper: Option<bool>,
+    fields: Fields<FieldAttributes>,
 }
 
 impl<'a> WasmOptions<'a> {
@@ -82,38 +102,22 @@ impl<'a> WasmOptions<'a> {
             }
         };
 
-        let mut fields = Vec::new();
-        for (i, field) in serde_container.data.all_fields().enumerate() {
-            let mut optional = false;
-            if let Some(expr) = field.attrs.skip_serializing_if() {
-                let path = expr
-                    .path
-                    .segments
-                    .iter()
-                    .map(|segment| segment.ident.to_string())
-                    .join("::");
-                optional |= path == "Option::is_none";
+        let (fields, variants) = match (&serde_container.data, attributes.data) {
+            (ast::Data::Struct(_, serde_fields), darling::ast::Data::Struct(field_attributes)) => {
+                let fields = get_fields(serde_fields, &field_attributes);
+                (fields, Vec::new())
             }
-
-            let mut type_rename = TypeRenameMap::default();
-            if let Some(Fields { fields, .. }) = attributes.data.as_ref().take_struct() {
-                let Some(field) = fields.get(i) else {
-                    continue;
-                };
-                type_rename = field
-                    .rename_type
-                    .as_ref()
-                    .or(field.rename_types.as_ref())
-                    .cloned()
-                    .unwrap_or_default();
+            (ast::Data::Enum(serde_variants), darling::ast::Data::Enum(variant_attributes)) => {
+                let variants = get_variants(serde_variants, &variant_attributes);
+                (Vec::new(), variants)
             }
-
-            fields.push(FieldWasm {
-                member: field.member.clone(),
-                optional,
-                type_rename,
-            });
-        }
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    input,
+                    "invalid struct or enum for WASM",
+                ));
+            }
+        };
 
         let wasm_abi = attributes.wasm_abi.unwrap_or_default();
 
@@ -125,8 +129,8 @@ impl<'a> WasmOptions<'a> {
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
             wasm_ref: attributes.wasm_ref.unwrap_or_default(),
             rename: attributes.rename,
-            interface_type: attributes.interface_type,
             fields,
+            variants,
         })
     }
 
@@ -152,24 +156,20 @@ impl<'a> WasmOptions<'a> {
     pub fn serde_attrs(&self) -> &attr::Container {
         &self.serde_container.attrs
     }
-
-    pub fn get_field(&self, member: &Member) -> Option<&FieldWasm> {
-        self.fields.iter().find(|field| &field.member == member)
-    }
 }
 
-impl FromMeta for TypeRenameMap {
+impl FromMeta for ReferenceRenameMap {
     fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
         match expr {
             syn::Expr::Lit(syn::ExprLit {
                 lit: syn::Lit::Str(name),
                 ..
             }) => Ok(Self {
-                new_name: Some(name.value()),
-                name_map: BTreeMap::default(),
+                name: Some(name.value()),
+                types: BTreeMap::default(),
             }),
             syn::Expr::Array(syn::ExprArray { elems, .. }) => {
-                let mut name_map = BTreeMap::new();
+                let mut types = BTreeMap::new();
                 for elem in elems {
                     if let syn::Expr::Tuple(syn::ExprTuple { elems, .. }) = elem {
                         if elems.len() != 2 {
@@ -189,7 +189,13 @@ impl FromMeta for TypeRenameMap {
                             }),
                         ) = (&elems[0], &elems[1])
                         {
-                            name_map.insert(source.value(), target.value());
+                            types.insert(
+                                source.value(),
+                                TsType::Reference {
+                                    name: target.value(),
+                                    type_params: Vec::new(),
+                                },
+                            );
                         } else {
                             return Err(darling::Error::custom(
                                 "expected tuple of length 2 containing source and target names",
@@ -202,25 +208,111 @@ impl FromMeta for TypeRenameMap {
                         .with_span(elem));
                     }
                 }
-                Ok(Self {
-                    new_name: None,
-                    name_map,
-                })
+                Ok(Self { name: None, types })
             }
             _ => Err(darling::Error::custom("expected string literal")),
         }
-
-        // if let syn::Expr::Lit(syn::ExprLit {
-        //     lit: syn::Lit::Str(name),
-        //     ..
-        // }) = expr
-        // {
-        //     Ok(Self {
-        //         new_name: Some(name.value()),
-        //         name_map: Default::default(),
-        //     })
-        // } else {
-        //     Err(darling::Error::custom("expected string literal"))
-        // }
     }
+}
+
+fn get_fields(
+    serde_fields: &[ast::Field],
+    field_attributes: &Fields<FieldAttributes>,
+) -> Vec<FieldWasm> {
+    let mut fields = Vec::new();
+
+    for serde_field in serde_fields {
+        let mut optional = false;
+        if let Some(expr) = serde_field.attrs.skip_serializing_if() {
+            let path = expr
+                .path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .join("::");
+            optional |= path == "Option::is_none";
+        }
+
+        let mut as_string = false;
+        if let Some(with) = serde_field.attrs.serialize_with() {
+            as_string |= matches!(
+                with.path.segments.iter().rev().nth(1),
+                Some(
+                    syn::PathSegment { ident, .. }
+                ) if ident == "as_string"
+            );
+        }
+
+        let Some((_, field)) =
+            field_attributes
+                .iter()
+                .enumerate()
+                .find(|(i, field)| match &serde_field.member {
+                    Member::Named(serde_ident) => Some(serde_ident) == field.ident.as_ref(),
+                    Member::Unnamed(serde_index) => serde_index.index as usize == *i,
+                })
+        else {
+            continue;
+        };
+        let reference_rename = field
+            .rename_ref
+            .as_ref()
+            .or(field.rename_refs.as_ref())
+            .cloned()
+            .unwrap_or_default();
+        let rename_wrapper = field.rename_wrapper;
+
+        fields.push(FieldWasm {
+            member: serde_field.member.clone(),
+            optional,
+            as_string,
+            reference_rename,
+            rename_wrapper,
+        });
+    }
+
+    fields
+}
+
+fn get_variants(
+    serde_variants: &[ast::Variant],
+    variant_attributes: &[VariantAttributes],
+) -> Vec<VariantWasm> {
+    let mut variants = Vec::new();
+
+    for serde_variant in serde_variants {
+        let mut as_string = false;
+        if let Some(with) = serde_variant.attrs.serialize_with() {
+            as_string |= matches!(
+                with.path.segments.iter().rev().nth(1),
+                Some(
+                    syn::PathSegment { ident, .. }
+                ) if ident == "as_string"
+            );
+        }
+
+        let Some(variant) = variant_attributes
+            .iter()
+            .find(|variant| variant.ident == serde_variant.ident)
+        else {
+            continue;
+        };
+        let reference_rename = variant
+            .rename_ref
+            .as_ref()
+            .or(variant.rename_refs.as_ref())
+            .cloned()
+            .unwrap_or_default();
+        let rename_wrapper = variant.rename_wrapper;
+
+        variants.push(VariantWasm {
+            ident: serde_variant.ident.clone(),
+            as_string,
+            reference_rename,
+            rename_wrapper,
+            fields: get_fields(&serde_variant.fields, &variant.fields),
+        });
+    }
+
+    variants
 }

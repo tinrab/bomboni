@@ -83,7 +83,7 @@ mod tests {
 
         assert_eq!(
             ExternalTag::DECL,
-            "export type ExternalTag = {\n  String: string;\n} | {\n  Number: number;\n};"
+            "export type ExternalTag = {\n  String: string;\n  Number?: null;\n} | {\n  Number: number;\n  String?: null;\n};"
         );
         assert_eq!(
             AdjacentTag::DECL,

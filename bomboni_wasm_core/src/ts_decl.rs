@@ -10,18 +10,21 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+#[derive(Debug)]
 pub enum TsDecl {
     TypeAlias(TypeAliasTsDecl),
     Interface(InterfaceTsDecl),
     Enum(EnumTsDecl),
 }
 
+#[derive(Debug)]
 pub struct TypeAliasTsDecl {
     pub name: String,
     pub type_params: Vec<String>,
     pub alias_type: TsType,
 }
 
+#[derive(Debug)]
 pub struct InterfaceTsDecl {
     pub name: String,
     pub type_params: Vec<String>,
@@ -29,10 +32,12 @@ pub struct InterfaceTsDecl {
     pub body: Vec<TsTypeElement>,
 }
 
+#[derive(Debug)]
 pub struct EnumTsDecl {
     pub name: String,
     pub type_params: Vec<String>,
     pub members: Vec<TypeAliasTsDecl>,
+    pub external_tag: bool,
 }
 
 pub struct TsDeclParser<'a> {
@@ -106,17 +111,47 @@ impl From<EnumTsDecl> for TsDecl {
 
 impl Display for EnumTsDecl {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        TypeAliasTsDecl {
-            name: self.name.clone(),
-            type_params: self.type_params.clone(),
-            alias_type: TsType::Union(
+        write!(
+            f,
+            "export type {}{} = {};",
+            self.name,
+            if self.type_params.is_empty() {
+                String::new()
+            } else {
+                format!("<{}>", self.type_params.join(", "))
+            },
+            TsType::Union(
                 self.members
                     .iter()
-                    .map(|member| member.alias_type.clone())
+                    .enumerate()
+                    .map(|(i, member)| {
+                        let mut member_type = member.alias_type.clone();
+                        if self.external_tag {
+                            // Add empty fields to externally tagged enum.
+                            // This makes it possible to switch based on kind in TypeScript.
+                            if let TsType::TypeLiteral(member_type) = &mut member_type {
+                                member_type.members.extend(
+                                    self.members.iter().enumerate().filter_map(
+                                        |(j, other_member)| {
+                                            if j == i {
+                                                None
+                                            } else {
+                                                Some(TsTypeElement {
+                                                    key: other_member.name.clone(),
+                                                    alias_type: TsType::nullish(),
+                                                    optional: true,
+                                                })
+                                            }
+                                        },
+                                    ),
+                                );
+                            }
+                        }
+                        member_type
+                    })
                     .collect(),
-            ),
-        }
-        .fmt(f)
+            )
+        )
     }
 }
 
@@ -140,6 +175,7 @@ impl Display for TsDecl {
     }
 }
 
+#[derive(Debug)]
 enum ParsedFields {
     Named(Vec<TsTypeElement>, Vec<TsType>),
     Unnamed(Vec<TsType>),
@@ -161,7 +197,7 @@ impl<'a> TsDeclParser<'a> {
     fn parse_struct(&self, style: ast::Style, fields: &[ast::Field]) -> TsDecl {
         match (
             self.options.serde_attrs().tag(),
-            self.parse_fields(style, fields),
+            self.parse_fields(style, fields, &self.options.fields),
         ) {
             (TagType::Internal { tag, .. }, ParsedFields::Named(members, extends)) => {
                 let name = self.options.name();
@@ -183,21 +219,32 @@ impl<'a> TsDeclParser<'a> {
     }
 
     fn parse_enum(&self, variants: &[ast::Variant]) -> EnumTsDecl {
-        let members: Vec<_> = variants
+        let tag_type = self.options.serde_attrs().tag();
+        let members: Vec<TypeAliasTsDecl> = variants
             .iter()
-            .filter(|variant| {
-                !variant.attrs.skip_serializing() && !variant.attrs.skip_deserializing()
-            })
-            .map(|variant| {
-                let tag_type = self.options.serde_attrs().tag();
+            .filter_map(|variant| {
+                if variant.attrs.skip_serializing() || variant.attrs.skip_deserializing() {
+                    return None;
+                }
+
+                let wasm_variant = self
+                    .options
+                    .variants
+                    .iter()
+                    .find(|v| v.ident == variant.ident)
+                    .unwrap();
+
                 let name = variant.attrs.name().serialize_name().to_string();
-                let variant_type: TsType = TsType::from(
-                    self.parse_fields(variant.style, &variant.fields),
-                )
+                let variant_type: TsType = TsType::from(self.parse_fields(
+                    variant.style,
+                    &variant.fields,
+                    &wasm_variant.fields,
+                ))
                 .with_tag_type(tag_type, &name, variant.style);
+
                 let mut alias_type = self.make_type_alias(variant_type);
                 alias_type.name = name;
-                alias_type
+                Some(alias_type)
             })
             .collect();
 
@@ -210,13 +257,19 @@ impl<'a> TsDeclParser<'a> {
                     .collect(),
             ),
             members,
+            external_tag: matches!(tag_type, TagType::External),
         }
     }
 
-    fn parse_fields(&self, style: ast::Style, fields: &[ast::Field]) -> ParsedFields {
+    fn parse_fields(
+        &self,
+        style: ast::Style,
+        fields: &[ast::Field],
+        wasm_fields: &'a [FieldWasm],
+    ) -> ParsedFields {
         match style {
             ast::Style::Newtype => {
-                return ParsedFields::Transparent(TsType::from_type(fields[0].ty))
+                return ParsedFields::Transparent(Self::parse_field(&fields[0], wasm_fields).0);
             }
             ast::Style::Unit => return ParsedFields::Transparent(TsType::nullish()),
             _ => {}
@@ -232,7 +285,7 @@ impl<'a> TsDeclParser<'a> {
             .collect();
 
         if fields.len() == 1 && self.options.serde_attrs().transparent() {
-            return ParsedFields::Transparent(self.parse_field(fields[0]).0);
+            return ParsedFields::Transparent(Self::parse_field(fields[0], wasm_fields).0);
         }
 
         match style {
@@ -244,10 +297,10 @@ impl<'a> TsDeclParser<'a> {
                     .into_iter()
                     .map(|field| {
                         let key = field.attrs.name().serialize_name().to_string();
-                        let (field_type, field_options) = self.parse_field(field);
+                        let (field_type, field_options) = Self::parse_field(field, wasm_fields);
 
                         let optional = field_options.map_or(false, |options| options.optional);
-                        let mut alias_type = if optional {
+                        let alias_type = if optional {
                             if let TsType::Option(t) = field_type {
                                 *t
                             } else {
@@ -256,12 +309,6 @@ impl<'a> TsDeclParser<'a> {
                         } else {
                             field_type
                         };
-
-                        if let Some(type_rename) =
-                            field_options.map(|field_options| &field_options.type_rename)
-                        {
-                            alias_type = alias_type.rename_reference(type_rename);
-                        }
 
                         TsTypeElement {
                             key,
@@ -275,17 +322,7 @@ impl<'a> TsDeclParser<'a> {
 
                 let flatten_fields = flatten_fields
                     .into_iter()
-                    .map(|field| {
-                        let (mut field_type, field_options) = self.parse_field(field);
-
-                        if let Some(type_rename) =
-                            field_options.map(|field_options| &field_options.type_rename)
-                        {
-                            field_type = field_type.rename_reference(type_rename);
-                        }
-
-                        field_type
-                    })
+                    .map(|field| Self::parse_field(field, wasm_fields).0)
                     .collect();
 
                 ParsedFields::Named(members, flatten_fields)
@@ -293,16 +330,30 @@ impl<'a> TsDeclParser<'a> {
             ast::Style::Tuple => ParsedFields::Unnamed(
                 fields
                     .into_iter()
-                    .map(|field| self.parse_field(field).0)
+                    .map(|field| Self::parse_field(field, wasm_fields).0)
                     .collect(),
             ),
             _ => unreachable!(),
         }
     }
 
-    fn parse_field(&self, field: &ast::Field) -> (TsType, Option<&FieldWasm>) {
-        let field_type = TsType::from_type(field.ty);
-        let field_options = self.options.get_field(&field.member);
+    fn parse_field(
+        field: &ast::Field,
+        wasm_fields: &'a [FieldWasm],
+    ) -> (TsType, Option<&'a FieldWasm>) {
+        let mut field_type = TsType::from_type(field.ty);
+        let field_options = wasm_fields.iter().find(|f| f.member == field.member);
+
+        if let Some(field_options) = field_options {
+            if field_options.as_string {
+                field_type = TsType::STRING;
+            }
+            field_type = field_type.rename_reference(&field_options.reference_rename);
+            if field_options.rename_wrapper.unwrap_or_default() {
+                field_type = field_type.rename_protobuf_wrapper();
+            }
+        }
+
         (field_type, field_options)
     }
 

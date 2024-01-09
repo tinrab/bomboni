@@ -1,16 +1,14 @@
-use std::collections::BTreeSet;
-use std::fmt::{self, Display, Formatter};
-
+use crate::options::ReferenceRenameMap;
 use itertools::Itertools;
 use serde_derive_internals::ast::Style;
 use serde_derive_internals::attr::TagType;
+use std::collections::BTreeSet;
+use std::fmt::{self, Display, Formatter};
 use syn::{
     Expr, ExprLit, GenericArgument, Lit, Path, PathArguments, PathSegment, ReturnType, Type,
     TypeArray, TypeBareFn, TypeGroup, TypeImplTrait, TypeParamBound, TypeParen, TypePath,
     TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
 };
-
-use crate::options::TypeRenameMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TsType {
@@ -352,41 +350,46 @@ impl TsType {
     }
 
     #[must_use]
-    pub fn rename_reference(self, type_rename: &TypeRenameMap) -> Self {
-        if type_rename.new_name.is_none() && type_rename.name_map.is_empty() {
+    pub fn rename_reference(self, rename_map: &ReferenceRenameMap) -> Self {
+        if rename_map.name.is_none() && rename_map.types.is_empty() {
             return self;
         }
         match self {
-            Self::Reference { name, type_params } => Self::Reference {
-                name: type_rename
-                    .new_name
-                    .clone()
-                    .or(type_rename.name_map.get(&name).cloned())
-                    .unwrap_or(name),
-                type_params: type_params
+            Self::Reference { name, type_params } => {
+                let type_params = type_params
                     .into_iter()
-                    .map(|param| param.rename_reference(type_rename))
-                    .collect(),
-            },
+                    .map(|param| param.rename_reference(rename_map))
+                    .collect();
+                if let Some(new_name) = rename_map.name.clone() {
+                    Self::Reference {
+                        name: new_name,
+                        type_params,
+                    }
+                } else if let Some(new_type) = rename_map.types.get(&name).cloned() {
+                    new_type
+                } else {
+                    Self::Reference { name, type_params }
+                }
+            }
 
-            Self::Array(element) => Self::Array(Box::new(element.rename_reference(type_rename))),
+            Self::Array(element) => Self::Array(Box::new(element.rename_reference(rename_map))),
             Self::Tuple(elements) => Self::Tuple(
                 elements
                     .into_iter()
-                    .map(|element| element.rename_reference(type_rename))
+                    .map(|element| element.rename_reference(rename_map))
                     .collect(),
             ),
-            Self::Option(element) => Self::Option(Box::new(element.rename_reference(type_rename))),
+            Self::Option(element) => Self::Option(Box::new(element.rename_reference(rename_map))),
             Self::Fn { params, alias_type } => Self::Fn {
                 params,
-                alias_type: Box::new(alias_type.rename_reference(type_rename)),
+                alias_type: Box::new(alias_type.rename_reference(rename_map)),
             },
             Self::TypeLiteral(TypeLiteralTsType { members }) => {
                 let members = members
                     .into_iter()
                     .map(|member| TsTypeElement {
                         key: member.key,
-                        alias_type: member.alias_type.rename_reference(type_rename),
+                        alias_type: member.alias_type.rename_reference(rename_map),
                         optional: member.optional,
                     })
                     .collect();
@@ -395,17 +398,57 @@ impl TsType {
             Self::Intersection(types) => Self::Intersection(
                 types
                     .into_iter()
-                    .map(|ty| ty.rename_reference(type_rename))
+                    .map(|ty| ty.rename_reference(rename_map))
                     .collect(),
             ),
             Self::Union(types) => Self::Union(
                 types
                     .into_iter()
-                    .map(|ty| ty.rename_reference(type_rename))
+                    .map(|ty| ty.rename_reference(rename_map))
                     .collect(),
             ),
             _ => self,
         }
+    }
+
+    #[must_use]
+    pub fn rename_protobuf_wrapper(self) -> Self {
+        let rename_map = ReferenceRenameMap {
+            name: None,
+            types: [
+                ("DoubleValue", "number"),
+                ("FloatValue", "number"),
+                ("Int64Value", "number"),
+                ("UInt64Value", "number"),
+                ("Int32Value", "number"),
+                ("UInt32Value", "number"),
+                ("BoolValue", "boolean"),
+                ("StringValue", "string"),
+            ]
+            .into_iter()
+            .map(|(s, t)| {
+                (
+                    s.into(),
+                    TsType::Reference {
+                        name: t.into(),
+                        type_params: Vec::new(),
+                    },
+                )
+            })
+            .chain([(
+                "BytesValue".into(),
+                if cfg!(feature = "js") {
+                    Self::Reference {
+                        name: String::from("Uint8Array"),
+                        type_params: vec![],
+                    }
+                } else {
+                    Self::Array(Box::new(Self::NUMBER))
+                },
+            )])
+            .collect(),
+        };
+        self.rename_reference(&rename_map)
     }
 }
 
