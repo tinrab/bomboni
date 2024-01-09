@@ -235,11 +235,17 @@ impl<'a> TsDeclParser<'a> {
                     .unwrap();
 
                 let name = variant.attrs.name().serialize_name().to_string();
-                let variant_type: TsType = TsType::from(self.parse_fields(
-                    variant.style,
-                    &variant.fields,
-                    &wasm_variant.fields,
-                ))
+                let variant_type: TsType = {
+                    if wasm_variant.as_string {
+                        TsType::STRING
+                    } else {
+                        TsType::from(self.parse_fields(
+                            variant.style,
+                            &variant.fields,
+                            &wasm_variant.fields,
+                        ))
+                    }
+                }
                 .with_tag_type(tag_type, &name, variant.style);
 
                 let mut alias_type = self.make_type_alias(variant_type);
