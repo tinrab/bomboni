@@ -254,6 +254,11 @@ mod wasm_as_string {
             <js_sys::JsString as OptionFromWasmAbi>::is_none(js)
         }
     }
+
+    #[wasm_bindgen(typescript_custom_section)]
+    const TS_APPEND_CONTENT: &'static str = r#"
+        export type UtcDateTime = string;
+    "#;
 }
 
 #[cfg(all(
@@ -300,6 +305,11 @@ mod wasm_as_date {
             <js_sys::Date as OptionFromWasmAbi>::is_none(js)
         }
     }
+
+    #[wasm_bindgen(typescript_custom_section)]
+    const TS_APPEND_CONTENT: &'static str = r#"
+        export type UtcDateTime = Date;
+    "#;
 }
 
 #[cfg(test)]

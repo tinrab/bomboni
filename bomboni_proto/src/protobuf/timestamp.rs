@@ -6,6 +6,16 @@ use std::{
     time::SystemTime,
 };
 use time::OffsetDateTime;
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm"
+))]
+use wasm_bindgen::{
+    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
+    describe::WasmDescribe,
+    prelude::*,
+};
 
 use crate::google::protobuf::Timestamp;
 
@@ -172,6 +182,61 @@ impl<'de> Deserialize<'de> for Timestamp {
         let s = String::deserialize(deserializer)?;
         Self::from_str(&s).map_err(de::Error::custom)
     }
+}
+
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm",
+))]
+mod wasm {
+    use super::*;
+
+    impl WasmDescribe for Timestamp {
+        fn describe() {
+            <UtcDateTime as WasmDescribe>::describe()
+        }
+    }
+
+    impl IntoWasmAbi for Timestamp {
+        type Abi = <UtcDateTime as IntoWasmAbi>::Abi;
+
+        fn into_abi(self) -> Self::Abi {
+            UtcDateTime::try_from(self).unwrap().into_abi()
+        }
+    }
+
+    impl OptionIntoWasmAbi for Timestamp {
+        #[inline]
+        fn none() -> Self::Abi {
+            <UtcDateTime as OptionIntoWasmAbi>::none()
+        }
+    }
+
+    impl FromWasmAbi for Timestamp {
+        type Abi = <UtcDateTime as FromWasmAbi>::Abi;
+
+        unsafe fn from_abi(js: Self::Abi) -> Self {
+            UtcDateTime::from_abi(js).into()
+        }
+    }
+
+    impl OptionFromWasmAbi for Timestamp {
+        #[inline]
+        fn is_none(js: &Self::Abi) -> bool {
+            <UtcDateTime as OptionFromWasmAbi>::is_none(js)
+        }
+    }
+
+    #[cfg_attr(feature = "js", wasm_bindgen(typescript_custom_section))]
+    const TS_APPEND_CONTENT: &'static str = r#"
+        export type Timestamp = Date;
+    "#;
+
+    #[cfg_attr(not(feature = "js"), wasm_bindgen(typescript_custom_section))]
+    const TS_APPEND_CONTENT: &'static str = r#"
+        export type Timestamp = string;
+    "#;
 }
 
 #[cfg(test)]
