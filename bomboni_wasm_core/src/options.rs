@@ -19,6 +19,8 @@ pub struct WasmOptions<'a> {
     pub from_wasm_abi: bool,
     pub wasm_ref: bool,
     pub rename: Option<String>,
+    pub reference_rename: ReferenceRenameMap,
+    pub rename_wrapper: Option<bool>,
     pub fields: Vec<FieldWasm>,
     pub variants: Vec<VariantWasm>,
 }
@@ -57,6 +59,9 @@ struct Attributes {
     from_wasm_abi: Option<bool>,
     wasm_ref: Option<bool>,
     rename: Option<String>,
+    rename_ref: Option<ReferenceRenameMap>,
+    rename_refs: Option<ReferenceRenameMap>,
+    rename_wrapper: Option<bool>,
     data: darling::ast::Data<VariantAttributes, FieldAttributes>,
 }
 
@@ -129,6 +134,13 @@ impl<'a> WasmOptions<'a> {
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
             wasm_ref: attributes.wasm_ref.unwrap_or_default(),
             rename: attributes.rename,
+            reference_rename: attributes
+                .rename_ref
+                .as_ref()
+                .or(attributes.rename_refs.as_ref())
+                .cloned()
+                .unwrap_or_default(),
+            rename_wrapper: attributes.rename_wrapper,
             fields,
             variants,
         })

@@ -269,7 +269,7 @@ impl<'a> TsDeclParser<'a> {
     ) -> ParsedFields {
         match style {
             ast::Style::Newtype => {
-                return ParsedFields::Transparent(Self::parse_field(&fields[0], wasm_fields).0);
+                return ParsedFields::Transparent(self.parse_field(&fields[0], wasm_fields).0);
             }
             ast::Style::Unit => return ParsedFields::Transparent(TsType::nullish()),
             _ => {}
@@ -285,7 +285,7 @@ impl<'a> TsDeclParser<'a> {
             .collect();
 
         if fields.len() == 1 && self.options.serde_attrs().transparent() {
-            return ParsedFields::Transparent(Self::parse_field(fields[0], wasm_fields).0);
+            return ParsedFields::Transparent(self.parse_field(fields[0], wasm_fields).0);
         }
 
         match style {
@@ -297,7 +297,7 @@ impl<'a> TsDeclParser<'a> {
                     .into_iter()
                     .map(|field| {
                         let key = field.attrs.name().serialize_name().to_string();
-                        let (field_type, field_options) = Self::parse_field(field, wasm_fields);
+                        let (field_type, field_options) = self.parse_field(field, wasm_fields);
 
                         let optional = field_options.map_or(false, |options| options.optional);
                         let alias_type = if optional {
@@ -322,7 +322,7 @@ impl<'a> TsDeclParser<'a> {
 
                 let flatten_fields = flatten_fields
                     .into_iter()
-                    .map(|field| Self::parse_field(field, wasm_fields).0)
+                    .map(|field| self.parse_field(field, wasm_fields).0)
                     .collect();
 
                 ParsedFields::Named(members, flatten_fields)
@@ -330,7 +330,7 @@ impl<'a> TsDeclParser<'a> {
             ast::Style::Tuple => ParsedFields::Unnamed(
                 fields
                     .into_iter()
-                    .map(|field| Self::parse_field(field, wasm_fields).0)
+                    .map(|field| self.parse_field(field, wasm_fields).0)
                     .collect(),
             ),
             _ => unreachable!(),
@@ -338,6 +338,7 @@ impl<'a> TsDeclParser<'a> {
     }
 
     fn parse_field(
+        &self,
         field: &ast::Field,
         wasm_fields: &'a [FieldWasm],
     ) -> (TsType, Option<&'a FieldWasm>) {
@@ -348,11 +349,21 @@ impl<'a> TsDeclParser<'a> {
             if field_options.as_string {
                 field_type = TsType::STRING;
             }
-            field_type = field_type.rename_reference(&field_options.reference_rename);
-            if field_options.rename_wrapper.unwrap_or_default() {
-                field_type = field_type.rename_protobuf_wrapper();
-            }
         }
+        if field_options
+            .and_then(|f| f.rename_wrapper)
+            .or(self.options.rename_wrapper)
+            .unwrap_or_default()
+        {
+            field_type = field_type.rename_protobuf_wrapper();
+        }
+        field_type = field_type.rename_reference(
+            field_options
+                .filter(|f| {
+                    f.reference_rename.name.is_some() || !f.reference_rename.types.is_empty()
+                })
+                .map_or(&self.options.reference_rename, |f| &f.reference_rename),
+        );
 
         (field_type, field_options)
     }
