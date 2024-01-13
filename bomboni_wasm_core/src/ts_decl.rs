@@ -355,6 +355,11 @@ impl<'a> TsDeclParser<'a> {
             if field_options.as_string {
                 field_type = TsType::STRING;
             }
+            if field_options.always_some.unwrap_or_default() {
+                if let TsType::Option(some_type) = field_type {
+                    field_type = *some_type;
+                }
+            }
         }
         if field_options
             .and_then(|f| f.rename_wrapper)

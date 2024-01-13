@@ -32,6 +32,7 @@ pub struct FieldWasm {
     pub as_string: bool,
     pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
+    pub always_some: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -72,6 +73,7 @@ struct FieldAttributes {
     rename_ref: Option<ReferenceRenameMap>,
     rename_refs: Option<ReferenceRenameMap>,
     rename_wrapper: Option<bool>,
+    always_some: Option<bool>,
 }
 
 #[derive(Debug, FromVariant)]
@@ -280,6 +282,7 @@ fn get_fields(
             as_string,
             reference_rename,
             rename_wrapper,
+            always_some: field.always_some,
         });
     }
 
