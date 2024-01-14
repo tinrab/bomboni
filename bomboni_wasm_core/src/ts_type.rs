@@ -1,4 +1,4 @@
-use crate::options::ReferenceRenameMap;
+use crate::options::ReferenceChangeMap;
 use serde_derive_internals::ast::Style;
 use serde_derive_internals::attr::TagType;
 use std::collections::BTreeSet;
@@ -28,6 +28,7 @@ pub enum TsType {
     TypeLiteral(TypeLiteralTsType),
     Intersection(Vec<Self>),
     Union(Vec<Self>),
+    Override(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,7 +158,7 @@ impl TsType {
     {
         f(self);
         match self {
-            Self::Keyword(_) | Self::Literal(_) => (),
+            Self::Keyword(_) | Self::Literal(_) | Self::Override(_) => (),
             Self::Array(element) => element.visit(f),
             Self::Tuple(elements) => {
                 elements.iter().for_each(|t| t.visit(f));
@@ -350,7 +351,7 @@ impl TsType {
     }
 
     #[must_use]
-    pub fn rename_reference(self, rename_map: &ReferenceRenameMap) -> Self {
+    pub fn change_reference(self, rename_map: &ReferenceChangeMap) -> Self {
         if rename_map.name.is_none() && rename_map.types.is_empty() {
             return self;
         }
@@ -358,7 +359,7 @@ impl TsType {
             Self::Reference { name, type_params } => {
                 let type_params = type_params
                     .into_iter()
-                    .map(|param| param.rename_reference(rename_map))
+                    .map(|param| param.change_reference(rename_map))
                     .collect();
                 if let Some(new_name) = rename_map.name.clone() {
                     Self::Reference {
@@ -372,24 +373,24 @@ impl TsType {
                 }
             }
 
-            Self::Array(element) => Self::Array(Box::new(element.rename_reference(rename_map))),
+            Self::Array(element) => Self::Array(Box::new(element.change_reference(rename_map))),
             Self::Tuple(elements) => Self::Tuple(
                 elements
                     .into_iter()
-                    .map(|element| element.rename_reference(rename_map))
+                    .map(|element| element.change_reference(rename_map))
                     .collect(),
             ),
-            Self::Option(element) => Self::Option(Box::new(element.rename_reference(rename_map))),
+            Self::Option(element) => Self::Option(Box::new(element.change_reference(rename_map))),
             Self::Fn { params, alias_type } => Self::Fn {
                 params,
-                alias_type: Box::new(alias_type.rename_reference(rename_map)),
+                alias_type: Box::new(alias_type.change_reference(rename_map)),
             },
             Self::TypeLiteral(TypeLiteralTsType { members }) => {
                 let members = members
                     .into_iter()
                     .map(|member| TsTypeElement {
                         key: member.key,
-                        alias_type: member.alias_type.rename_reference(rename_map),
+                        alias_type: member.alias_type.change_reference(rename_map),
                         optional: member.optional,
                     })
                     .collect();
@@ -398,13 +399,13 @@ impl TsType {
             Self::Intersection(types) => Self::Intersection(
                 types
                     .into_iter()
-                    .map(|ty| ty.rename_reference(rename_map))
+                    .map(|ty| ty.change_reference(rename_map))
                     .collect(),
             ),
             Self::Union(types) => Self::Union(
                 types
                     .into_iter()
-                    .map(|ty| ty.rename_reference(rename_map))
+                    .map(|ty| ty.change_reference(rename_map))
                     .collect(),
             ),
             _ => self,
@@ -413,7 +414,7 @@ impl TsType {
 
     #[must_use]
     pub fn rename_protobuf_wrapper(self) -> Self {
-        let rename_map = ReferenceRenameMap {
+        let rename_map = ReferenceChangeMap {
             name: None,
             types: [
                 ("DoubleValue", "number"),
@@ -448,7 +449,7 @@ impl TsType {
             )])
             .collect(),
         };
-        self.rename_reference(&rename_map)
+        self.change_reference(&rename_map)
     }
 }
 
@@ -545,6 +546,9 @@ impl Display for TsType {
                     .join(" | ");
 
                 write!(f, "{types}")
+            }
+            Self::Override(src) => {
+                write!(f, "{src}")
             }
         }
     }

@@ -364,6 +364,10 @@ impl<'a> TsDeclParser<'a> {
             name
         });
 
+        if let Some(override_type) = wasm_field.override_type.clone() {
+            return (name, TsType::Override(override_type), wasm_field);
+        }
+
         let mut field_type = TsType::from_type(field.ty);
         if wasm_field.as_string {
             field_type = TsType::STRING;
@@ -380,13 +384,13 @@ impl<'a> TsDeclParser<'a> {
         {
             field_type = field_type.rename_protobuf_wrapper();
         }
-        field_type = field_type.rename_reference(
-            if wasm_field.reference_rename.name.is_some()
-                || !wasm_field.reference_rename.types.is_empty()
+        field_type = field_type.change_reference(
+            if wasm_field.reference_change.name.is_some()
+                || !wasm_field.reference_change.types.is_empty()
             {
-                &wasm_field.reference_rename
+                &wasm_field.reference_change
             } else {
-                &self.options.reference_rename
+                &self.options.reference_change
             },
         );
 
@@ -408,6 +412,10 @@ impl<'a> TsDeclParser<'a> {
             }
             name
         });
+
+        if let Some(override_type) = wasm_variant.override_type.clone() {
+            return self.make_type_alias(TsType::Override(override_type));
+        }
 
         let variant_type: TsType = {
             if wasm_variant.as_string {

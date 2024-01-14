@@ -19,8 +19,8 @@ pub struct WasmOptions<'a> {
     pub from_wasm_abi: bool,
     pub wasm_ref: bool,
     pub as_enum: bool,
+    pub reference_change: ReferenceChangeMap,
     pub rename: Option<String>,
-    pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
     pub rename_all: Option<attr::RenameRule>,
     pub rename_boundary: Vec<Boundary>,
@@ -32,7 +32,8 @@ pub struct FieldWasm {
     pub member: Member,
     pub optional: bool,
     pub as_string: bool,
-    pub reference_rename: ReferenceRenameMap,
+    pub reference_change: ReferenceChangeMap,
+    pub override_type: Option<String>,
     pub rename_wrapper: Option<bool>,
     pub always_some: Option<bool>,
     pub rename: Option<String>,
@@ -41,14 +42,15 @@ pub struct FieldWasm {
 pub struct VariantWasm {
     pub ident: Ident,
     pub as_string: bool,
-    pub reference_rename: ReferenceRenameMap,
+    pub reference_change: ReferenceChangeMap,
+    pub override_type: Option<String>,
     pub rename_wrapper: Option<bool>,
     pub fields: Vec<FieldWasm>,
     pub rename: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ReferenceRenameMap {
+pub struct ReferenceChangeMap {
     pub name: Option<String>,
     pub types: BTreeMap<String, TsType>,
 }
@@ -64,8 +66,8 @@ struct Attributes {
     wasm_ref: Option<bool>,
     as_enum: Option<bool>,
     rename: Option<String>,
-    rename_ref: Option<ReferenceRenameMap>,
-    rename_refs: Option<ReferenceRenameMap>,
+    change_ref: Option<ReferenceChangeMap>,
+    change_refs: Option<ReferenceChangeMap>,
     rename_wrapper: Option<bool>,
     rename_all: Option<String>,
     rename_boundary: Option<String>,
@@ -76,8 +78,9 @@ struct Attributes {
 #[darling(attributes(wasm))]
 struct FieldAttributes {
     ident: Option<Ident>,
-    rename_ref: Option<ReferenceRenameMap>,
-    rename_refs: Option<ReferenceRenameMap>,
+    change_ref: Option<ReferenceChangeMap>,
+    change_refs: Option<ReferenceChangeMap>,
+    override_type: Option<String>,
     rename_wrapper: Option<bool>,
     always_some: Option<bool>,
     rename: Option<String>,
@@ -87,8 +90,9 @@ struct FieldAttributes {
 #[darling(attributes(wasm))]
 struct VariantAttributes {
     ident: Ident,
-    rename_ref: Option<ReferenceRenameMap>,
-    rename_refs: Option<ReferenceRenameMap>,
+    change_ref: Option<ReferenceChangeMap>,
+    change_refs: Option<ReferenceChangeMap>,
+    override_type: Option<String>,
     rename_wrapper: Option<bool>,
     fields: Fields<FieldAttributes>,
     rename: Option<String>,
@@ -159,10 +163,10 @@ impl<'a> WasmOptions<'a> {
             wasm_ref: attributes.wasm_ref.unwrap_or_default(),
             as_enum: attributes.as_enum.unwrap_or_default(),
             rename: attributes.rename,
-            reference_rename: attributes
-                .rename_ref
+            reference_change: attributes
+                .change_ref
                 .as_ref()
-                .or(attributes.rename_refs.as_ref())
+                .or(attributes.change_refs.as_ref())
                 .cloned()
                 .unwrap_or_default(),
             rename_wrapper: attributes.rename_wrapper,
@@ -197,7 +201,7 @@ impl<'a> WasmOptions<'a> {
     }
 }
 
-impl FromMeta for ReferenceRenameMap {
+impl FromMeta for ReferenceChangeMap {
     fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
         match expr {
             syn::Expr::Lit(syn::ExprLit {
@@ -294,10 +298,10 @@ fn get_fields(
         else {
             continue;
         };
-        let reference_rename = field
-            .rename_ref
+        let reference_change = field
+            .change_ref
             .as_ref()
-            .or(field.rename_refs.as_ref())
+            .or(field.change_refs.as_ref())
             .cloned()
             .unwrap_or_default();
         let rename_wrapper = field.rename_wrapper;
@@ -306,7 +310,8 @@ fn get_fields(
             member: serde_field.member.clone(),
             optional,
             as_string,
-            reference_rename,
+            reference_change,
+            override_type: field.override_type.clone(),
             rename_wrapper,
             always_some: field.always_some,
             rename: field.rename.clone(),
@@ -339,10 +344,10 @@ fn get_variants(
         else {
             continue;
         };
-        let reference_rename = variant
-            .rename_ref
+        let reference_change = variant
+            .change_ref
             .as_ref()
-            .or(variant.rename_refs.as_ref())
+            .or(variant.change_refs.as_ref())
             .cloned()
             .unwrap_or_default();
         let rename_wrapper = variant.rename_wrapper;
@@ -350,7 +355,8 @@ fn get_variants(
         variants.push(VariantWasm {
             ident: serde_variant.ident.clone(),
             as_string,
-            reference_rename,
+            reference_change,
+            override_type: variant.override_type.clone(),
             rename_wrapper,
             fields: get_fields(&serde_variant.fields, &variant.fields),
             rename: variant.rename.clone(),
