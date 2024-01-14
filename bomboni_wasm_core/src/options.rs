@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use convert_case::Boundary;
 use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta, FromVariant};
 use itertools::Itertools;
 use proc_macro2::Ident;
@@ -22,6 +23,7 @@ pub struct WasmOptions<'a> {
     pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
     pub rename_all: Option<attr::RenameRule>,
+    pub rename_boundary: Vec<Boundary>,
     pub fields: Vec<FieldWasm>,
     pub variants: Vec<VariantWasm>,
 }
@@ -65,6 +67,7 @@ struct Attributes {
     rename_refs: Option<ReferenceRenameMap>,
     rename_wrapper: Option<bool>,
     rename_all: Option<String>,
+    rename_boundary: Option<String>,
     data: darling::ast::Data<VariantAttributes, FieldAttributes>,
 }
 
@@ -140,6 +143,11 @@ impl<'a> WasmOptions<'a> {
         } else {
             None
         };
+        let rename_boundary = if let Some(rename_boundary) = attributes.rename_boundary.as_ref() {
+            Boundary::list_from(rename_boundary)
+        } else {
+            Vec::new()
+        };
 
         Ok(Self {
             serde_container,
@@ -157,6 +165,7 @@ impl<'a> WasmOptions<'a> {
                 .unwrap_or_default(),
             rename_wrapper: attributes.rename_wrapper,
             rename_all,
+            rename_boundary,
             fields,
             variants,
         })

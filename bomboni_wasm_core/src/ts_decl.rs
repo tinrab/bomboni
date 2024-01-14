@@ -2,10 +2,8 @@ use crate::{
     options::{FieldWasm, WasmOptions},
     ts_type::{TsType, TsTypeElement, TypeLiteralTsType},
 };
-use bomboni_core::{
-    string::{str_to_case, Case},
-    syn::type_is_phantom,
-};
+use bomboni_core::{string::str_to_case, syn::type_is_phantom};
+use convert_case::{Case, Casing};
 use itertools::Itertools;
 use serde_derive_internals::{
     ast,
@@ -338,7 +336,7 @@ impl<'a> TsDeclParser<'a> {
         let name = wasm_field.rename.clone().unwrap_or_else(|| {
             let mut name = field.attrs.name().serialize_name().to_string();
             if let Some(rename_all) = self.options.rename_all {
-                name = Self::apply_rename(&name, rename_all);
+                name = self.apply_rename(&name, rename_all);
             }
             name
         });
@@ -383,7 +381,7 @@ impl<'a> TsDeclParser<'a> {
         let name = wasm_variant.rename.clone().unwrap_or_else(|| {
             let mut name = variant.attrs.name().serialize_name().to_string();
             if let Some(rename_all) = self.options.rename_all {
-                name = Self::apply_rename(&name, rename_all);
+                name = self.apply_rename(&name, rename_all);
             }
             name
         });
@@ -407,17 +405,47 @@ impl<'a> TsDeclParser<'a> {
         alias_type
     }
 
-    fn apply_rename(s: &str, rename_rule: RenameRule) -> String {
-        match rename_rule {
-            RenameRule::None => s.to_owned(),
-            RenameRule::LowerCase => str_to_case(s, Case::Lower),
-            RenameRule::UpperCase => str_to_case(s, Case::Upper),
-            RenameRule::PascalCase => str_to_case(s, Case::Pascal),
-            RenameRule::CamelCase => str_to_case(s, Case::Camel),
-            RenameRule::SnakeCase => str_to_case(s, Case::Snake),
-            RenameRule::ScreamingSnakeCase => str_to_case(s, Case::ScreamingSnake),
-            RenameRule::KebabCase => str_to_case(s, Case::Kebab),
-            RenameRule::ScreamingKebabCase => str_to_case(s, Case::Cobol),
+    fn apply_rename(&self, s: &str, rename_rule: RenameRule) -> String {
+        if self.options.rename_boundary.is_empty() {
+            match rename_rule {
+                RenameRule::None => s.to_owned(),
+                RenameRule::LowerCase => str_to_case(s, Case::Lower),
+                RenameRule::UpperCase => str_to_case(s, Case::Upper),
+                RenameRule::PascalCase => str_to_case(s, Case::Pascal),
+                RenameRule::CamelCase => str_to_case(s, Case::Camel),
+                RenameRule::SnakeCase => str_to_case(s, Case::Snake),
+                RenameRule::ScreamingSnakeCase => str_to_case(s, Case::ScreamingSnake),
+                RenameRule::KebabCase => str_to_case(s, Case::Kebab),
+                RenameRule::ScreamingKebabCase => str_to_case(s, Case::Cobol),
+            }
+        } else {
+            match rename_rule {
+                RenameRule::None => s.to_owned(),
+                RenameRule::LowerCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Lower),
+                RenameRule::UpperCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Upper),
+                RenameRule::PascalCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Pascal),
+                RenameRule::CamelCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Camel),
+                RenameRule::SnakeCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Snake),
+                RenameRule::ScreamingSnakeCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::ScreamingSnake),
+                RenameRule::KebabCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Kebab),
+                RenameRule::ScreamingKebabCase => s
+                    .with_boundaries(&self.options.rename_boundary)
+                    .to_case(Case::Cobol),
+            }
         }
     }
 
