@@ -48,6 +48,22 @@ mod tests {
     }
 
     #[test]
+    fn renames() {
+        #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(rename_all = "camelCase")]
+        struct Item {
+            test_name: String,
+            #[wasm(rename = "x")]
+            value: i32,
+        }
+
+        assert_eq!(
+            Item::DECL,
+            "export interface Item {\n  testName: string;\n  x: number;\n}"
+        );
+    }
+
+    #[test]
     fn enums() {
         #[derive(Serialize, Deserialize, Wasm)]
         pub enum ExternalTag {

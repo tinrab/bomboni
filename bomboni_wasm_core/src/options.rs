@@ -21,11 +21,11 @@ pub struct WasmOptions<'a> {
     pub rename: Option<String>,
     pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
+    pub rename_all: Option<attr::RenameRule>,
     pub fields: Vec<FieldWasm>,
     pub variants: Vec<VariantWasm>,
 }
 
-#[derive(Debug)]
 pub struct FieldWasm {
     pub member: Member,
     pub optional: bool,
@@ -33,15 +33,16 @@ pub struct FieldWasm {
     pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
     pub always_some: Option<bool>,
+    pub rename: Option<String>,
 }
 
-#[derive(Debug)]
 pub struct VariantWasm {
     pub ident: Ident,
     pub as_string: bool,
     pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
     pub fields: Vec<FieldWasm>,
+    pub rename: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -63,6 +64,7 @@ struct Attributes {
     rename_ref: Option<ReferenceRenameMap>,
     rename_refs: Option<ReferenceRenameMap>,
     rename_wrapper: Option<bool>,
+    rename_all: Option<String>,
     data: darling::ast::Data<VariantAttributes, FieldAttributes>,
 }
 
@@ -74,6 +76,7 @@ struct FieldAttributes {
     rename_refs: Option<ReferenceRenameMap>,
     rename_wrapper: Option<bool>,
     always_some: Option<bool>,
+    rename: Option<String>,
 }
 
 #[derive(Debug, FromVariant)]
@@ -84,6 +87,7 @@ struct VariantAttributes {
     rename_refs: Option<ReferenceRenameMap>,
     rename_wrapper: Option<bool>,
     fields: Fields<FieldAttributes>,
+    rename: Option<String>,
 }
 
 impl<'a> WasmOptions<'a> {
@@ -128,6 +132,15 @@ impl<'a> WasmOptions<'a> {
 
         let wasm_abi = attributes.wasm_abi.unwrap_or_default();
 
+        let rename_all = if let Some(rename_all) = attributes.rename_all {
+            Some(
+                attr::RenameRule::from_str(&rename_all)
+                    .map_err(|err| syn::Error::new_spanned(input, err))?,
+            )
+        } else {
+            None
+        };
+
         Ok(Self {
             serde_container,
             wasm_bindgen: attributes.wasm_bindgen,
@@ -143,6 +156,7 @@ impl<'a> WasmOptions<'a> {
                 .cloned()
                 .unwrap_or_default(),
             rename_wrapper: attributes.rename_wrapper,
+            rename_all,
             fields,
             variants,
         })
@@ -283,6 +297,7 @@ fn get_fields(
             reference_rename,
             rename_wrapper,
             always_some: field.always_some,
+            rename: field.rename.clone(),
         });
     }
 
@@ -326,6 +341,7 @@ fn get_variants(
             reference_rename,
             rename_wrapper,
             fields: get_fields(&serde_variant.fields, &variant.fields),
+            rename: variant.rename.clone(),
         });
     }
 
