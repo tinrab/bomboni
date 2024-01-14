@@ -5,7 +5,13 @@
 //!
 //! [1]: https://github.com/madonoharu/tsify
 
-use bomboni_wasm_core::{options::WasmOptions, ts_decl::TsDeclParser};
+use std::collections::BTreeSet;
+
+use bomboni_core::string::{str_to_case, Case};
+use bomboni_wasm_core::{
+    options::WasmOptions,
+    ts_decl::{TsDecl, TsDeclParser},
+};
 use proc_macro2::{Literal, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{self, parse_quote, DeriveInput};
@@ -51,6 +57,12 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
             }
         });
     }
+
+    let enum_js = if options.as_enum {
+        expand_enum_js(&options, &ts_decl)?
+    } else {
+        quote!()
+    };
 
     let wasm_mod = options
         .wasm_bindgen
@@ -103,6 +115,7 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
             }
 
             #wasm_abi
+            #enum_js
         };
     })
 }
@@ -209,4 +222,43 @@ fn expand_wasm_ref(options: &WasmOptions) -> TokenStream {
             }
         }
     }
+}
+
+fn expand_enum_js(options: &WasmOptions, ts_decl: &TsDecl) -> syn::Result<TokenStream> {
+    let mut variants = String::new();
+    let ts_enum = if let TsDecl::Enum(ts_enum) = ts_decl {
+        if !ts_enum.as_enum {
+            return Ok(quote!());
+        }
+        ts_enum
+    } else {
+        return Ok(quote!());
+    };
+
+    let mut unique_member_names = BTreeSet::new();
+    for member in &ts_enum.members {
+        let member_name = str_to_case(&member.name, Case::Pascal);
+        let member_type_value = member.alias_type.to_string();
+        if !unique_member_names.insert(member_name.clone())
+            || !unique_member_names.insert(member_type_value.clone())
+        {
+            return Err(syn::Error::new_spanned(
+                &options.serde_container.ident,
+                format!("duplicate enum member name: {member_name}"),
+            ));
+        }
+
+        variants.push_str(&format!("{member_name}: {member_type_value},\n"));
+        variants.push_str(&format!("{member_type_value}: \"{member_name}\",\n"));
+    }
+
+    let js_literal = Literal::string(&format!(
+        "module.exports.{} = Object.freeze({{\n  {}}});",
+        ts_decl.name(),
+        variants,
+    ));
+    Ok(quote! {
+        #[wasm_bindgen(inline_js = #js_literal)]
+        extern "C" {}
+    })
 }

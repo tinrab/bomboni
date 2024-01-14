@@ -1,6 +1,5 @@
 use crate::config::CompileConfig;
 use bomboni_core::string::{str_to_case, Case};
-use itertools::Itertools;
 use prost_types::{DescriptorProto, FileDescriptorSet, OneofDescriptorProto};
 use syn::{parse_quote, ExprPath, PathSegment};
 
@@ -57,6 +56,7 @@ impl<'a> Context<'a> {
                     .trim_start_matches(matcher)
                     .trim_matches('.')
                     .split('.')
+                    .collect::<Vec<_>>()
                     .join("::")
             )
         } else {
@@ -75,7 +75,11 @@ impl<'a> Context<'a> {
             }
             format!(
                 "{}{}",
-                self.package_name.split('.').map(|_| "super").join("::"),
+                self.package_name
+                    .split('.')
+                    .map(|_| "super")
+                    .collect::<Vec<_>>()
+                    .join("::"),
                 type_path
             )
         };

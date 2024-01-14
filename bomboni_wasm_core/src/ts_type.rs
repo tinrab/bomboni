@@ -1,8 +1,8 @@
 use crate::options::ReferenceRenameMap;
-use itertools::Itertools;
 use serde_derive_internals::ast::Style;
 use serde_derive_internals::attr::TagType;
 use std::collections::BTreeSet;
+use std::fmt::Write;
 use std::fmt::{self, Display, Formatter};
 use syn::{
     Expr, ExprLit, GenericArgument, Lit, Path, PathArguments, PathSegment, ReturnType, Type,
@@ -478,11 +478,19 @@ impl Display for TsType {
                 write!(
                     f,
                     "[{}]",
-                    elements.iter().map(ToString::to_string).join(", ")
+                    elements
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 )
             }
             Self::Reference { name, type_params } => {
-                let params = type_params.iter().map(ToString::to_string).join(", ");
+                let params = type_params
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 if params.is_empty() {
                     write!(f, "{name}")
                 } else {
@@ -494,6 +502,7 @@ impl Display for TsType {
                     .iter()
                     .enumerate()
                     .map(|(i, param)| format!("arg{i}: {param}"))
+                    .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "({params}) => {alias_type}")
             }
@@ -515,6 +524,7 @@ impl Display for TsType {
                         Self::Union(_) => format!("({ty})"),
                         _ => ty.to_string(),
                     })
+                    .collect::<Vec<_>>()
                     .join(" & ");
 
                 write!(f, "{types}")
@@ -531,6 +541,7 @@ impl Display for TsType {
                         Self::Intersection(_) => format!("({ty})"),
                         _ => ty.to_string(),
                     })
+                    .collect::<Vec<_>>()
                     .join(" | ");
 
                 write!(f, "{types}")
@@ -574,11 +585,10 @@ impl From<TypeLiteralTsType> for TsType {
 
 impl Display for TypeLiteralTsType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let members = self
-            .members
-            .iter()
-            .map(|member| format!("\n  {member};"))
-            .join("");
+        let members = self.members.iter().fold(String::new(), |mut s, member| {
+            let _ = write!(s, "\n  {member};");
+            s
+        });
         if members.is_empty() {
             write!(f, "{{}}")
         } else {

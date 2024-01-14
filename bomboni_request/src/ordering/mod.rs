@@ -5,8 +5,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use itertools::Itertools;
-
 use crate::schema::Schema;
 
 use self::error::{OrderingError, OrderingResult};
@@ -40,7 +38,7 @@ impl Ordering {
         let mut term_names = BTreeSet::new();
         for parts in source
             .split(',')
-            .map(|part| part.split_whitespace().collect_vec())
+            .map(|part| part.split_whitespace().collect::<Vec<_>>())
             .filter(|parts| !parts.is_empty())
         {
             let mut direction = OrderingDirection::Ascending;
@@ -123,7 +121,13 @@ impl DerefMut for Ordering {
 
 impl Display for Ordering {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.iter().map(ToString::to_string).join(", "))
+        f.write_str(
+            &self
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", "),
+        )
     }
 }
 

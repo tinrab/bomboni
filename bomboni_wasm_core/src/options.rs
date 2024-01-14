@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use convert_case::Boundary;
 use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta, FromVariant};
-use itertools::Itertools;
 use proc_macro2::Ident;
 use serde_derive_internals::{
     ast::{self, Container as SerdeContainer},
@@ -269,6 +268,7 @@ fn get_fields(
                 .segments
                 .iter()
                 .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>()
                 .join("::");
             optional |= path == "Option::is_none";
         }

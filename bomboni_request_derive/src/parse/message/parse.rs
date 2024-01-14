@@ -1,5 +1,4 @@
 use darling::FromMeta;
-use itertools::Itertools;
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{quote, ToTokens};
 
@@ -178,6 +177,7 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
                     .segments
                     .iter()
                     .map(|s| s.ident.to_string())
+                    .collect::<Vec<_>>()
                     .join("."),
             );
             quote! {
@@ -719,7 +719,14 @@ fn expand_extract_source_field(field: &ParseField) -> TokenStream {
             let mut extract = quote!();
             for (i, part) in parts.iter().enumerate() {
                 let part_ident = Ident::from_string(part).unwrap();
-                let part_literal = Literal::string(&parts.iter().take(i + 1).join("."));
+                let part_literal = Literal::string(
+                    &parts
+                        .iter()
+                        .take(i + 1)
+                        .copied()
+                        .collect::<Vec<_>>()
+                        .join("."),
+                );
 
                 extract.extend(if i < parts.len() - 1 {
                     quote! {

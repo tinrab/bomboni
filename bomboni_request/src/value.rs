@@ -4,7 +4,6 @@ use std::{
 };
 
 use bomboni_common::date_time::UtcDateTime;
-use itertools::Itertools;
 use pest::iterators::Pair;
 
 use crate::filter::parser::Rule;
@@ -82,7 +81,15 @@ impl Display for Value {
                 f.write_char('"')
             }
             Self::Repeated(values) => {
-                write!(f, "[{}]", values.iter().join(", "))
+                write!(
+                    f,
+                    "[{}]",
+                    values
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
             Self::Any => f.write_char('*'),
         }

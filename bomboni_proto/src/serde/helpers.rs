@@ -49,8 +49,6 @@ pub mod as_string {
 }
 
 pub mod string_list {
-    use itertools::Itertools;
-
     use super::{
         de, fmt, Deserializer, Display, Formatter, FromStr, PhantomData, Serialize, Serializer,
     };
@@ -63,7 +61,11 @@ pub mod string_list {
         T: ToString,
         S: Serializer,
     {
-        let value = value.iter().map(ToString::to_string).join(",");
+        let value = value
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
         value.serialize(serializer)
     }
 

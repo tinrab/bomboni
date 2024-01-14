@@ -4,11 +4,11 @@ use crate::{
 };
 use bomboni_core::{string::str_to_case, syn::type_is_phantom};
 use convert_case::{Case, Casing};
-use itertools::Itertools;
 use serde_derive_internals::{
     ast,
     attr::{RenameRule, TagType},
 };
+use std::fmt::Write;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -89,7 +89,11 @@ impl Display for InterfaceTsDecl {
             write!(
                 f,
                 " extends {}",
-                self.extends.iter().map(ToString::to_string).join(", ")
+                self.extends
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )?;
         }
 
@@ -99,10 +103,10 @@ impl Display for InterfaceTsDecl {
             write!(
                 f,
                 " {{{}\n}}",
-                self.body
-                    .iter()
-                    .map(|element| format!("\n  {element};"))
-                    .join("")
+                self.body.iter().fold(String::new(), |mut s, element| {
+                    let _ = write!(s, "\n  {element};");
+                    s
+                })
             )
         }
     }
