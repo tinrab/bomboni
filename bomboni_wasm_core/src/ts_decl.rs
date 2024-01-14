@@ -42,6 +42,7 @@ pub struct EnumTsDecl {
     pub type_params: Vec<String>,
     pub members: Vec<TypeAliasTsDecl>,
     pub external_tag: bool,
+    pub as_enum: bool,
 }
 
 pub struct TsDeclParser<'a> {
@@ -115,47 +116,64 @@ impl From<EnumTsDecl> for TsDecl {
 
 impl Display for EnumTsDecl {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "export type {}{} = {};",
-            self.name,
-            if self.type_params.is_empty() {
-                String::new()
-            } else {
-                format!("<{}>", self.type_params.join(", "))
-            },
-            TsType::Union(
-                self.members
-                    .iter()
-                    .enumerate()
-                    .map(|(i, member)| {
-                        let mut member_type = member.alias_type.clone();
-                        if self.external_tag {
-                            // Add empty fields to externally tagged enum.
-                            // This makes it possible to switch based on kind in TypeScript.
-                            if let TsType::TypeLiteral(member_type) = &mut member_type {
-                                member_type.members.extend(
-                                    self.members.iter().enumerate().filter_map(
-                                        |(j, other_member)| {
-                                            if j == i {
-                                                None
-                                            } else {
-                                                Some(TsTypeElement {
-                                                    key: other_member.name.clone(),
-                                                    alias_type: TsType::nullish(),
-                                                    optional: true,
-                                                })
-                                            }
-                                        },
-                                    ),
-                                );
+        if self.as_enum {
+            assert!(
+                self.type_params.is_empty(),
+                "enum with type params not supported"
+            );
+            write!(f, "export enum {} {{", self.name)?;
+            for member in &self.members {
+                write!(
+                    f,
+                    "\n  {} = {},",
+                    str_to_case(&member.name, Case::Pascal),
+                    &member.alias_type
+                )?;
+            }
+            write!(f, "\n}}")
+        } else {
+            write!(
+                f,
+                "export type {}{} = {};",
+                self.name,
+                if self.type_params.is_empty() {
+                    String::new()
+                } else {
+                    format!("<{}>", self.type_params.join(", "))
+                },
+                TsType::Union(
+                    self.members
+                        .iter()
+                        .enumerate()
+                        .map(|(i, member)| {
+                            let mut member_type = member.alias_type.clone();
+                            if self.external_tag {
+                                // Add empty fields to externally tagged enum.
+                                // This makes it possible to switch based on kind in TypeScript.
+                                if let TsType::TypeLiteral(member_type) = &mut member_type {
+                                    member_type.members.extend(
+                                        self.members.iter().enumerate().filter_map(
+                                            |(j, other_member)| {
+                                                if j == i {
+                                                    None
+                                                } else {
+                                                    Some(TsTypeElement {
+                                                        key: other_member.name.clone(),
+                                                        alias_type: TsType::nullish(),
+                                                        optional: true,
+                                                    })
+                                                }
+                                            },
+                                        ),
+                                    );
+                                }
                             }
-                        }
-                        member_type
-                    })
-                    .collect(),
+                            member_type
+                        })
+                        .collect(),
+                )
             )
-        )
+        }
     }
 }
 
@@ -245,6 +263,7 @@ impl<'a> TsDeclParser<'a> {
             ),
             members,
             external_tag: matches!(tag_type, TagType::External),
+            as_enum: self.options.as_enum,
         }
     }
 

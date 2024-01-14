@@ -19,6 +19,7 @@ pub struct WasmOptions<'a> {
     pub into_wasm_abi: bool,
     pub from_wasm_abi: bool,
     pub wasm_ref: bool,
+    pub as_enum: bool,
     pub rename: Option<String>,
     pub reference_rename: ReferenceRenameMap,
     pub rename_wrapper: Option<bool>,
@@ -62,6 +63,7 @@ struct Attributes {
     into_wasm_abi: Option<bool>,
     from_wasm_abi: Option<bool>,
     wasm_ref: Option<bool>,
+    as_enum: Option<bool>,
     rename: Option<String>,
     rename_ref: Option<ReferenceRenameMap>,
     rename_refs: Option<ReferenceRenameMap>,
@@ -156,6 +158,7 @@ impl<'a> WasmOptions<'a> {
             into_wasm_abi: attributes.into_wasm_abi.unwrap_or(wasm_abi),
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
             wasm_ref: attributes.wasm_ref.unwrap_or_default(),
+            as_enum: attributes.as_enum.unwrap_or_default(),
             rename: attributes.rename,
             reference_rename: attributes
                 .rename_ref
