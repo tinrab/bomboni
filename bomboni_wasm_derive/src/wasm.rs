@@ -253,7 +253,7 @@ fn expand_enum_js(options: &WasmOptions, ts_decl: &TsDecl) -> syn::Result<TokenS
     }
 
     let js_literal = Literal::string(&format!(
-        "module.exports.{} = Object.freeze({{\n  {}}});",
+        "export const {} = Object.freeze({{\n  {}}});",
         ts_decl.name(),
         variants,
     ));
