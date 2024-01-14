@@ -161,6 +161,7 @@ fn expand_from_wasm_abi(options: &WasmOptions) -> TokenStream {
                     Ok(value) => value,
                     Err(err) => {
                         _wasm_bindgen::throw_str(&err.to_string());
+                        #[allow(unreachable_code)]
                         core::hint::unreachable_unchecked()
                     }
                 }
@@ -201,6 +202,7 @@ fn expand_wasm_ref(options: &WasmOptions) -> TokenStream {
                     Ok(value) => core::mem::ManuallyDrop::new(value),
                     Err(err) => {
                         _wasm_bindgen::throw_str(&err.to_string());
+                        #[allow(unreachable_code)]
                         core::hint::unreachable_unchecked()
                     }
                 }
