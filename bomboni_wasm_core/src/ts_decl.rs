@@ -2,9 +2,15 @@ use crate::{
     options::{FieldWasm, WasmOptions},
     ts_type::{TsType, TsTypeElement, TypeLiteralTsType},
 };
-use bomboni_core::syn::type_is_phantom;
+use bomboni_core::{
+    string::{str_to_case, Case},
+    syn::type_is_phantom,
+};
 use itertools::Itertools;
-use serde_derive_internals::{ast, attr::TagType};
+use serde_derive_internals::{
+    ast,
+    attr::{RenameRule, TagType},
+};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -331,8 +337,8 @@ impl<'a> TsDeclParser<'a> {
 
         let name = wasm_field.rename.clone().unwrap_or_else(|| {
             let mut name = field.attrs.name().serialize_name().to_string();
-            if let Some(rename_all) = self.options.rename_all.as_ref() {
-                name = rename_all.apply_to_field(&name);
+            if let Some(rename_all) = self.options.rename_all {
+                name = Self::apply_rename(&name, rename_all);
             }
             name
         });
@@ -376,8 +382,8 @@ impl<'a> TsDeclParser<'a> {
 
         let name = wasm_variant.rename.clone().unwrap_or_else(|| {
             let mut name = variant.attrs.name().serialize_name().to_string();
-            if let Some(rename_all) = self.options.rename_all.as_ref() {
-                name = rename_all.apply_to_variant(&name);
+            if let Some(rename_all) = self.options.rename_all {
+                name = Self::apply_rename(&name, rename_all);
             }
             name
         });
@@ -399,6 +405,20 @@ impl<'a> TsDeclParser<'a> {
         alias_type.name = name;
 
         alias_type
+    }
+
+    fn apply_rename(s: &str, rename_rule: RenameRule) -> String {
+        match rename_rule {
+            RenameRule::None => s.to_owned(),
+            RenameRule::LowerCase => str_to_case(s, Case::Lower),
+            RenameRule::UpperCase => str_to_case(s, Case::Upper),
+            RenameRule::PascalCase => str_to_case(s, Case::Pascal),
+            RenameRule::CamelCase => str_to_case(s, Case::Camel),
+            RenameRule::SnakeCase => str_to_case(s, Case::Snake),
+            RenameRule::ScreamingSnakeCase => str_to_case(s, Case::ScreamingSnake),
+            RenameRule::KebabCase => str_to_case(s, Case::Kebab),
+            RenameRule::ScreamingKebabCase => str_to_case(s, Case::Cobol),
+        }
     }
 
     fn make_named_decl(&self, members: Vec<TsTypeElement>, extends: Vec<TsType>) -> TsDecl {
