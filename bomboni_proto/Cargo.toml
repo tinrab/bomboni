@@ -18,13 +18,14 @@ testing = []
 tonic = ["dep:tonic", "dep:http"]
 chrono = ["dep:chrono", "bomboni_common/chrono"]
 json = ["dep:serde_json"]
-wasm = ["dep:wasm-bindgen", "bomboni_common/wasm"]
+wasm = ["dep:wasm-bindgen", "bomboni_common/wasm", "dep:bomboni_wasm"]
 js = ["bomboni_common/js"]
 
 [dependencies]
 bomboni_common = { path = "../bomboni_common", features = [
   "serde",
 ], version = "0.1.53" }
+bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.53", optional = true }
 thiserror = "1.0.56"
 time = { version = "0.3.31", features = ["serde", "formatting", "parsing"] }
 prost = "0.12.3"

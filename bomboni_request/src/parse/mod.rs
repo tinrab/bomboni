@@ -7,7 +7,7 @@ use bomboni_common::id::Id;
     feature = "wasm"
 ))]
 use {
-    bomboni_wasm_derive::Wasm,
+    bomboni_wasm::Wasm,
     serde::{Deserialize, Serialize},
     wasm_bindgen::prelude::*,
 };

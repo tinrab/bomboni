@@ -17,13 +17,22 @@ path = "src/lib.rs"
 derive = []
 testing = []
 tonic = ["bomboni_proto/tonic", "dep:tonic"]
-wasm = ["bomboni_common/wasm", "dep:wasm-bindgen", "dep:serde", "dep:getrandom"]
+wasm = [
+  "dep:bomboni_wasm",
+  "bomboni_common/wasm",
+  "dep:wasm-bindgen",
+  "dep:js-sys",
+  "dep:serde",
+  "dep:getrandom",
+]
 
 [dependencies]
 bomboni_common = { path = "../bomboni_common", version = "0.1.53" }
 bomboni_proto = { path = "../bomboni_proto", version = "0.1.53" }
 bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.53" }
-bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.53" }
+bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.53", features = [
+  "derive",
+], optional = true }
 thiserror = "1.0.56"
 itertools = "0.12.0"
 prost = "0.12.3"
@@ -39,6 +48,7 @@ regex = "1.10.2"
 serde = { version = "1.0.195", features = ["derive"], optional = true }
 tonic = { version = "0.10.2", optional = true }
 wasm-bindgen = { version = "0.2.90", optional = true }
+js-sys = { version = "0.3.67", optional = true }
 getrandom = { version = "0.2.12", features = ["js"], optional = true }
 
 [dev-dependencies]

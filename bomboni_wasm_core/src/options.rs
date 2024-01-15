@@ -267,14 +267,19 @@ fn get_fields(
     for serde_field in serde_fields {
         let mut optional = false;
         if let Some(expr) = serde_field.attrs.skip_serializing_if() {
-            let path = expr
-                .path
-                .segments
-                .iter()
-                .map(|segment| segment.ident.to_string())
-                .collect::<Vec<_>>()
-                .join("::");
-            optional |= path == "Option::is_none";
+            let last_step = expr.path.segments.iter().rev().nth(1);
+            optional |= matches!(
+                last_step,
+                Some(
+                    syn::PathSegment { ident, .. }
+                ) if ident == "is_none"
+            );
+            optional |= matches!(
+                last_step,
+                Some(
+                    syn::PathSegment { ident, .. }
+                ) if ident == "is_default"
+            );
         }
 
         let mut as_string = false;

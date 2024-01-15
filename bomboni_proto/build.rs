@@ -4,6 +4,7 @@ use bomboni_prost::{
     compile,
     config::{ApiConfig, CompileConfig},
 };
+use prost_build::Config;
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -64,46 +65,14 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         .compile_well_known_types()
         .protoc_arg("--experimental_allow_proto3_optional")
         .btree_map(["."]);
+    build_serde(&mut config);
 
-    for type_path in get_camel_cased_type_paths() {
-        config.type_attribute(
-            type_path,
-            r#"
-                #[derive(::serde::Serialize, ::serde::Deserialize)]
-                #[serde(rename_all = "camelCase")]
-            "#,
-        );
-    }
-    for type_path in get_default_type_paths() {
-        config.field_attribute(
-            type_path,
-            r#"#[serde(default, skip_serializing_if = "crate::serde::helpers::is_default")]"#,
-        );
-    }
+    #[cfg(feature = "wasm")]
+    build_wasm(&mut config);
+
     for type_path in get_copy_type_paths() {
         config.type_attribute(type_path, r"#[derive(Copy)]");
     }
-    config.type_attribute(
-        ".google.rpc.Status",
-        r"#[derive(::serde::Serialize, ::serde::Deserialize)]",
-    );
-    config.field_attribute(
-        ".google.rpc.Status.details",
-        r#"#[serde(with = "crate::google::rpc::status::details_serde")]"#,
-    );
-    config.field_attribute(
-        ".google.rpc.Status.code",
-        r#"#[serde(with = "crate::google::rpc::helpers::code_serde")]"#,
-    );
-
-    config.field_attribute(
-        ".tools.Status",
-        r#"#[serde(with = "crate::tools::helpers::status_serde")]"#,
-    );
-    config.field_attribute(
-        ".tools.CommandResponse.Status",
-        r#"#[serde(with = "crate::tools::helpers::command_response::status_serde")]"#,
-    );
 
     config.compile_protos(&proto_paths, &["./proto"])?;
 
@@ -120,8 +89,9 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     Ok(())
 }
 
-fn get_camel_cased_type_paths() -> impl Iterator<Item = String> {
-    [
+fn build_serde(config: &mut Config) {
+    // Camel cased
+    for type_name in [
         "RetryInfo",
         "DebugInfo",
         "QuotaFailure",
@@ -132,17 +102,72 @@ fn get_camel_cased_type_paths() -> impl Iterator<Item = String> {
         "ResourceInfo",
         "Help",
         "LocalizedMessage",
-    ]
-    .into_iter()
-    .map(|type_name| format!(".google.rpc.{type_name}"))
-}
+    ] {
+        config.type_attribute(
+            format!(".google.rpc.{type_name}"),
+            r#"
+                #[derive(::serde::Serialize, ::serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+            "#,
+        );
+    }
 
-fn get_default_type_paths() -> impl Iterator<Item = String> {
-    std::iter::once("ErrorInfo.metadata").map(|type_name| format!(".google.rpc.{type_name}"))
+    // Skip defaults
+    config.field_attribute(
+        ".google.rpc.ErrorInfo.metadata",
+        r#"#[serde(default, skip_serializing_if = "crate::serde::helpers::is_default")]"#,
+    );
+
+    config.type_attribute(
+        ".google.rpc.Status",
+        r"#[derive(::serde::Serialize, ::serde::Deserialize)]",
+    );
+
+    config.field_attribute(
+        ".google.rpc.Status.details",
+        r#"#[serde(with = "crate::google::rpc::status::details_serde")]"#,
+    );
+    config.field_attribute(
+        ".google.rpc.Status.code",
+        r#"#[serde(with = "crate::google::rpc::helpers::code_serde")]"#,
+    );
+    config.field_attribute(
+        ".tools.Status",
+        r#"#[serde(with = "crate::tools::helpers::status_serde")]"#,
+    );
+    config.field_attribute(
+        ".tools.CommandResponse.Status",
+        r#"#[serde(with = "crate::tools::helpers::command_response::status_serde")]"#,
+    );
 }
 
 fn get_copy_type_paths() -> impl Iterator<Item = String> {
     ["Timestamp", "Empty", "Duration"]
         .into_iter()
         .map(|type_name| format!(".google.protobuf.{type_name}"))
+}
+
+#[cfg(feature = "wasm")]
+fn build_wasm(config: &mut Config) {
+    for type_name in [
+        "Status",
+        "RetryInfo",
+        "DebugInfo",
+        "QuotaFailure",
+        "ErrorInfo",
+        "PreconditionFailure",
+        "BadRequest",
+        "RequestInfo",
+        "ResourceInfo",
+        "Help",
+        "LocalizedMessage",
+    ] {
+        config.type_attribute(
+            format!(".google.rpc.{type_name}"),
+            r"
+                #[derive(bomboni_wasm::Wasm)]
+                #[wasm(bomboni_wasm = bomboni_wasm, wasm_abi)]
+            ",
+        );
+    }
 }

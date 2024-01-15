@@ -8,6 +8,16 @@ use bomboni_proto::google::rpc::{Code, Status};
 use prost::{DecodeError, EncodeError};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm"
+))]
+use wasm_bindgen::{
+    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi, ReturnWasmAbi},
+    describe::WasmDescribe,
+    prelude::*,
+};
 
 #[derive(Error, Debug)]
 pub enum RequestError {
@@ -507,6 +517,43 @@ where
 
     fn wrap_request<N: Display>(self, name: N) -> RequestError {
         RequestError::generic(self).wrap_request(name)
+    }
+}
+
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm",
+))]
+mod wasm {
+    use super::*;
+
+    impl WasmDescribe for RequestError {
+        fn describe() {
+            <Status as WasmDescribe>::describe()
+        }
+    }
+
+    impl From<RequestError> for JsValue {
+        fn from(value: RequestError) -> Self {
+            use bomboni_wasm::Wasm;
+            JsValue::from(Status::from(value).to_js().unwrap())
+        }
+    }
+
+    impl IntoWasmAbi for RequestError {
+        type Abi = <Status as IntoWasmAbi>::Abi;
+
+        fn into_abi(self) -> Self::Abi {
+            Status::from(self).into_abi()
+        }
+    }
+
+    impl OptionIntoWasmAbi for RequestError {
+        #[inline]
+        fn none() -> Self::Abi {
+            <Status as OptionIntoWasmAbi>::none()
+        }
     }
 }
 
