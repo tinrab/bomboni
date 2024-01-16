@@ -11,17 +11,6 @@ use std::{
 #[cfg(feature = "serde")]
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
-    describe::WasmDescribe,
-    prelude::*,
-};
-
 pub mod generator;
 #[cfg(feature = "mysql")]
 mod mysql;
@@ -31,6 +20,15 @@ const WORKER_BITS: i64 = 16;
 const SEQUENCE_BITS: i64 = 16;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    all(
+        target_family = "wasm",
+        not(any(target_os = "emscripten", target_os = "wasi")),
+        feature = "wasm"
+    ),
+    derive(bomboni_wasm_derive::Wasm),
+    wasm(as_string)
+)]
 pub struct Id(u128);
 
 impl Id {
@@ -132,86 +130,6 @@ impl<'de> Deserialize<'de> for Id {
             <D as Deserializer<'de>>::Error::invalid_value(Unexpected::Str(value.as_str()), &"Id")
         })
     }
-}
-
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-mod wasm {
-    use super::*;
-
-    impl WasmDescribe for Id {
-        fn describe() {
-            <js_sys::JsString as WasmDescribe>::describe()
-        }
-    }
-
-    impl From<Id> for js_sys::JsString {
-        fn from(value: Id) -> Self {
-            value.to_string().into()
-        }
-    }
-
-    impl From<js_sys::JsString> for Id {
-        fn from(value: js_sys::JsString) -> Self {
-            Self::from_str(&value.as_string().unwrap()).unwrap()
-        }
-    }
-
-    impl From<&js_sys::JsString> for Id {
-        fn from(value: &js_sys::JsString) -> Self {
-            Self::from_str(&value.as_string().unwrap()).unwrap()
-        }
-    }
-
-    impl IntoWasmAbi for Id {
-        type Abi = <js_sys::JsString as IntoWasmAbi>::Abi;
-
-        fn into_abi(self) -> Self::Abi {
-            js_sys::JsString::from(self.to_string()).into_abi()
-        }
-    }
-
-    impl OptionIntoWasmAbi for Id {
-        #[inline]
-        fn none() -> Self::Abi {
-            <js_sys::JsString as OptionIntoWasmAbi>::none()
-        }
-    }
-
-    impl FromWasmAbi for Id {
-        type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
-
-        unsafe fn from_abi(js: Self::Abi) -> Self {
-            match js_sys::JsString::from_abi(js)
-                .as_string()
-                .as_ref()
-                .map(|s| Self::from_str(s))
-            {
-                Some(Ok(value)) => value,
-                Some(Err(err)) => {
-                    wasm_bindgen::throw_str(&err.to_string());
-                }
-                None => {
-                    wasm_bindgen::throw_str("expected string");
-                }
-            }
-        }
-    }
-
-    impl OptionFromWasmAbi for Id {
-        #[inline]
-        fn is_none(js: &Self::Abi) -> bool {
-            js_sys::JsString::is_none(js)
-        }
-    }
-
-    #[wasm_bindgen(typescript_custom_section)]
-    const TS_APPEND_CONTENT: &'static str = r#"
-        export type Id = string;
-    "#;
 }
 
 #[cfg(test)]

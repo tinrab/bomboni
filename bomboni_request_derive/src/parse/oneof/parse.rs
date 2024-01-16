@@ -1,5 +1,5 @@
 use darling::FromMeta;
-use proc_macro2::{Ident, Literal, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 
 use crate::parse::{ParseOptions, ParseTaggedUnion, ParseVariant};
@@ -122,7 +122,7 @@ fn expand_tagged_union(
     }
 
     let field_ident = &tagged_union.field;
-    let field_literal = Literal::string(&tagged_union.field.to_string());
+    let field_literal = tagged_union.field.to_string();
     let source = &options.source;
     let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
 

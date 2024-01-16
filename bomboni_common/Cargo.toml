@@ -18,7 +18,12 @@ mysql = ["dep:sqlx"]
 serde = ["dep:serde"]
 tokio = ["dep:tokio"]
 chrono = ["dep:chrono"]
-wasm = ["dep:js-sys", "dep:wasm-bindgen", "time/wasm-bindgen"]
+wasm = [
+  "dep:bomboni_wasm_derive",
+  "dep:js-sys",
+  "dep:wasm-bindgen",
+  "time/wasm-bindgen",
+]
 js = []
 
 [dependencies]
@@ -32,6 +37,7 @@ sqlx = { version = "0.7", features = ["mysql"], optional = true }
 chrono = { version = "0.4.31", optional = true }
 js-sys = { version = "0.3.67", optional = true }
 wasm-bindgen = { version = "0.2.90", optional = true }
+bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.53", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.111"

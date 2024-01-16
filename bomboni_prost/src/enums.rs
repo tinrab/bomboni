@@ -1,5 +1,5 @@
 use bomboni_core::string::{str_to_case, Case};
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::TokenStream;
 use prost_types::EnumDescriptorProto;
 use quote::{format_ident, quote};
 
@@ -20,7 +20,7 @@ pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescri
 fn write_name(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
     let enum_ident = context.get_type_expr_path(enum_type.name());
     let enum_proto_name = context.get_proto_type_name(enum_type.name());
-    let package_proto_name = Literal::string(&context.package_name);
+    let package_proto_name = &context.package_name;
 
     s.extend(quote! {
     impl #enum_ident {
@@ -40,7 +40,7 @@ fn write_value_names(context: &Context, s: &mut TokenStream, enum_type: &EnumDes
             "{}_VALUE_NAME",
             str_to_case(value.name(), Case::ScreamingSnake)
         );
-        let value_name = Literal::string(value.name());
+        let value_name = value.name();
 
         value_names.extend(quote! {
             pub const #value_name_ident: &'static str = #value_name;

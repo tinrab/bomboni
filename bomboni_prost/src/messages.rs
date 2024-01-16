@@ -1,6 +1,6 @@
 use bomboni_core::format_comment;
 use bomboni_core::string::{str_to_case, Case};
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::TokenStream;
 use prost_types::DescriptorProto;
 use quote::{format_ident, quote};
 
@@ -51,7 +51,7 @@ pub fn write_message(context: &Context, s: &mut TokenStream, message: &Descripto
 fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     let message_ident = context.get_type_expr_path(message.name());
     let message_proto_name = context.get_proto_type_name(message.name());
-    let package_proto_name = Literal::string(&context.package_name);
+    let package_proto_name = &context.package_name;
 
     let type_url = if context.config.api.type_url {
         quote!(
@@ -83,15 +83,12 @@ fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorPr
     let message_proto_name = context.get_proto_type_name(message.name());
 
     let type_url = if let Some(domain) = context.config.api.domain.as_ref() {
-        Literal::string(&format!(
+        format!(
             "{}/{}.{}",
             domain, &context.package_name, message_proto_name
-        ))
+        )
     } else {
-        Literal::string(&format!(
-            "/{}.{}",
-            &context.package_name, message_proto_name
-        ))
+        format!("/{}.{}", &context.package_name, message_proto_name)
     };
 
     s.extend(quote! {
@@ -111,7 +108,7 @@ fn write_field_names(context: &Context, s: &mut TokenStream, message: &Descripto
             "{}_FIELD_NAME",
             str_to_case(field.name(), Case::ScreamingSnake)
         );
-        let field_name = Literal::string(field.name());
+        let field_name = field.name();
         names.extend(quote! {
             pub const #field_name_ident: &'static str = #field_name;
         });

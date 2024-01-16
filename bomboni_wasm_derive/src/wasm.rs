@@ -9,10 +9,10 @@ use std::collections::BTreeSet;
 
 use bomboni_core::string::{str_to_case, Case};
 use bomboni_wasm_core::{
-    options::{ProxyWasm, WasmOptions},
+    options::{AsStringWasm, ProxyWasm, WasmOptions},
     ts_decl::{TsDecl, TsDeclParser},
 };
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{self, parse_quote, DeriveInput};
 
@@ -21,6 +21,9 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
 
     if let Some(proxy) = options.proxy.as_ref() {
         return Ok(derive_proxy(proxy, &options));
+    }
+    if let Some(as_string) = options.as_string.as_ref() {
+        return Ok(derive_as_string(as_string, &options));
     }
 
     let mut wasm_abi = quote!();
@@ -33,8 +36,8 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
 
     let ident = options.ident();
     let ts_decl = TsDeclParser::new(&options).parse();
-    let ts_decl_literal = Literal::string(&ts_decl.to_string());
-    let ts_decl_name = Literal::string(ts_decl.name());
+    let ts_decl_literal = ts_decl.to_string();
+    let ts_decl_name = ts_decl.name();
 
     let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
@@ -244,6 +247,121 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
     }
 }
 
+fn derive_as_string(as_string: &AsStringWasm, options: &WasmOptions) -> TokenStream {
+    let ident = options.ident();
+    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
+
+    let try_from = if let Some(try_from) = as_string.try_from.clone() {
+        try_from
+    } else {
+        parse_quote!(FromStr::from_str)
+    };
+    let into = if let Some(into) = as_string.into.clone() {
+        into
+    } else {
+        parse_quote!(ToString::to_string)
+    };
+
+    let type_name = options.name();
+    let type_len = type_name.len() as u32;
+    let type_chars = type_name.chars().map(|c| c as u32);
+
+    let type_decl_literal = format!("export type {type_name} = string;");
+    let unexpected_error = format!("expected `{type_name}`");
+
+    let usage = expand_usage(options);
+
+    quote! {
+        #[automatically_derived]
+        const _: () = {
+            #usage
+
+            #[automatically_derived]
+            impl #impl_generics WasmDescribe for #ident #type_generics #where_clause {
+                #[inline]
+                fn describe() {
+                    use wasm_bindgen::describe::*;
+                    inform(NAMED_EXTERNREF);
+                    inform(#type_len);
+                    #(inform(#type_chars);)*
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics From<#ident #type_generics> for js_sys::JsString {
+                #[inline]
+                fn from(value: #ident #type_generics) -> Self {
+                    #into(&value).into()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics From<js_sys::JsString> for #ident #type_generics #where_clause {
+                #[inline]
+                fn from(value: js_sys::JsString) -> Self {
+                    #try_from(&value.as_string().unwrap()).unwrap_throw()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics From<&js_sys::JsString> for #ident #type_generics #where_clause {
+                #[inline]
+                fn from(value: &js_sys::JsString) -> Self {
+                    #try_from(&value.as_string().unwrap()).unwrap_throw()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics IntoWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <js_sys::JsString as IntoWasmAbi>::Abi;
+
+                #[inline]
+                fn into_abi(self) -> Self::Abi {
+                    js_sys::JsString::from(#into(&self)).into_abi()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics OptionIntoWasmAbi for #ident #type_generics #where_clause {
+                #[inline]
+                fn none() -> Self::Abi {
+                    <js_sys::JsString as OptionIntoWasmAbi>::none()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics FromWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
+
+                #[inline]
+                unsafe fn from_abi(js: Self::Abi) -> Self {
+                    match js_sys::JsString::from_abi(js)
+                        .as_string()
+                        .as_ref()
+                        .map(|s| #try_from(s))
+                    {
+                        Some(result) => result.unwrap_throw(),
+                        None => {
+                            wasm_bindgen::throw_str(#unexpected_error);
+                        }
+                    }
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics OptionFromWasmAbi for #ident #type_generics #where_clause {
+                #[inline]
+                fn is_none(js: &Self::Abi) -> bool {
+                    js_sys::JsString::is_none(js)
+                }
+            }
+
+            #[wasm_bindgen(typescript_custom_section)]
+            const TS_APPEND_CONTENT: &'static str = #type_decl_literal;
+        };
+    }
+}
+
 fn expand_into_wasm_abi(options: &WasmOptions) -> TokenStream {
     let ident = options.ident();
     let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
@@ -382,11 +500,11 @@ fn expand_enum_js(options: &WasmOptions, ts_decl: &TsDecl) -> syn::Result<TokenS
         variants.push_str(&format!("{member_type_value}: \"{member_name}\",\n"));
     }
 
-    let js_literal = Literal::string(&format!(
+    let js_literal = format!(
         "export const {} = Object.freeze({{\n  {}}});",
         ts_decl.name(),
         variants,
-    ));
+    );
     Ok(quote! {
         #[wasm_bindgen(inline_js = #js_literal)]
         extern "C" {}

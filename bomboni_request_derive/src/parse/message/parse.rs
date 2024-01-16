@@ -1,6 +1,6 @@
 use bomboni_core::syn::type_is_phantom;
 use darling::FromMeta;
-use proc_macro2::{Ident, Literal, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 
 use crate::parse::{DeriveOptions, ParseField, ParseOptions, QueryOptions};
@@ -172,15 +172,13 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
 
     if let Some(DeriveOptions { func, source_field }) = field.derive.as_ref() {
         return Ok(if let Some(source_field) = source_field.as_ref() {
-            let source_field_name = Literal::string(
-                &source_field
-                    .path
-                    .segments
-                    .iter()
-                    .map(|s| s.ident.to_string())
-                    .collect::<Vec<_>>()
-                    .join("."),
-            );
+            let source_field_name = &source_field
+                .path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join(".");
             quote! {
                 #target_ident: { #func(&source.#source_field, #source_field_name)? },
             }
@@ -720,14 +718,12 @@ fn expand_extract_source_field(field: &ParseField) -> TokenStream {
             let mut extract = quote!();
             for (i, part) in parts.iter().enumerate() {
                 let part_ident = Ident::from_string(part).unwrap();
-                let part_literal = Literal::string(
-                    &parts
-                        .iter()
-                        .take(i + 1)
-                        .copied()
-                        .collect::<Vec<_>>()
-                        .join("."),
-                );
+                let part_literal = &parts
+                    .iter()
+                    .take(i + 1)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(".");
 
                 extract.extend(if i < parts.len() - 1 {
                     quote! {

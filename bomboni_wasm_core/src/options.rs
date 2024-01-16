@@ -18,6 +18,7 @@ pub struct WasmOptions<'a> {
     pub into_wasm_abi: bool,
     pub from_wasm_abi: bool,
     pub as_enum: bool,
+    pub as_string: Option<AsStringWasm>,
     pub proxy: Option<ProxyWasm>,
     pub reference_change: ReferenceChangeMap,
     pub rename: Option<String>,
@@ -62,6 +63,12 @@ pub struct ProxyWasm {
     pub try_from: Option<Path>,
 }
 
+#[derive(Debug)]
+pub struct AsStringWasm {
+    pub into: Option<Path>,
+    pub try_from: Option<Path>,
+}
+
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(wasm))]
 struct Attributes {
@@ -71,6 +78,7 @@ struct Attributes {
     into_wasm_abi: Option<bool>,
     from_wasm_abi: Option<bool>,
     as_enum: Option<bool>,
+    as_string: Option<AsStringWasm>,
     proxy: Option<ProxyWasm>,
     rename: Option<String>,
     change_ref: Option<ReferenceChangeMap>,
@@ -168,6 +176,7 @@ impl<'a> WasmOptions<'a> {
             into_wasm_abi: attributes.into_wasm_abi.unwrap_or(wasm_abi),
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
             as_enum: attributes.as_enum.unwrap_or_default(),
+            as_string: attributes.as_string,
             proxy: attributes.proxy,
             rename: attributes.rename,
             reference_change: attributes
@@ -322,6 +331,52 @@ impl FromMeta for ProxyWasm {
             proxy: proxy.ok_or_else(|| darling::Error::custom("proxy source not specified"))?,
             into,
             try_from,
+        })
+    }
+}
+
+impl FromMeta for AsStringWasm {
+    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
+        let mut into = None;
+        let mut try_from = None;
+        for item in items {
+            match item {
+                darling::ast::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
+                    path,
+                    value: syn::Expr::Path(value),
+                    ..
+                })) => {
+                    if path.is_ident("into") {
+                        if into.is_some() {
+                            return Err(
+                                darling::Error::custom("into already specified").with_span(item)
+                            );
+                        }
+                        into = Some(value.path.clone());
+                    } else if path.is_ident("try_from") {
+                        if try_from.is_some() {
+                            return Err(darling::Error::custom("try_from already specified")
+                                .with_span(item));
+                        }
+                        try_from = Some(value.path.clone());
+                    } else {
+                        return Err(
+                            darling::Error::custom("expected into or try_from").with_span(item)
+                        );
+                    }
+                }
+                _ => {
+                    return Err(darling::Error::custom("expected proxy path").with_span(item));
+                }
+            }
+        }
+        Ok(Self { into, try_from })
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Self {
+            into: None,
+            try_from: None,
         })
     }
 }
