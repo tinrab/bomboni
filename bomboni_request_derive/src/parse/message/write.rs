@@ -1,3 +1,4 @@
+use bomboni_core::syn::type_is_phantom;
 use darling::FromMeta;
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
@@ -9,7 +10,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {
     let mut write_fields = quote!();
 
     for field in fields {
-        if field.skip || field.derive.is_some() {
+        if field.skip || field.derive.is_some() || type_is_phantom(&field.ty) {
             continue;
         }
 

@@ -1,3 +1,4 @@
+use bomboni_core::syn::type_is_phantom;
 use darling::FromMeta;
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{quote, ToTokens};
@@ -63,7 +64,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
 
         let field_ident = field.ident.as_ref().unwrap();
-        if field.skip {
+        if field.skip || type_is_phantom(&field.ty) {
             skipped_fields.extend(quote! {
                 #field_ident: Default::default(),
             });

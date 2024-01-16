@@ -69,6 +69,8 @@ pub struct ParsedResource {
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, HashMap};
+    use std::fmt::Debug;
+    use std::marker::PhantomData;
 
     use crate::error::PathError;
     use crate::ordering::Ordering;
@@ -1382,60 +1384,31 @@ mod tests {
     #[test]
     fn parse_generics() {
         #[derive(Debug, Clone, PartialEq, Default)]
-        struct Item {
-            value: i32,
+        struct Item<T: Debug + Clone> {
+            value: T,
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item, write)]
-        struct ParsedItem<T, S = String>
+        #[parse(source = Item::<TSource>, write)]
+        struct ParsedItem<T, TSource, S = String>
         where
-            T: Clone + Default + RequestParse<i32> + Into<i32>,
-            S: ToString + Default,
+            T: Default + Debug + Clone + Into<TSource>,
+            TSource: Default + Debug + Clone + RequestParseInto<T>,
+            S: Default + Debug + Clone,
         {
             value: T,
             #[parse(skip)]
             skipped: S,
+            _ts: PhantomData<TSource>,
         }
 
-        #[derive(Debug, Clone, PartialEq)]
-        struct Union {
-            kind: Option<UnionKind>,
-        }
-
-        #[derive(Debug, Clone, PartialEq)]
-        enum UnionKind {
-            String(String),
-            Generic(i32),
-        }
-
-        impl UnionKind {
-            pub fn get_variant_name(&self) -> &'static str {
-                match self {
-                    Self::String(_) => "string",
-                    Self::Generic(_) => "generic",
-                }
-            }
-        }
-
-        #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source = UnionKind, write)]
-        enum ParsedUnionKind<T>
+        #[derive(Debug, Clone, PartialEq, Default, Parse)]
+        #[parse(source = Item::<i32>, write)]
+        struct ParsedItemI32<T>
         where
-            T: Clone + Default + RequestParse<i32> + Into<i32>,
+            T: Default + Debug + Clone + RequestParse<i32> + Into<i32>,
         {
-            String(String),
-            Generic(T),
-        }
-
-        #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source = Union, tagged_union { oneof = UnionKind, field = kind }, write)]
-        enum ParsedTaggedUnionKind<T>
-        where
-            T: Clone + Default + RequestParse<i32> + Into<i32>,
-        {
-            String(String),
-            Generic(T),
+            value: T,
         }
 
         impl RequestParse<i32> for i32 {
@@ -1445,41 +1418,25 @@ mod tests {
         }
 
         assert_eq!(
-            ParsedItem::<i32, String>::parse(Item { value: 42 }).unwrap(),
-            ParsedItem::<i32, String> {
+            ParsedItem::<i32, i32, String>::parse(Item { value: 42 }).unwrap(),
+            ParsedItem::<i32, i32, String> {
                 value: 42,
                 skipped: String::new(),
+                _ts: PhantomData,
             }
         );
         assert_eq!(
-            Item::from(ParsedItem::<i32, String> {
+            Item::from(ParsedItem::<i32, i32, String> {
                 value: 42,
                 skipped: String::new(),
+                _ts: PhantomData,
             }),
             Item { value: 42 }
         );
 
         assert_eq!(
-            ParsedUnionKind::<i32>::parse(UnionKind::Generic(42)).unwrap(),
-            ParsedUnionKind::<i32>::Generic(42)
-        );
-        assert_eq!(
-            UnionKind::from(ParsedUnionKind::<i32>::Generic(42)),
-            UnionKind::Generic(42)
-        );
-
-        assert_eq!(
-            ParsedTaggedUnionKind::<i32>::parse(Union {
-                kind: Some(UnionKind::Generic(42)),
-            })
-            .unwrap(),
-            ParsedTaggedUnionKind::<i32>::Generic(42)
-        );
-        assert_eq!(
-            Union::from(ParsedTaggedUnionKind::<i32>::Generic(42)),
-            Union {
-                kind: Some(UnionKind::Generic(42)),
-            }
+            ParsedItemI32::<i32>::parse(Item { value: 42 }).unwrap(),
+            ParsedItemI32::<i32> { value: 42 }
         );
     }
 

@@ -1,4 +1,5 @@
 {
     "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
-    "rust-analyzer.checkOnSave": false
+    "rust-analyzer.checkOnSave": false,
+    "rust-analyzer.showUnlinkedFileNotification": false
 }

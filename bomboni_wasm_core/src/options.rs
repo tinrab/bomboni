@@ -19,6 +19,7 @@ pub struct WasmOptions<'a> {
     pub from_wasm_abi: bool,
     pub wasm_ref: bool,
     pub as_enum: bool,
+    pub proxy: Option<ProxyWasm>,
     pub reference_change: ReferenceChangeMap,
     pub rename: Option<String>,
     pub rename_wrapper: Option<bool>,
@@ -55,6 +56,13 @@ pub struct ReferenceChangeMap {
     pub types: BTreeMap<String, TsType>,
 }
 
+#[derive(Debug)]
+pub struct ProxyWasm {
+    pub proxy: Path,
+    pub into: Option<Path>,
+    pub try_from: Option<Path>,
+}
+
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(wasm))]
 struct Attributes {
@@ -65,6 +73,7 @@ struct Attributes {
     from_wasm_abi: Option<bool>,
     wasm_ref: Option<bool>,
     as_enum: Option<bool>,
+    proxy: Option<ProxyWasm>,
     rename: Option<String>,
     change_ref: Option<ReferenceChangeMap>,
     change_refs: Option<ReferenceChangeMap>,
@@ -162,6 +171,7 @@ impl<'a> WasmOptions<'a> {
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
             wasm_ref: attributes.wasm_ref.unwrap_or_default(),
             as_enum: attributes.as_enum.unwrap_or_default(),
+            proxy: attributes.proxy,
             rename: attributes.rename,
             reference_change: attributes
                 .change_ref
@@ -255,6 +265,67 @@ impl FromMeta for ReferenceChangeMap {
             }
             _ => Err(darling::Error::custom("expected string literal")),
         }
+    }
+}
+
+impl FromMeta for ProxyWasm {
+    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
+        match expr {
+            syn::Expr::Path(syn::ExprPath { path, .. }) => Ok(Self {
+                proxy: path.clone(),
+                into: None,
+                try_from: None,
+            }),
+            _ => Err(darling::Error::custom("expected proxy path").with_span(expr)),
+        }
+    }
+
+    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
+        let mut proxy = None;
+        let mut into = None;
+        let mut try_from = None;
+        for item in items {
+            match item {
+                darling::ast::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
+                    path,
+                    value: syn::Expr::Path(value),
+                    ..
+                })) => {
+                    if path.is_ident("source") {
+                        if proxy.is_some() {
+                            return Err(darling::Error::custom("proxy source already specified")
+                                .with_span(item));
+                        }
+                        proxy = Some(value.path.clone());
+                    } else if path.is_ident("into") {
+                        if into.is_some() {
+                            return Err(
+                                darling::Error::custom("into already specified").with_span(item)
+                            );
+                        }
+                        into = Some(value.path.clone());
+                    } else if path.is_ident("try_from") {
+                        if try_from.is_some() {
+                            return Err(darling::Error::custom("try_from already specified")
+                                .with_span(item));
+                        }
+                        try_from = Some(value.path.clone());
+                    } else {
+                        return Err(
+                            darling::Error::custom("expected into or try_from").with_span(item)
+                        );
+                    }
+                }
+                _ => {
+                    return Err(darling::Error::custom("expected proxy path").with_span(item));
+                }
+            }
+        }
+        Ok(Self {
+            proxy: proxy.ok_or_else(|| darling::Error::custom("proxy source not specified"))?,
+            into,
+            try_from,
+        })
     }
 }
 

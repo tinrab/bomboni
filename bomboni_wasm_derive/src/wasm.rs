@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 
 use bomboni_core::string::{str_to_case, Case};
 use bomboni_wasm_core::{
-    options::WasmOptions,
+    options::{ProxyWasm, WasmOptions},
     ts_decl::{TsDecl, TsDeclParser},
 };
 use proc_macro2::{Literal, TokenStream};
@@ -19,12 +19,9 @@ use syn::{self, parse_quote, DeriveInput};
 pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
     let options = WasmOptions::from_derive_input(&input)?;
 
-    let ident = options.ident();
-    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
-
-    let ts_decl = TsDeclParser::new(&options).parse();
-    let ts_decl_literal = Literal::string(&ts_decl.to_string());
-    let ts_decl_name = Literal::string(ts_decl.name());
+    if let Some(proxy) = options.proxy.as_ref() {
+        return Ok(derive_proxy(proxy, &options));
+    }
 
     let mut wasm_abi = quote!();
     if options.into_wasm_abi {
@@ -36,6 +33,12 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
     if options.wasm_ref {
         wasm_abi.extend(expand_wasm_ref(&options));
     }
+
+    let ident = options.ident();
+    let ts_decl = TsDeclParser::new(&options).parse();
+    let ts_decl_literal = Literal::string(&ts_decl.to_string());
+    let ts_decl_name = Literal::string(ts_decl.name());
+    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     if !wasm_abi.is_empty() {
         wasm_abi.extend(quote! {
@@ -63,45 +66,7 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
     } else {
         quote!()
     };
-
-    let wasm_mod = options
-        .wasm_bindgen
-        .as_ref()
-        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
-    let mut usage = quote! {
-        use #wasm_mod::{
-            prelude::*,
-            convert::{IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi},
-            describe::WasmDescribe,
-        };
-    };
-
-    usage.extend(if let Some(path) = options.wasm_bindgen.as_ref() {
-        quote! {
-            use #path as _wasm_bindgen;
-        }
-    } else {
-        quote! {
-            extern crate wasm_bindgen as _wasm_bindgen;
-        }
-    });
-    usage.extend(
-        if let Some(path) = options.serde_attrs().custom_serde_path() {
-            quote! {
-                use #path as _serde;
-            }
-        } else {
-            quote! {
-                extern crate serde as _serde;
-            }
-        },
-    );
-    if let Some(bomboni_mod) = options.bomboni_wasm.as_ref() {
-        usage.extend(quote! {
-            use #bomboni_mod::Wasm;
-        });
-    }
-
+    let usage = expand_usage(&options);
     Ok(quote! {
         #[automatically_derived]
         const _: () = {
@@ -110,7 +75,7 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
             #[wasm_bindgen(typescript_custom_section)]
             const TS_APPEND_CONTENT: &'static str = #ts_decl_literal;
 
-            impl #ident #type_generics #where_clause {
+            impl #impl_generics #ident #type_generics #where_clause {
                 const DECL: &'static str = #ts_decl_literal;
             }
 
@@ -118,6 +83,110 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
             #enum_js
         };
     })
+}
+
+fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
+    let ident = options.ident();
+    let proxy_ident = &proxy.proxy;
+
+    let generics = options.generics();
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    let mut result = if options.into_wasm_abi {
+        quote! {
+            impl #impl_generics WasmDescribe for #ident #type_generics #where_clause {
+                fn describe() {
+                    <#proxy_ident as WasmDescribe>::describe()
+                }
+            }
+        }
+    } else {
+        quote!()
+    };
+
+    let proxy_try_from = if let Some(try_from) = proxy.try_from.clone() {
+        try_from
+    } else {
+        parse_quote!(TryFrom::try_from)
+    };
+
+    if options.into_wasm_abi {
+        let proxy_into = if let Some(into) = proxy.into.clone() {
+            into
+        } else {
+            parse_quote!(Into::into)
+        };
+
+        result.extend(quote! {
+            #[automatically_derived]
+            impl #impl_generics IntoWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <#proxy_ident as IntoWasmAbi>::Abi;
+
+                fn into_abi(self) -> Self::Abi {
+                    let proxy: #proxy_ident = #proxy_into(self);
+                    proxy.into_abi()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics OptionIntoWasmAbi for #ident #type_generics #where_clause {
+                #[inline]
+                fn none() -> Self::Abi {
+                    <#proxy_ident as OptionIntoWasmAbi>::none()
+                }
+            }
+        });
+    }
+
+    if options.from_wasm_abi {
+        result.extend(quote! {
+            #[automatically_derived]
+            impl #impl_generics FromWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <#proxy_ident as FromWasmAbi>::Abi;
+
+                #[inline]
+                unsafe fn from_abi(js: Self::Abi) -> Self {
+                    #proxy_try_from(#proxy_ident::from_abi(js)).unwrap_throw()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics OptionFromWasmAbi for #ident #type_generics #where_clause {
+                #[inline]
+                fn is_none(js: &Self::Abi) -> bool {
+                    <#proxy_ident as OptionFromWasmAbi>::is_none(js)
+                }
+            }
+        });
+    }
+
+    if options.wasm_ref {
+        result.extend(quote! {
+            #[automatically_derived]
+            impl #impl_generics RefFromWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <#proxy_ident as RefFromWasmAbi>::Abi;
+                type Anchor = core::mem::ManuallyDrop<#ident #type_generics>;
+
+                #[inline]
+                unsafe fn ref_from_abi(js: Self::Abi) -> Self::Anchor {
+                    let js_value = <#proxy_ident as RefFromWasmAbi>::ref_from_abi(js);
+                    core::mem::ManuallyDrop::new(
+                        #proxy_try_from(core::mem::ManuallyDrop::into_inner(js_value))
+                            .unwrap_throw()
+                    )
+                }
+            }
+        });
+    }
+
+    let usage = expand_usage(options);
+    quote! {
+        #[automatically_derived]
+        const _: () = {
+            #usage
+            #result
+        };
+    }
 }
 
 fn expand_into_wasm_abi(options: &WasmOptions) -> TokenStream {
@@ -206,19 +275,15 @@ fn expand_wasm_ref(options: &WasmOptions) -> TokenStream {
         #[automatically_derived]
         impl #impl_generics RefFromWasmAbi for #ident #type_generics #where_clause {
             type Abi = <JsType as FromWasmAbi>::Abi;
-            type Anchor = core::mem::ManuallyDrop<#ident>;
+            type Anchor = core::mem::ManuallyDrop<#ident #type_generics>;
 
             #[inline]
             unsafe fn ref_from_abi(js: Self::Abi) -> Self::Anchor {
                 let js_value = <JsValue as RefFromWasmAbi>::ref_from_abi(js);
-                match Self::from_js(core::mem::ManuallyDrop::into_inner(js_value)) {
-                    Ok(value) => core::mem::ManuallyDrop::new(value),
-                    Err(err) => {
-                        _wasm_bindgen::throw_str(&err.to_string());
-                        #[allow(unreachable_code)]
-                        core::hint::unreachable_unchecked()
-                    }
-                }
+                core::mem::ManuallyDrop::new(
+                    Self::from_js(core::mem::ManuallyDrop::into_inner(js_value))
+                        .unwrap_throw()
+                )
             }
         }
     }
@@ -261,4 +326,48 @@ fn expand_enum_js(options: &WasmOptions, ts_decl: &TsDecl) -> syn::Result<TokenS
         #[wasm_bindgen(inline_js = #js_literal)]
         extern "C" {}
     })
+}
+
+fn expand_usage(options: &WasmOptions) -> TokenStream {
+    let wasm_mod = options
+        .wasm_bindgen
+        .as_ref()
+        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
+    let mut result = quote! {
+        use #wasm_mod::{
+            prelude::*,
+            convert::{IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi},
+            describe::WasmDescribe,
+        };
+    };
+
+    result.extend(if let Some(path) = options.wasm_bindgen.as_ref() {
+        quote! {
+            use #path as _wasm_bindgen;
+        }
+    } else {
+        quote! {
+            extern crate wasm_bindgen as _wasm_bindgen;
+        }
+    });
+
+    result.extend(
+        if let Some(path) = options.serde_attrs().custom_serde_path() {
+            quote! {
+                use #path as _serde;
+            }
+        } else {
+            quote! {
+                extern crate serde as _serde;
+            }
+        },
+    );
+
+    if let Some(bomboni_mod) = options.bomboni_wasm.as_ref() {
+        result.extend(quote! {
+            use #bomboni_mod::Wasm;
+        });
+    }
+
+    result
 }
