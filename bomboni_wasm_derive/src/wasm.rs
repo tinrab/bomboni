@@ -38,6 +38,7 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
     let ts_decl = TsDeclParser::new(&options).parse();
     let ts_decl_literal = Literal::string(&ts_decl.to_string());
     let ts_decl_name = Literal::string(ts_decl.name());
+
     let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     if !wasm_abi.is_empty() {
@@ -48,14 +49,24 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
                 pub type JsType;
             }
 
+            #[automatically_derived]
             impl #impl_generics Wasm for #ident #type_generics #where_clause {
                 type JsType = JsType;
             }
 
+            #[automatically_derived]
             impl #impl_generics WasmDescribe for #ident #type_generics #where_clause {
                 #[inline]
                 fn describe() {
                     <Self as Wasm>::JsType::describe()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics WasmDescribeVector for #ident #type_generics #where_clause {
+                #[inline]
+                fn describe_vector() {
+                    <Self as Wasm>::JsType::describe_vector()
                 }
             }
         });
@@ -75,6 +86,7 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
             #[wasm_bindgen(typescript_custom_section)]
             const TS_APPEND_CONTENT: &'static str = #ts_decl_literal;
 
+            #[automatically_derived]
             impl #impl_generics #ident #type_generics #where_clause {
                 const DECL: &'static str = #ts_decl_literal;
             }
@@ -89,8 +101,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
     let ident = options.ident();
     let proxy_ident = &proxy.proxy;
 
-    let generics = options.generics();
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     let mut result = if options.into_wasm_abi {
         quote! {
@@ -129,6 +140,16 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
             }
 
             #[automatically_derived]
+            impl VectorIntoWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as IntoWasmAbi>::Abi;
+
+                #[inline]
+                fn vector_into_abi(vector: _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]>) -> Self::Abi {
+                    _wasm_bindgen::convert::js_value_vector_into_abi(vector)
+                }
+            }
+
+            #[automatically_derived]
             impl #impl_generics OptionIntoWasmAbi for #ident #type_generics #where_clause {
                 #[inline]
                 fn none() -> Self::Abi {
@@ -147,6 +168,16 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
                 #[inline]
                 unsafe fn from_abi(js: Self::Abi) -> Self {
                     #proxy_try_from(#proxy_ident::from_abi(js)).unwrap_throw()
+                }
+            }
+
+            #[automatically_derived]
+            impl VectorFromWasmAbi for #ident #type_generics #where_clause {
+                type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as FromWasmAbi>::Abi;
+
+                #[inline]
+                unsafe fn vector_from_abi(js: Self::Abi) -> _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]> {
+                    _wasm_bindgen::convert::js_value_vector_from_abi(js)
                 }
             }
 
@@ -191,14 +222,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
 
 fn expand_into_wasm_abi(options: &WasmOptions) -> TokenStream {
     let ident = options.ident();
-    let serde_path = options.serde_attrs().serde_path();
-    let mut generics = options.generics().clone();
-    generics
-        .make_where_clause()
-        .predicates
-        .push(parse_quote!(Self: #serde_path::Serialize));
-
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     quote! {
         #[automatically_derived]
@@ -212,10 +236,28 @@ fn expand_into_wasm_abi(options: &WasmOptions) -> TokenStream {
         }
 
         #[automatically_derived]
+        impl VectorIntoWasmAbi for #ident #type_generics #where_clause {
+            type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as IntoWasmAbi>::Abi;
+
+            #[inline]
+            fn vector_into_abi(vector: _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]>) -> Self::Abi {
+                _wasm_bindgen::convert::js_value_vector_into_abi(vector)
+            }
+        }
+
+        #[automatically_derived]
         impl #impl_generics OptionIntoWasmAbi for #ident #type_generics #where_clause {
             #[inline]
             fn none() -> Self::Abi {
                 <JsType as OptionIntoWasmAbi>::none()
+            }
+        }
+
+        #[automatically_derived]
+        impl #impl_generics From<#ident #type_generics> for JsValue #where_clause {
+            #[inline]
+            fn from(value: #ident #type_generics) -> Self {
+                value.to_js().unwrap().into()
             }
         }
     }
@@ -223,14 +265,7 @@ fn expand_into_wasm_abi(options: &WasmOptions) -> TokenStream {
 
 fn expand_from_wasm_abi(options: &WasmOptions) -> TokenStream {
     let ident = options.ident();
-    let serde_path = options.serde_attrs().serde_path();
-    let mut generics = options.generics().clone();
-    generics
-        .make_where_clause()
-        .predicates
-        .push(parse_quote!(Self: #serde_path::de::DeserializeOwned));
-
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     quote! {
         #[automatically_derived]
@@ -257,19 +292,32 @@ fn expand_from_wasm_abi(options: &WasmOptions) -> TokenStream {
                 <JsType as OptionFromWasmAbi>::is_none(js)
             }
         }
+
+        #[automatically_derived]
+        impl VectorFromWasmAbi for #ident #type_generics #where_clause {
+            type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as FromWasmAbi>::Abi;
+
+            #[inline]
+            unsafe fn vector_from_abi(js: Self::Abi) -> _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]> {
+                _wasm_bindgen::convert::js_value_vector_from_abi(js)
+            }
+        }
+
+        #[automatically_derived]
+        impl #impl_generics TryFromJsValue for #ident #type_generics #where_clause {
+            type Error = JsValue;
+
+            #[inline]
+            fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
+                Ok(Self::from_js(value)?)
+            }
+        }
     }
 }
 
 fn expand_wasm_ref(options: &WasmOptions) -> TokenStream {
     let ident = options.ident();
-    let serde_path = options.serde_attrs().serde_path();
-    let mut generics = options.generics().clone();
-    generics
-        .make_where_clause()
-        .predicates
-        .push(parse_quote!(Self: #serde_path::de::DeserializeOwned));
-
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     quote! {
         #[automatically_derived]
@@ -336,8 +384,12 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
     let mut result = quote! {
         use #wasm_mod::{
             prelude::*,
-            convert::{IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi},
-            describe::WasmDescribe,
+            convert::{
+                IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi,
+                TryFromJsValue, VectorFromWasmAbi, VectorIntoWasmAbi,
+            },
+            describe::{WasmDescribe, WasmDescribeVector},
+            JsObject,
         };
     };
 
