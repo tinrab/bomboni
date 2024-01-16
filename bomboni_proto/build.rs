@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
             .extern_path(".google", "::bomboni_proto::google")
             .protoc_arg("--experimental_allow_proto3_optional")
             .btree_map(["."])
-            .compile_protos(&proto_paths, &["./tests/proto/"])?;
+            .compile_protos(&proto_paths, &["./proto", "./tests/proto/"])?;
 
         compile(CompileConfig {
             api: ApiConfig {
