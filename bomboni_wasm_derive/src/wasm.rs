@@ -30,9 +30,6 @@ pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
     if options.from_wasm_abi {
         wasm_abi.extend(expand_from_wasm_abi(&options));
     }
-    if options.wasm_ref {
-        wasm_abi.extend(expand_wasm_ref(&options));
-    }
 
     let ident = options.ident();
     let ts_decl = TsDeclParser::new(&options).parse();
@@ -110,6 +107,14 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
                     <#proxy_ident as WasmDescribe>::describe()
                 }
             }
+
+            #[automatically_derived]
+            impl #impl_generics WasmDescribeVector for #ident #type_generics #where_clause {
+                #[inline]
+                fn describe_vector() {
+                    <#proxy_ident as WasmDescribeVector>::describe_vector()
+                }
+            }
         }
     } else {
         quote!()
@@ -141,11 +146,15 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
 
             #[automatically_derived]
             impl VectorIntoWasmAbi for #ident #type_generics #where_clause {
-                type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as IntoWasmAbi>::Abi;
+                type Abi = <#proxy_ident as VectorIntoWasmAbi>::Abi;
 
                 #[inline]
                 fn vector_into_abi(vector: _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]>) -> Self::Abi {
-                    _wasm_bindgen::convert::js_value_vector_into_abi(vector)
+                    let values: Box<[#proxy_ident]> = vector.into_vec()
+                        .into_iter()
+                        .map(|e| #proxy_into(e))
+                        .collect();
+                    values.into_abi()
                 }
             }
 
@@ -154,6 +163,15 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
                 #[inline]
                 fn none() -> Self::Abi {
                     <#proxy_ident as OptionIntoWasmAbi>::none()
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics From<#ident #type_generics> for JsValue #where_clause {
+                #[inline]
+                fn from(value: #ident #type_generics) -> Self {
+                    let proxy: #proxy_ident = #proxy_into(value);
+                    proxy.to_js().unwrap().into()
                 }
             }
         });
@@ -172,8 +190,16 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
             }
 
             #[automatically_derived]
+            impl #impl_generics OptionFromWasmAbi for #ident #type_generics #where_clause {
+                #[inline]
+                fn is_none(js: &Self::Abi) -> bool {
+                    <#proxy_ident as OptionFromWasmAbi>::is_none(js)
+                }
+            }
+
+            #[automatically_derived]
             impl VectorFromWasmAbi for #ident #type_generics #where_clause {
-                type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as FromWasmAbi>::Abi;
+                type Abi = <#proxy_ident as VectorFromWasmAbi>::Abi;
 
                 #[inline]
                 unsafe fn vector_from_abi(js: Self::Abi) -> _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]> {
@@ -182,17 +208,15 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
             }
 
             #[automatically_derived]
-            impl #impl_generics OptionFromWasmAbi for #ident #type_generics #where_clause {
+            impl #impl_generics TryFromJsValue for #ident #type_generics #where_clause {
+                type Error = JsValue;
+
                 #[inline]
-                fn is_none(js: &Self::Abi) -> bool {
-                    <#proxy_ident as OptionFromWasmAbi>::is_none(js)
+                fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
+                    Ok(#proxy_try_from(#proxy_ident::from_js(value)?).unwrap_throw())
                 }
             }
-        });
-    }
 
-    if options.wasm_ref {
-        result.extend(quote! {
             #[automatically_derived]
             impl #impl_generics RefFromWasmAbi for #ident #type_generics #where_clause {
                 type Abi = <#proxy_ident as RefFromWasmAbi>::Abi;
@@ -312,14 +336,7 @@ fn expand_from_wasm_abi(options: &WasmOptions) -> TokenStream {
                 Ok(Self::from_js(value)?)
             }
         }
-    }
-}
 
-fn expand_wasm_ref(options: &WasmOptions) -> TokenStream {
-    let ident = options.ident();
-    let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
-
-    quote! {
         #[automatically_derived]
         impl #impl_generics RefFromWasmAbi for #ident #type_generics #where_clause {
             type Abi = <JsType as FromWasmAbi>::Abi;
