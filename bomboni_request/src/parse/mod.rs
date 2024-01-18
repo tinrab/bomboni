@@ -91,6 +91,7 @@ mod tests {
         Int32Value, Int64Value, StringValue, Timestamp, UInt32Value,
     };
     use bomboni_request_derive::{impl_parse_into_map, parse_resource_name, Parse};
+    use serde::{Deserialize, Serialize};
 
     use super::*;
 
@@ -1923,5 +1924,26 @@ mod tests {
                 part: Some(Part { value: 1337 }),
             }
         );
+    }
+
+    #[test]
+    fn serde_as() {
+        #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+        struct Item {
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = Item, write, serde_as)]
+        struct ParsedItem {
+            value: i32,
+        }
+
+        let js = serde_json::to_string_pretty(&Item { value: 42 }).unwrap();
+        assert_eq!(
+            js,
+            serde_json::to_string_pretty(&ParsedItem { value: 42 }).unwrap(),
+        );
+        assert_eq!(serde_json::from_str::<ParsedItem>(&js).unwrap().value, 42);
     }
 }

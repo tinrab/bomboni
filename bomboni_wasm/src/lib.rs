@@ -6,8 +6,6 @@ pub mod utility;
 pub trait Wasm {
     type JsType: JsCast;
 
-    // const DECL: &'static str;
-
     fn to_js(&self) -> Result<Self::JsType, serde_wasm_bindgen::Error>
     where
         Self: serde::Serialize,
@@ -90,13 +88,6 @@ mod tests {
             value: i32,
         }
 
-        // #[derive(Serialize, Deserialize, Wasm)]
-        // #[repr(i32)]
-        // pub enum CStyle {
-        //     A = 1,
-        //     B = 2,
-        // }
-
         assert_eq!(
             ExternalTag::DECL,
             "export type ExternalTag = {\n  String: string;\n  Number?: null;\n} | {\n  Number: number;\n  String?: null;\n};"
@@ -110,7 +101,5 @@ mod tests {
             InternalTag::DECL,
             "export type InternalTag = {\n  kind: \"String\";\n  value: string;\n} | ({\n  kind: \"Item\";\n} & InternalItem);"
         );
-
-        // println!("{}", serde_json::to_string_pretty(&CStyle::A).unwrap());
     }
 }

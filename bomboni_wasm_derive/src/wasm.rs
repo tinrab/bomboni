@@ -174,7 +174,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
                 #[inline]
                 fn from(value: #ident #type_generics) -> Self {
                     let proxy: #proxy_ident = #proxy_into(value);
-                    proxy.to_js().unwrap().into()
+                    proxy.to_js().unwrap_throw().into()
                 }
             }
         });

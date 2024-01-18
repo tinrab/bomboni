@@ -48,6 +48,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> TokenStream {
     let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
 
     quote! {
+        #[automatically_derived]
         impl #impl_generics From<#ident #type_generics> for #source #where_clause {
             #[allow(clippy::needless_update)]
             fn from(value: #ident #type_generics) -> Self {

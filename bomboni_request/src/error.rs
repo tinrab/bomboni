@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::query::error::QueryError;
@@ -51,7 +52,8 @@ pub enum PathErrorStep {
     Key(String),
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum CommonError {
     #[error("requested entity was not found")]
     ResourceNotFound,

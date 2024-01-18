@@ -10,6 +10,7 @@ mod message;
 mod oneof;
 pub mod parse_into_map;
 pub mod parse_resource_name;
+mod serde;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse))]
@@ -22,6 +23,18 @@ pub struct ParseOptions {
     /// Set to true to implement `From` trait for converting parsed type back into source proto type.
     #[darling(default)]
     pub write: bool,
+    /// Implement `serde::Serialize` from source type.
+    #[darling(default)]
+    pub serialize_as: bool,
+    /// Implement `serde::Deserialize` from source type.
+    #[darling(default)]
+    pub deserialize_as: bool,
+    /// Implement `serde::Serialize` and `serde::Deserialize` from source type.
+    #[darling(default)]
+    pub serde_as: bool,
+    /// Custom serde crate.
+    #[darling(default)]
+    pub serde_crate: Option<Path>,
     /// Used to create tagged unions.
     #[darling(default)]
     pub tagged_union: Option<ParseTaggedUnion>,
@@ -208,10 +221,14 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         }
     };
 
-    match &options.data {
-        ast::Data::Struct(fields) => message::expand(&options, &fields.fields),
-        ast::Data::Enum(variants) => oneof::expand(&options, variants),
-    }
+    let mut result = match &options.data {
+        ast::Data::Struct(fields) => message::expand(&options, &fields.fields)?,
+        ast::Data::Enum(variants) => oneof::expand(&options, variants)?,
+    };
+
+    result.extend(serde::expand(&options)?);
+
+    Ok(result)
 }
 
 pub fn parse_default_expr(meta: &Meta) -> darling::Result<Expr> {

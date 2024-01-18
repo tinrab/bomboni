@@ -133,6 +133,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
 
     Ok(if options.search_query.is_some() {
         quote! {
+            #[automatically_derived]
             impl #ident #type_generics #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
                 pub fn parse_search_query<P: PageTokenBuilder #query_token_type >(
@@ -145,6 +146,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     } else if options.list_query.is_some() {
         quote! {
+            #[automatically_derived]
             impl #ident #type_generics #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
                 pub fn parse_list_query<P: PageTokenBuilder #query_token_type >(
@@ -157,6 +159,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     } else {
         quote! {
+            #[automatically_derived]
             impl #impl_generics RequestParse<#source> for #ident #type_generics #where_clause {
                 #[allow(clippy::ignored_unit_patterns)]
                 fn parse(source: #source) -> RequestResult<Self> {
