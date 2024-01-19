@@ -60,7 +60,10 @@ function test() {
 
 function publish() {
 	if [[ "$2" =~ ^(--actually-do-it)$ ]]; then
+		cargo publish -p bomboni_core --allow-dirty
+		cargo publish -p bomboni_wasm_core --allow-dirty
 		cargo publish -p bomboni_wasm_derive --allow-dirty
+		cargo publish -p bomboni_wasm --allow-dirty
 		cargo publish -p bomboni_common --allow-dirty
 		cargo publish -p bomboni_prost --allow-dirty
 		cargo publish -p bomboni_proto --allow-dirty
@@ -69,7 +72,10 @@ function publish() {
 		cargo publish -p bomboni_template --allow-dirty
 		cargo publish -p bomboni --allow-dirty
 	else
+		cargo publish -p bomboni_core --dry-run --allow-dirty
+		cargo publish -p bomboni_wasm_core --dry-run --allow-dirty
 		cargo publish -p bomboni_wasm_derive --dry-run --allow-dirty
+		cargo publish -p bomboni_wasm --dry-run --allow-dirty
 		cargo publish -p bomboni_common --dry-run --allow-dirty
 		cargo publish -p bomboni_prost --dry-run --allow-dirty
 		cargo publish -p bomboni_proto --dry-run --allow-dirty

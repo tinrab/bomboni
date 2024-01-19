@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request_derive"
-version = "0.1.53"
+version = "0.1.54"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Internal request derive macros for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -15,7 +15,7 @@ path = "src/lib.rs"
 proc-macro = true
 
 [dependencies]
-bomboni_core = { path = "../bomboni_core", version = "0.1.53" }
+bomboni_core = { path = "../bomboni_core", version = "0.1.54" }
 proc-macro2 = { version = "1.0.76", features = ["proc-macro"] }
 syn = "2.0.48"
 quote = "1.0.35"

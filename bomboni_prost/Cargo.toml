@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_prost"
-version = "0.1.53"
+version = "0.1.54"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with prost. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -14,7 +14,7 @@ name = "bomboni_prost"
 path = "src/lib.rs"
 
 [dependencies]
-bomboni_core = { path = "../bomboni_core", version = "0.1.53" }
+bomboni_core = { path = "../bomboni_core", version = "0.1.54" }
 prost = "0.12.3"
 prost-types = "0.12.3"
 proc-macro2 = "1.0.76"
