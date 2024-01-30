@@ -1,8 +1,8 @@
 [package]
-name = "bomboni_core"
+name = "bomboni_fs"
 version = "0.1.54"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
-description = "Internal part of Bomboni library."
+description = "Utilites for working with the file system. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
@@ -10,11 +10,7 @@ readme = "../README.md"
 edition = "2021"
 
 [lib]
-name = "bomboni_core"
+name = "bomboni_fs"
 path = "src/lib.rs"
 
 [dependencies]
-convert_case = "0.6.0"
-proc-macro2 = "1.0.78"
-syn = { version = "2.0.48", features = ["full"] }
-quote = "1.0.35"

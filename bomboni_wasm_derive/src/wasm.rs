@@ -165,7 +165,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
             }
 
             #[automatically_derived]
-            impl VectorIntoWasmAbi for #ident #type_generics #where_clause {
+            impl #impl_generics VectorIntoWasmAbi for #ident #type_generics #where_clause {
                 type Abi = <#proxy_ident as VectorIntoWasmAbi>::Abi;
 
                 #[inline]
@@ -211,7 +211,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
             }
 
             #[automatically_derived]
-            impl VectorFromWasmAbi for #ident #type_generics #where_clause {
+            impl #impl_generics VectorFromWasmAbi for #ident #type_generics #where_clause {
                 type Abi = <#proxy_ident as VectorFromWasmAbi>::Abi;
 
                 #[inline]
@@ -362,7 +362,7 @@ fn derive_as_string(as_string: &AsStringWasm, options: &WasmOptions) -> TokenStr
             }
 
             #[automatically_derived]
-            impl VectorIntoWasmAbi for #ident #type_generics #where_clause {
+            impl #impl_generics VectorIntoWasmAbi for #ident #type_generics #where_clause {
                 type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[js_sys::JsString]> as IntoWasmAbi>::Abi;
 
                 #[inline]
@@ -399,7 +399,7 @@ fn derive_as_string(as_string: &AsStringWasm, options: &WasmOptions) -> TokenStr
             }
 
             #[automatically_derived]
-            impl VectorFromWasmAbi for #ident #type_generics #where_clause {
+            impl #impl_generics VectorFromWasmAbi for #ident #type_generics #where_clause {
                 type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as FromWasmAbi>::Abi;
 
                 #[inline]
@@ -479,7 +479,7 @@ fn expand_into_wasm_abi(options: &WasmOptions) -> TokenStream {
         }
 
         #[automatically_derived]
-        impl VectorIntoWasmAbi for #ident #type_generics #where_clause {
+        impl #impl_generics VectorIntoWasmAbi for #ident #type_generics #where_clause {
             type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as IntoWasmAbi>::Abi;
 
             #[inline]
@@ -531,7 +531,7 @@ fn expand_from_wasm_abi(options: &WasmOptions) -> TokenStream {
         }
 
         #[automatically_derived]
-        impl VectorFromWasmAbi for #ident #type_generics #where_clause {
+        impl #impl_generics VectorFromWasmAbi for #ident #type_generics #where_clause {
             type Abi = <_wasm_bindgen::__rt::std::boxed::Box<[JsValue]> as FromWasmAbi>::Abi;
 
             #[inline]

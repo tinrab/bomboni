@@ -28,7 +28,7 @@ js = []
 
 [dependencies]
 thiserror = "1.0.56"
-regex = "1.10.2"
+regex = "1.10.3"
 time = { version = "0.3.31", features = ["formatting", "parsing"] }
 
 tokio = { version = "1.35.1", features = ["time", "sync"], optional = true }

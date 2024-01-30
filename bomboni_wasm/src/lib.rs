@@ -1,7 +1,6 @@
 use wasm_bindgen::prelude::*;
 
 pub mod macros;
-pub mod utility;
 
 pub trait Wasm {
     type JsType: JsCast;

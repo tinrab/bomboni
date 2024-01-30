@@ -18,6 +18,7 @@ resolver = "2"
 members = [
   "bomboni_common",
   "bomboni_core",
+  "bomboni_fs",
   "bomboni_prost",
   "bomboni_proto",
   "bomboni_request",
@@ -47,6 +48,7 @@ wasm = [
   "bomboni_request/wasm",
 ]
 js = ["bomboni_common/js", "bomboni_proto/js", "bomboni_wasm/js"]
+fs = ["dep:bomboni_fs"]
 
 [dependencies]
 bomboni_common = { path = "bomboni_common", version = "0.1.54" }
@@ -56,3 +58,4 @@ bomboni_proto = { path = "bomboni_proto", version = "0.1.54", optional = true }
 bomboni_request = { path = "bomboni_request", version = "0.1.54", optional = true }
 bomboni_template = { path = "bomboni_template", version = "0.1.54", optional = true }
 bomboni_wasm = { path = "bomboni_wasm", version = "0.1.54", optional = true }
+bomboni_fs = { path = "bomboni_fs", version = "0.1.54", optional = true }

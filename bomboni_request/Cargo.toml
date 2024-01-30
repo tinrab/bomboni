@@ -42,7 +42,7 @@ aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
 rsa = "0.9.6"
 rand = "0.8.5"
-regex = "1.10.2"
+regex = "1.10.3"
 serde = { version = "1.0.195", features = ["derive"] }
 
 tonic = { version = "0.10.2", optional = true }

@@ -26,3 +26,8 @@ pub mod template {
 pub mod wasm {
     pub use bomboni_wasm::*;
 }
+
+#[cfg(feature = "fs")]
+pub mod fs {
+    pub use bomboni_fs::*;
+}
