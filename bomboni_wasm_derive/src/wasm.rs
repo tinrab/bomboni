@@ -277,7 +277,11 @@ fn derive_as_string(as_string: &AsStringWasm, options: &WasmOptions) -> TokenStr
     let type_len = type_name.len() as u32;
     let type_chars = type_name.chars().map(|c| c as u32);
 
-    let type_decl_literal = format!("export type {type_name} = string;");
+    let type_decl_literal = if let Some(override_type) = options.override_type.as_ref() {
+        format!("export type {type_name} = {override_type};")
+    } else {
+        format!("export type {type_name} = string;")
+    };
     let unexpected_error = format!("expected `{type_name}`");
 
     let usage = expand_usage(options);
