@@ -214,6 +214,15 @@ impl<'a> TsDeclParser<'a> {
     }
 
     pub fn parse(&self) -> TsDecl {
+        if let Some(override_type) = self.options.override_type.as_ref() {
+            return TypeAliasTsDecl {
+                name: self.options.name().into(),
+                type_params: Vec::new(),
+                alias_type: TsType::Override(override_type.clone()),
+            }
+            .into();
+        }
+
         match &self.options.serde_data() {
             ast::Data::Struct(style, fields) => self.parse_struct(*style, fields),
             ast::Data::Enum(variants) => self.parse_enum(variants).into(),

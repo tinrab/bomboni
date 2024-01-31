@@ -25,6 +25,7 @@ pub struct WasmOptions<'a> {
     pub rename_wrapper: Option<bool>,
     pub rename_all: Option<attr::RenameRule>,
     pub rename_boundary: Vec<Boundary>,
+    pub override_type: Option<String>,
     pub fields: Vec<FieldWasm>,
     pub variants: Vec<VariantWasm>,
 }
@@ -86,6 +87,7 @@ struct Attributes {
     rename_wrapper: Option<bool>,
     rename_all: Option<String>,
     rename_boundary: Option<String>,
+    override_type: Option<String>,
     data: darling::ast::Data<VariantAttributes, FieldAttributes>,
 }
 
@@ -188,6 +190,7 @@ impl<'a> WasmOptions<'a> {
             rename_wrapper: attributes.rename_wrapper,
             rename_all,
             rename_boundary,
+            override_type: attributes.override_type,
             fields,
             variants,
         })
