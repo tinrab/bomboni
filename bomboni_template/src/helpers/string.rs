@@ -1,9 +1,10 @@
-use std::collections::BTreeMap;
-
+use crate::helpers::utility::get_param_opt;
+use crate::helpers::utility::get_param_value;
 use convert_case::{Case, Casing};
 use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
+use std::collections::BTreeMap;
 
-use super::utility::{get_param, get_param_opt, get_param_value};
+use super::utility::get_param;
 
 pub const UPPER_CASE_HELPER_NAME: &str = "upperCase";
 pub const LOWER_CASE_HELPER_NAME: &str = "lowerCase";

@@ -66,11 +66,11 @@ struct MathHelper;
 impl HelperDef for MathHelper {
     fn call_inner<'reg: 'rc, 'rc>(
         &self,
-        h: &Helper<'reg, 'rc>,
+        h: &Helper<'rc>,
         _: &'reg Handlebars<'reg>,
         _: &'rc Context,
         _: &mut RenderContext<'reg, 'rc>,
-    ) -> Result<ScopedJson<'reg, 'rc>, RenderError> {
+    ) -> Result<ScopedJson<'rc>, RenderError> {
         macro_rules! binary_op {
             ($op:tt) => {{
                 let a: f64 = get_param_value(h, 0, "a")?.as_f64().unwrap_or(0.0);

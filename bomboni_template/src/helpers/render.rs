@@ -1,10 +1,8 @@
-use std::collections::BTreeMap;
-
+use super::utility::get_param;
 use handlebars::{
     Context, Decorator, Handlebars, Helper, HelperResult, Output, RenderContext, RenderError,
 };
-
-use super::utility::get_param;
+use std::collections::BTreeMap;
 
 pub const RENDER_HELPER_NAME: &str = "render";
 pub const SET_DECORATOR_NAME: &str = "set";
@@ -60,9 +58,8 @@ fn set_decorator(
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
-
     use crate::helpers::string::register_string_helpers;
+    use serde_json::{json, Value};
 
     use super::*;
 

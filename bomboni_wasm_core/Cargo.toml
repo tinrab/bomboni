@@ -21,6 +21,6 @@ bomboni_core = { path = "../bomboni_core", version = "0.1.54" }
 proc-macro2 = { version = "1.0.78", features = ["proc-macro"] }
 syn = "2.0.48"
 quote = "1.0.35"
-darling = "0.20.3"
+darling = "0.20.5"
 serde_derive_internals = "0.29.0"
 convert_case = "0.6.0"

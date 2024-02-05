@@ -1,12 +1,11 @@
-use std::collections::BTreeMap;
-
+use super::utility::{get_hash_opt, get_param, get_param_value};
 use bomboni_proto::serde::helpers::is_truthy;
-use handlebars::{Context, Handlebars, Helper, HelperDef, RenderContext, RenderError, ScopedJson};
+use handlebars::{
+    Context, Handlebars, Helper, HelperDef, RenderContext, RenderError, RenderErrorReason,
+    ScopedJson,
+};
 use serde_json::Value;
-
-use crate::helpers::utility::get_param_value;
-
-use super::utility::{get_hash_opt, get_param};
+use std::collections::BTreeMap;
 
 pub const OBJECT_HELPER_NAME: &str = "object";
 pub const OBJECT_HAS_KEY_HELPER_NAME: &str = "objectHasKey";
@@ -64,11 +63,11 @@ struct ValueHelper;
 impl HelperDef for ValueHelper {
     fn call_inner<'reg: 'rc, 'rc>(
         &self,
-        h: &Helper<'reg, 'rc>,
+        h: &Helper<'rc>,
         r: &'reg Handlebars<'reg>,
         _ctx: &'rc Context,
         _rc: &mut RenderContext<'reg, 'rc>,
-    ) -> Result<ScopedJson<'reg, 'rc>, RenderError> {
+    ) -> Result<ScopedJson<'rc>, RenderError> {
         match h.name() {
             OBJECT_HELPER_NAME => {
                 let obj: BTreeMap<_, _> = h.hash().iter().map(|(k, v)| (k, v.value())).collect();
@@ -92,9 +91,13 @@ impl HelperDef for ValueHelper {
                 Ok(serde_json::to_value(arr).unwrap().into())
             }
             GROUP_BY_HELPER_NAME => {
-                let values = get_param_value(h, 0, "value")?
-                    .as_array()
-                    .ok_or_else(|| RenderError::new("`value` param is not an array"))?;
+                let values = get_param_value(h, 0, "value")?.as_array().ok_or_else(|| {
+                    RenderErrorReason::ParamTypeMismatchForName(
+                        GROUP_BY_HELPER_NAME,
+                        "value".into(),
+                        "array".into(),
+                    )
+                })?;
                 let key: String = get_param(h, 1, "key")?;
 
                 let groups: BTreeMap<String, Vec<&Value>> =

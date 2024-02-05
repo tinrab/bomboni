@@ -66,7 +66,7 @@ struct CaseHelper<'a> {
 impl HelperDef for CaseHelper<'_> {
     fn call<'reg: 'rc, 'rc>(
         &self,
-        h: &Helper<'reg, 'rc>,
+        h: &Helper<'rc>,
         r: &'reg Handlebars<'reg>,
         ctx: &'rc Context,
         rc: &mut RenderContext<'reg, 'rc>,
@@ -104,7 +104,7 @@ struct DefaultHelper<'a> {
 impl HelperDef for DefaultHelper<'_> {
     fn call<'reg: 'rc, 'rc>(
         &self,
-        h: &Helper<'reg, 'rc>,
+        h: &Helper<'rc>,
         r: &'reg Handlebars<'reg>,
         ctx: &'rc Context,
         rc: &mut RenderContext<'reg, 'rc>,
@@ -132,11 +132,10 @@ impl HelperDef for DefaultHelper<'_> {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-
     use crate::helpers::string::register_string_helpers;
 
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn it_works() {
