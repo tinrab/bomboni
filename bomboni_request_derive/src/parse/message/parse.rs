@@ -248,7 +248,9 @@ fn expand_parse_field(options: &ParseOptions, field: &ParseField) -> syn::Result
         ));
     }
 
-    let field_name = if let Some(name) = field.name.as_ref() {
+    let field_name = if let Some(source_name) = field.source_name.as_ref() {
+        quote!(#source_name)
+    } else if let Some(name) = field.name.as_ref() {
         quote! { #name }
     } else {
         field

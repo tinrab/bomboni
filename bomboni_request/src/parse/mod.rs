@@ -275,6 +275,14 @@ mod tests {
 
         assert_parse_field_err!(
             Item {
+                string: String::new(),
+                ..Default::default()
+            },
+            "string",
+            &CommonError::RequiredFieldMissing
+        );
+        assert_parse_field_err!(
+            Item {
                 required_string: String::new(),
                 ..Default::default()
             },
