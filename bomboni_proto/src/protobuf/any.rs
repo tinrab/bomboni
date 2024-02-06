@@ -168,6 +168,7 @@ macro_rules! impl_proto_any_seq_serde {
                     $any_serde::serialize(self.0, serializer)
                 }
             }
+
             let mut seq = serializer.serialize_seq(Some(details.len()))?;
             for detail in details {
                 seq.serialize_element(&Proxy(detail))?;

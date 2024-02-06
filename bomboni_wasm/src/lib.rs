@@ -23,7 +23,7 @@ pub trait Wasm {
 #[cfg(feature = "derive")]
 pub use bomboni_wasm_derive::*;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "derive"))]
 mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};

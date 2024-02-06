@@ -1,5 +1,5 @@
 mod protobuf;
-mod rpc;
+pub mod rpc;
 pub mod serde;
 
 /// Includes generated protobuf code.

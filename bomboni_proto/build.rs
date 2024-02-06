@@ -122,22 +122,13 @@ fn build_serde(config: &mut Config) {
         ".google.rpc.Status",
         r"#[derive(::serde::Serialize, ::serde::Deserialize)]",
     );
-
-    config.field_attribute(
-        ".google.rpc.Status.details",
-        r#"#[serde(with = "crate::google::rpc::status::details_serde")]"#,
-    );
     config.field_attribute(
         ".google.rpc.Status.code",
         r#"#[serde(with = "crate::google::rpc::helpers::code_serde")]"#,
     );
     config.field_attribute(
-        ".tools.Status",
-        r#"#[serde(with = "crate::tools::helpers::status_serde")]"#,
-    );
-    config.field_attribute(
-        ".tools.CommandResponse.Status",
-        r#"#[serde(with = "crate::tools::helpers::command_response::status_serde")]"#,
+        ".google.rpc.Status.details",
+        r#"#[serde(with = "crate::rpc::status::details_serde")]"#,
     );
 }
 
@@ -149,7 +140,7 @@ fn get_copy_type_paths() -> impl Iterator<Item = String> {
 
 #[cfg(feature = "wasm")]
 fn build_wasm(config: &mut Config) {
-    for type_name in [
+    let error_details = [
         "Status",
         "RetryInfo",
         "DebugInfo",
@@ -161,7 +152,8 @@ fn build_wasm(config: &mut Config) {
         "ResourceInfo",
         "Help",
         "LocalizedMessage",
-    ] {
+    ];
+    for type_name in &error_details {
         config.type_attribute(
             format!(".google.rpc.{type_name}"),
             r"
@@ -170,4 +162,22 @@ fn build_wasm(config: &mut Config) {
             ",
         );
     }
+    config.field_attribute(
+        ".google.rpc.Status.code",
+        "#[wasm(override_type = \"string\")]",
+    );
+    config.field_attribute(
+        ".google.rpc.Status.details",
+        format!(
+            "#[wasm(override_type = \"(\n{})[]\")]",
+            error_details
+                .iter()
+                .skip(1)
+                .map(|type_name| format!(
+                    "  ( {{'@type': 'type.googleapis.com/google.rpc.{type_name}';}} & ({type_name}) )\n"
+                ))
+                .collect::<Vec<_>>()
+                .join(" | ")
+        ),
+    );
 }
