@@ -1,6 +1,6 @@
 [package]
 name = "bomboni"
-version = "0.1.54"
+version = "0.1.55"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utility Library for Rust"
 repository = "https://github.com/tinrab/bomboni"
@@ -51,11 +51,11 @@ js = ["bomboni_common/js", "bomboni_proto/js", "bomboni_wasm/js"]
 fs = ["dep:bomboni_fs"]
 
 [dependencies]
-bomboni_common = { path = "bomboni_common", version = "0.1.54" }
+bomboni_common = { path = "bomboni_common", version = "0.1.55" }
 
-bomboni_prost = { path = "bomboni_prost", version = "0.1.54", optional = true }
-bomboni_proto = { path = "bomboni_proto", version = "0.1.54", optional = true }
-bomboni_request = { path = "bomboni_request", version = "0.1.54", optional = true }
-bomboni_template = { path = "bomboni_template", version = "0.1.54", optional = true }
-bomboni_wasm = { path = "bomboni_wasm", version = "0.1.54", optional = true }
-bomboni_fs = { path = "bomboni_fs", version = "0.1.54", optional = true }
+bomboni_prost = { path = "bomboni_prost", version = "0.1.55", optional = true }
+bomboni_proto = { path = "bomboni_proto", version = "0.1.55", optional = true }
+bomboni_request = { path = "bomboni_request", version = "0.1.55", optional = true }
+bomboni_template = { path = "bomboni_template", version = "0.1.55", optional = true }
+bomboni_wasm = { path = "bomboni_wasm", version = "0.1.55", optional = true }
+bomboni_fs = { path = "bomboni_fs", version = "0.1.55", optional = true }

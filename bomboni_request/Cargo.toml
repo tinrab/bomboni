@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request"
-version = "0.1.54"
+version = "0.1.55"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -26,10 +26,10 @@ wasm = [
 ]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.54" }
-bomboni_proto = { path = "../bomboni_proto", version = "0.1.54" }
-bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.54" }
-bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.54", features = [
+bomboni_common = { path = "../bomboni_common", version = "0.1.55" }
+bomboni_proto = { path = "../bomboni_proto", version = "0.1.55" }
+bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.55" }
+bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.55", features = [
   "derive",
 ], optional = true }
 thiserror = "1.0.56"

@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_template"
-version = "0.1.54"
+version = "0.1.55"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working Handlebars templates. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -17,8 +17,8 @@ path = "src/lib.rs"
 testing = []
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.54" }
-bomboni_proto = { version = "0.1.54", path = "../bomboni_proto", features = [
+bomboni_common = { path = "../bomboni_common", version = "0.1.55" }
+bomboni_proto = { version = "0.1.55", path = "../bomboni_proto", features = [
   "json",
 ] }
 thiserror = "1.0.56"

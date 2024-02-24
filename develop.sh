@@ -63,26 +63,28 @@ function publish() {
 		cargo publish -p bomboni_core --allow-dirty
 		cargo publish -p bomboni_wasm_core --allow-dirty
 		cargo publish -p bomboni_wasm_derive --allow-dirty
-		cargo publish -p bomboni_wasm --allow-dirty
 		cargo publish -p bomboni_common --allow-dirty
+		cargo publish -p bomboni_wasm --allow-dirty
 		cargo publish -p bomboni_prost --allow-dirty
 		cargo publish -p bomboni_proto --allow-dirty
 		cargo publish -p bomboni_request_derive --allow-dirty
 		cargo publish -p bomboni_request --allow-dirty
 		cargo publish -p bomboni_template --allow-dirty
+		cargo publish -p bomboni_fs --allow-dirty
 		cargo publish -p bomboni --allow-dirty
 	else
-		cargo publish -p bomboni_core --dry-run --allow-dirty
-		cargo publish -p bomboni_wasm_core --dry-run --allow-dirty
-		cargo publish -p bomboni_wasm_derive --dry-run --allow-dirty
-		cargo publish -p bomboni_wasm --dry-run --allow-dirty
-		cargo publish -p bomboni_common --dry-run --allow-dirty
-		cargo publish -p bomboni_prost --dry-run --allow-dirty
-		cargo publish -p bomboni_proto --dry-run --allow-dirty
-		cargo publish -p bomboni_request_derive --dry-run --allow-dirty
-		cargo publish -p bomboni_request --dry-run --allow-dirty
-		cargo publish -p bomboni_template --dry-run --allow-dirty
-		cargo publish -p bomboni --dry-run --allow-dirty
+		cargo publish -p bomboni_core --allow-dirty --dry-run
+		cargo publish -p bomboni_wasm_core --allow-dirty --dry-run
+		cargo publish -p bomboni_wasm_derive --allow-dirty --dry-run
+		cargo publish -p bomboni_common --allow-dirty --dry-run
+		cargo publish -p bomboni_wasm --allow-dirty --dry-run
+		cargo publish -p bomboni_prost --allow-dirty --dry-run
+		cargo publish -p bomboni_proto --allow-dirty --dry-run
+		cargo publish -p bomboni_request_derive --allow-dirty --dry-run
+		cargo publish -p bomboni_request --allow-dirty --dry-run
+		cargo publish -p bomboni_template --allow-dirty --dry-run
+		cargo publish -p bomboni_fs --allow-dirty --dry-run
+		cargo publish -p bomboni --allow-dirty --dry-run
 	fi
 }
 

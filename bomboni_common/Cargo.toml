@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_common"
-version = "0.1.54"
+version = "0.1.55"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Common things for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -37,7 +37,7 @@ sqlx = { version = "0.7", features = ["mysql"], optional = true }
 chrono = { version = "0.4.33", optional = true }
 js-sys = { version = "0.3.67", optional = true }
 wasm-bindgen = { version = "0.2.90", optional = true }
-bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.54", optional = true }
+bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.55", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.113"

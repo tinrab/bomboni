@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_fs"
-version = "0.1.54"
+version = "0.1.55"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilites for working with the file system. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
