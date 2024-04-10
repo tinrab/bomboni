@@ -265,7 +265,7 @@ fn derive_as_string(as_string: &AsStringWasm, options: &WasmOptions) -> TokenStr
     let try_from = if let Some(try_from) = as_string.try_from.clone() {
         try_from
     } else {
-        parse_quote!(FromStr::from_str)
+        parse_quote!(core::str::FromStr::from_str)
     };
     let into = if let Some(into) = as_string.into.clone() {
         into.to_token_stream()

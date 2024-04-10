@@ -181,4 +181,16 @@ fn build_wasm(config: &mut Config) {
                 .join(" | ")
         ),
     );
+
+    config.type_attribute(
+        ".google.protobuf.Duration",
+        r#"
+            #[derive(bomboni_wasm::Wasm)]
+            #[wasm(
+                bomboni_wasm = bomboni_wasm,
+                as_string,
+                override_type = "`${number}.${number}s` | `${number}s`",
+            )]
+        "#,
+    );
 }

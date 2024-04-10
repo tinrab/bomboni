@@ -1,8 +1,6 @@
+use crate::google::protobuf::Duration;
 use crate::serde::helpers as serde_helpers;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-#[cfg(feature = "chrono")]
-use chrono::Duration as ChronoDuration;
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
@@ -10,8 +8,6 @@ use std::{
 };
 use thiserror::Error;
 use time::Duration as TimeDuration;
-
-use crate::google::protobuf::Duration;
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum DurationError {
@@ -131,23 +127,26 @@ impl TryFrom<Duration> for TimeDuration {
 }
 
 #[cfg(feature = "chrono")]
-impl TryFrom<ChronoDuration> for Duration {
-    type Error = DurationError;
+mod chrono_impl {
+    use chrono::Duration as ChronoDuration;
 
-    fn try_from(duration: ChronoDuration) -> Result<Self, DurationError> {
-        duration
-            .to_std()
-            .map_err(|_| DurationError::OutOfRange)?
-            .try_into()
+    impl TryFrom<ChronoDuration> for Duration {
+        type Error = DurationError;
+
+        fn try_from(duration: ChronoDuration) -> Result<Self, DurationError> {
+            duration
+                .to_std()
+                .map_err(|_| DurationError::OutOfRange)?
+                .try_into()
+        }
     }
-}
 
-#[cfg(feature = "chrono")]
-impl TryFrom<Duration> for ChronoDuration {
-    type Error = DurationError;
+    impl TryFrom<Duration> for ChronoDuration {
+        type Error = DurationError;
 
-    fn try_from(duration: Duration) -> Result<Self, DurationError> {
-        Self::from_std(StdDuration::try_from(duration)?).map_err(|_| DurationError::OutOfRange)
+        fn try_from(duration: Duration) -> Result<Self, DurationError> {
+            Self::from_std(StdDuration::try_from(duration)?).map_err(|_| DurationError::OutOfRange)
+        }
     }
 }
 
