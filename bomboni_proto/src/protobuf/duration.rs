@@ -128,6 +128,7 @@ impl TryFrom<Duration> for TimeDuration {
 
 #[cfg(feature = "chrono")]
 mod chrono_impl {
+    use super::{Duration, DurationError, StdDuration};
     use chrono::Duration as ChronoDuration;
 
     impl TryFrom<ChronoDuration> for Duration {

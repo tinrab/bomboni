@@ -2,6 +2,9 @@ use wasm_bindgen::prelude::*;
 
 pub mod macros;
 
+const JSON_SERIALIZER: serde_wasm_bindgen::Serializer =
+    serde_wasm_bindgen::Serializer::json_compatible();
+
 pub trait Wasm {
     type JsType: JsCast;
 
@@ -9,7 +12,8 @@ pub trait Wasm {
     where
         Self: serde::Serialize,
     {
-        serde_wasm_bindgen::to_value(self).map(JsCast::unchecked_from_js)
+        self.serialize(&JSON_SERIALIZER)
+            .map(JsCast::unchecked_from_js)
     }
 
     fn from_js<T: Into<JsValue>>(js: T) -> Result<Self, serde_wasm_bindgen::Error>
