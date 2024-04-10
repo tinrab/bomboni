@@ -1,6 +1,3 @@
-use prost::Name;
-use serde::{Deserialize, Serialize};
-
 use crate::tools::{
     command::v1::{
         command::{
@@ -11,6 +8,8 @@ use crate::tools::{
     command_response::Status as CommandResponseStatus,
     helpers, CommandRequest, Status,
 };
+use prost::Name;
+use serde::{Deserialize, Serialize};
 
 #[allow(unused_qualifications, clippy::all, clippy::pedantic)]
 pub mod tools {

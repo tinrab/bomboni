@@ -118,20 +118,40 @@ impl TryFrom<Timestamp> for OffsetDateTime {
 }
 
 #[cfg(feature = "chrono")]
-impl TryFrom<chrono::NaiveDateTime> for Timestamp {
-    type Error = UtcDateTimeError;
+mod chrono_impl {
+    use super::{Timestamp, UtcDateTime, UtcDateTimeError};
+    use chrono::{DateTime, NaiveDateTime, Utc};
 
-    fn try_from(value: chrono::NaiveDateTime) -> Result<Self, Self::Error> {
-        UtcDateTime::try_from(value).map(Into::into)
+    impl TryFrom<NaiveDateTime> for Timestamp {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: NaiveDateTime) -> Result<Self, Self::Error> {
+            UtcDateTime::try_from(value).map(Into::into)
+        }
     }
-}
 
-#[cfg(feature = "chrono")]
-impl TryFrom<Timestamp> for chrono::NaiveDateTime {
-    type Error = UtcDateTimeError;
+    impl TryFrom<Timestamp> for NaiveDateTime {
+        type Error = UtcDateTimeError;
 
-    fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-        UtcDateTime::try_from(value)?.try_into()
+        fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+            UtcDateTime::try_from(value)?.try_into()
+        }
+    }
+
+    impl TryFrom<DateTime<Utc>> for Timestamp {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: DateTime<Utc>) -> Result<Self, Self::Error> {
+            UtcDateTime::try_from(value).map(Into::into)
+        }
+    }
+
+    impl TryFrom<Timestamp> for DateTime<Utc> {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+            UtcDateTime::try_from(value)?.try_into()
+        }
     }
 }
 

@@ -17,7 +17,6 @@ path = "src/lib.rs"
 testing = []
 tonic = ["dep:tonic", "dep:http"]
 chrono = ["dep:chrono", "bomboni_common/chrono"]
-json = ["dep:serde_json"]
 wasm = ["dep:wasm-bindgen", "bomboni_common/wasm", "dep:bomboni_wasm"]
 js = ["bomboni_common/js"]
 
@@ -26,21 +25,21 @@ bomboni_common = { path = "../bomboni_common", features = [
   "serde",
 ], version = "0.1.55" }
 bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.55", optional = true }
-thiserror = "1.0.56"
+thiserror = "1.0.58"
 time = { version = "0.3.34", features = ["serde", "formatting", "parsing"] }
-prost = "0.12.3"
-serde = { version = "1.0.196", features = ["derive"] }
+prost = "0.12.4"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.115"
 pot = "3.0.0"
 
-tonic = { version = "0.10.2", optional = true }
-http = { version = "1.0.0", optional = true }
-chrono = { version = "0.4.33", optional = true }
-serde_json = { version = "1.0.113", optional = true }
-wasm-bindgen = { version = "0.2.90", optional = true }
+tonic = { version = "0.11.0", optional = true }
+http = { version = "1.1.0", optional = true }
+chrono = { version = "0.4.37", optional = true }
+wasm-bindgen = { version = "0.2.92", optional = true }
 
 [dev-dependencies]
-serde_json = "1.0.113"
+serde_json = "1.0.115"
 
 [build-dependencies]
 bomboni_prost = { path = "../bomboni_prost", version = "0.1.55" }
-prost-build = "0.12.3"
+prost-build = "0.12.4"

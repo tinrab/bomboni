@@ -47,6 +47,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         "google/protobuf/any.proto",
         "google/protobuf/field_mask.proto",
         "google/protobuf/empty.proto",
+        "google/protobuf/struct.proto",
         "google/rpc/error_details.proto",
         "google/rpc/code.proto",
         "google/rpc/status.proto",

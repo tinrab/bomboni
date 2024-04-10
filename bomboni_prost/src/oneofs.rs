@@ -123,7 +123,9 @@ fn write_variant_from(
                 quote! { #field_type_ident }
             }
             field_descriptor_proto::Type::Enum => {
-                quote! { todo!() }
+                let field_type_ident =
+                    context.get_ident_from_type_name_reference(field.type_name.as_ref().unwrap());
+                quote! { #field_type_ident }
             }
             field_descriptor_proto::Type::String => quote! { String },
             field_descriptor_proto::Type::Bytes => quote! { Vec<u8> },
@@ -158,6 +160,7 @@ fn write_variant_from(
         if variant_ident.len() != 1 {
             continue;
         }
+
         let variant_ident = variant_ident.into_iter().next().unwrap();
         let source_type = syn::parse_str::<TypePath>(&source_type).unwrap();
         s.extend(quote! {

@@ -6,9 +6,6 @@ use thiserror::Error;
 use time::convert::{Nanosecond, Second};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 #[cfg(all(
     target_family = "wasm",
     not(any(target_os = "emscripten", target_os = "wasi")),
@@ -157,44 +154,73 @@ impl TryFrom<SystemTime> for UtcDateTime {
 }
 
 #[cfg(feature = "chrono")]
-impl TryFrom<chrono::NaiveDateTime> for UtcDateTime {
-    type Error = UtcDateTimeError;
+mod chrono_impl {
+    use super::{UtcDateTime, UtcDateTimeError};
+    use chrono::{DateTime, NaiveDateTime, Utc};
 
-    fn try_from(value: chrono::NaiveDateTime) -> Result<Self, Self::Error> {
-        Self::from_timestamp(value.timestamp(), value.timestamp_subsec_nanos())
+    impl TryFrom<NaiveDateTime> for UtcDateTime {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: NaiveDateTime) -> Result<Self, Self::Error> {
+            let utc = value.and_utc();
+            Self::from_timestamp(utc.timestamp(), utc.timestamp_subsec_nanos())
+        }
     }
-}
 
-#[cfg(feature = "chrono")]
-impl TryFrom<UtcDateTime> for chrono::NaiveDateTime {
-    type Error = UtcDateTimeError;
+    impl TryFrom<UtcDateTime> for NaiveDateTime {
+        type Error = UtcDateTimeError;
 
-    fn try_from(value: UtcDateTime) -> Result<Self, Self::Error> {
-        let (seconds, nanoseconds) = value.timestamp();
-        Self::from_timestamp_opt(seconds, nanoseconds).ok_or(UtcDateTimeError::NotUtc)
+        fn try_from(value: UtcDateTime) -> Result<Self, Self::Error> {
+            DateTime::try_from(value).map(|dt| dt.naive_utc())
+        }
+    }
+
+    impl TryFrom<DateTime<Utc>> for UtcDateTime {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: DateTime<Utc>) -> Result<Self, Self::Error> {
+            Self::from_timestamp(value.timestamp(), value.timestamp_subsec_nanos())
+        }
+    }
+
+    impl TryFrom<UtcDateTime> for DateTime<Utc> {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: UtcDateTime) -> Result<Self, Self::Error> {
+            let (seconds, nanoseconds) = value.timestamp();
+            DateTime::from_timestamp(seconds, nanoseconds).ok_or(UtcDateTimeError::NotUtc)
+        }
     }
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for UtcDateTime {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let s = self.to_string();
-        serializer.serialize_str(&s)
-    }
-}
+mod serde_impl {
+    use super::UtcDateTime;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::str::FromStr;
 
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for UtcDateTime {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de;
-        let s = String::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(de::Error::custom)
+    impl Serialize for UtcDateTime {
+        fn serialize<S>(
+            &self,
+            serializer: S,
+        ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+        where
+            S: Serializer,
+        {
+            let s = self.to_string();
+            serializer.serialize_str(&s)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for UtcDateTime {
+        fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            use serde::de;
+            let s = String::deserialize(deserializer)?;
+            Self::from_str(&s).map_err(de::Error::custom)
+        }
     }
 }
 
@@ -337,6 +363,45 @@ mod tests {
         assert_eq!(
             UtcDateTime::from_timestamp(10, 20).unwrap().timestamp(),
             (10, 20)
+        );
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn convert_chrono() {
+        let chrono_naive =
+            chrono::NaiveDateTime::parse_from_str("2020-01-01 12:00:00", "%Y-%m-%d %H:%M:%S")
+                .unwrap();
+        let utc = UtcDateTime::try_from(chrono_naive).unwrap();
+        assert_eq!(utc.to_string(), "2020-01-01T12:00:00Z");
+        assert_eq!(chrono::NaiveDateTime::try_from(utc).unwrap(), chrono_naive);
+
+        let chrono_naive_nanos = chrono::DateTime::from_timestamp(1337, 420)
+            .unwrap()
+            .naive_utc();
+        let utc = UtcDateTime::try_from(chrono_naive_nanos).unwrap();
+        assert_eq!(utc.timestamp(), (1337, 420));
+        assert_eq!(
+            chrono::NaiveDateTime::try_from(utc).unwrap(),
+            chrono_naive_nanos
+        );
+
+        let chrono_dt = chrono::DateTime::parse_from_rfc3339("2020-01-01T12:00:00Z")
+            .unwrap()
+            .to_utc();
+        let utc = UtcDateTime::try_from(chrono_dt).unwrap();
+        assert_eq!(utc.to_string(), "2020-01-01T12:00:00Z");
+        assert_eq!(
+            chrono::DateTime::<chrono::Utc>::try_from(utc).unwrap(),
+            chrono_dt,
+        );
+
+        let chrono_dt_nanos = chrono::DateTime::from_timestamp(1337, 420).unwrap();
+        let utc = UtcDateTime::try_from(chrono_dt_nanos).unwrap();
+        assert_eq!(utc.timestamp(), (1337, 420));
+        assert_eq!(
+            chrono::DateTime::<chrono::Utc>::try_from(utc).unwrap(),
+            chrono_dt_nanos,
         );
     }
 }

@@ -1,12 +1,10 @@
 use crate::google::protobuf::Duration;
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value as JsonValue;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::str::FromStr;
-
-#[cfg(feature = "json")]
-use serde_json::Value as JsonValue;
 
 pub fn is_default<T>(value: &T) -> bool
 where
@@ -105,7 +103,6 @@ pub mod string_list {
 }
 
 // Credit: https://github.com/sunng87/handlebars-rust/blob/v4.5.0/src/json/value.rs#L113
-#[cfg(feature = "json")]
 #[must_use]
 pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
     match value {
@@ -125,7 +122,6 @@ pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
     }
 }
 
-#[cfg(feature = "json")]
 pub fn merge_json(a: &mut JsonValue, b: JsonValue) {
     if let JsonValue::Object(a) = a {
         if let JsonValue::Object(b) = b {

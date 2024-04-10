@@ -91,7 +91,7 @@ macro_rules! impl_proto_any_serde {
         }
 
         /// Deserialize different messages based on Type URL.
-        /// We deserialize to a proxy Value form `pot` library then convert to the target message type.
+        /// We deserialize to a proxy Value from `pot` library then convert to the target message type.
         /// Pot is used because it's self-describing and supports all of serde's types.
         pub fn deserialize<'de, D>(
             deserializer: D,
@@ -106,7 +106,7 @@ macro_rules! impl_proto_any_serde {
             const TYPE_FIELD_NAME: &'static str=  "@type";
 
             let proxy = Value::deserialize(deserializer)?;
-            let (type_url, mappings) =    if let Value::Mappings(mut mappings) = proxy {
+            let (type_url, mappings) = if let Value::Mappings(mut mappings) = proxy {
                 let type_url = mappings
                     .remove(
                         mappings
