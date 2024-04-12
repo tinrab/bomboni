@@ -160,6 +160,7 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests {
     use crate::{
         filter::error::FilterError, ordering::OrderingDirection,

@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let fd_path = out_dir.join("fd.pb");
 
-    #[cfg(any(feature = "testing", debug_assertions))]
+    #[cfg(feature = "testing")]
     {
         let fd_path = out_dir.join("test.pb");
 
@@ -68,11 +68,29 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         .btree_map(["."]);
     build_serde(&mut config);
 
-    #[cfg(feature = "wasm")]
-    build_wasm(&mut config);
+    // #[cfg(all(
+    //     target_family = "wasm",
+    //     not(any(target_os = "emscripten", target_os = "wasi")),
+    //     // feature = "wasm",
+    // ))]
+    // panic!(
+    //     "FEATURES: {:?}, {:?}",
+    //     std::env::var("CARGO_FEATURE_FAKE"),
+    //     std::env::var("CARGO_FEATURE_WASM")
+    // );
+
+    // print target arch
+    // panic!(
+    //     "TARGET_FAMILY: {:?}",
+    //     std::env::var("CARGO_CFG_TARGET_FAMILY")
+    // );
+
+    if std::env::var("CARGO_CFG_TARGET_FAMILY") == Ok("wasm".into()) && cfg!(feature = "wasm") {
+        build_wasm(&mut config);
+    }
 
     for type_path in get_copy_type_paths() {
-        config.type_attribute(type_path, r"#[derive(Copy)]");
+        config.message_attribute(type_path, r"#[derive(Copy)]");
     }
 
     config.compile_protos(&proto_paths, &["./proto"])?;
@@ -104,7 +122,7 @@ fn build_serde(config: &mut Config) {
         "Help",
         "LocalizedMessage",
     ] {
-        config.type_attribute(
+        config.message_attribute(
             format!(".google.rpc.{type_name}"),
             r#"
                 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -119,7 +137,7 @@ fn build_serde(config: &mut Config) {
         r#"#[serde(default, skip_serializing_if = "crate::serde::helpers::is_default")]"#,
     );
 
-    config.type_attribute(
+    config.message_attribute(
         ".google.rpc.Status",
         r"#[derive(::serde::Serialize, ::serde::Deserialize)]",
     );
@@ -139,7 +157,6 @@ fn get_copy_type_paths() -> impl Iterator<Item = String> {
         .map(|type_name| format!(".google.protobuf.{type_name}"))
 }
 
-#[cfg(feature = "wasm")]
 fn build_wasm(config: &mut Config) {
     let error_details = [
         "Status",
@@ -155,11 +172,11 @@ fn build_wasm(config: &mut Config) {
         "LocalizedMessage",
     ];
     for type_name in &error_details {
-        config.type_attribute(
+        config.message_attribute(
             format!(".google.rpc.{type_name}"),
             r"
                 #[derive(bomboni_wasm::Wasm)]
-                #[wasm(bomboni_wasm = bomboni_wasm, wasm_abi)]
+                #[wasm(bomboni_wasm_crate = bomboni_wasm, wasm_abi)]
             ",
         );
     }
@@ -182,15 +199,69 @@ fn build_wasm(config: &mut Config) {
         ),
     );
 
-    config.type_attribute(
+    config.message_attribute(
         ".google.protobuf.Duration",
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_wasm = bomboni_wasm,
-                as_string,
+                bomboni_wasm_crate = bomboni_wasm,
+                wasm_abi,
+                js_value { convert_string },
                 override_type = "`${number}.${number}s` | `${number}s`",
             )]
         "#,
     );
+    config.message_attribute(
+        ".google.protobuf.Struct",
+        r#"
+            #[derive(bomboni_wasm::Wasm)]
+            #[wasm(
+                bomboni_wasm_crate = bomboni_wasm,
+                wasm_abi,
+                js_value,
+                rename = "JsonObject",
+                override_type = "{[key: string]: JsonValue}",
+            )]
+        "#,
+    );
+    config.message_attribute(
+        ".google.protobuf.Value",
+        r#"
+            #[derive(bomboni_wasm::Wasm)]
+            #[wasm(
+                bomboni_wasm_crate = bomboni_wasm,
+                wasm_abi,
+                js_value,
+                rename = "JsonValue",
+                override_type = "string | number | boolean | null | JsonObject | Array<JsonValue>",
+            )]
+        "#,
+    );
+
+    if cfg!(feature = "js") {
+        config.message_attribute(
+            ".google.protobuf.Timestamp",
+            r#"
+                #[derive(bomboni_wasm::Wasm)]
+                #[wasm(
+                    bomboni_wasm_crate = bomboni_wasm,
+                    wasm_abi,
+                    js_value,
+                    override_type = "Date",
+                )]
+            "#,
+        );
+    } else {
+        config.message_attribute(
+            ".google.protobuf.Timestamp",
+            "
+                #[derive(bomboni_wasm::Wasm)]
+                #[wasm(
+                    bomboni_wasm_crate = bomboni_wasm,
+                    wasm_abi,
+                    js_value { convert_string },
+                )]
+            ",
+        );
+    }
 }

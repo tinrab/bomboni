@@ -14,11 +14,13 @@ name = "bomboni_template"
 path = "src/lib.rs"
 
 [features]
+default = ["testing"]
 testing = []
 
 [dependencies]
 bomboni_common = { path = "../bomboni_common", version = "0.1.55" }
 bomboni_proto = { version = "0.1.55", path = "../bomboni_proto" }
+
 thiserror = "1.0.58"
 handlebars = "5.1.2"
 serde = { version = "1.0.197", features = ["derive"] }

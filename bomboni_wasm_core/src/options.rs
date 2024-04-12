@@ -13,12 +13,13 @@ use crate::ts_type::TsType;
 
 pub struct WasmOptions<'a> {
     pub serde_container: SerdeContainer<'a>,
-    pub wasm_bindgen: Option<Path>,
-    pub bomboni_wasm: Option<Path>,
+    pub wasm_bindgen_crate: Option<Path>,
+    pub js_sys_crate: Option<Path>,
+    pub bomboni_wasm_crate: Option<Path>,
     pub into_wasm_abi: bool,
     pub from_wasm_abi: bool,
-    pub as_enum: bool,
-    pub as_string: Option<AsStringWasm>,
+    pub enum_value: bool,
+    pub js_value: Option<JsValueWasm>,
     pub proxy: Option<ProxyWasm>,
     pub reference_change: ReferenceChangeMap,
     pub rename: Option<String>,
@@ -33,7 +34,6 @@ pub struct WasmOptions<'a> {
 pub struct FieldWasm {
     pub member: Member,
     pub optional: bool,
-    pub as_string: bool,
     pub reference_change: ReferenceChangeMap,
     pub override_type: Option<String>,
     pub rename_wrapper: Option<bool>,
@@ -43,7 +43,6 @@ pub struct FieldWasm {
 
 pub struct VariantWasm {
     pub ident: Ident,
-    pub as_string: bool,
     pub reference_change: ReferenceChangeMap,
     pub override_type: Option<String>,
     pub rename_wrapper: Option<bool>,
@@ -58,14 +57,15 @@ pub struct ReferenceChangeMap {
 }
 
 #[derive(Debug)]
-pub struct ProxyWasm {
-    pub proxy: Path,
+pub struct JsValueWasm {
     pub into: Option<Path>,
     pub try_from: Option<Path>,
+    pub convert_string: bool,
 }
 
 #[derive(Debug)]
-pub struct AsStringWasm {
+pub struct ProxyWasm {
+    pub proxy: Path,
     pub into: Option<Path>,
     pub try_from: Option<Path>,
 }
@@ -73,13 +73,14 @@ pub struct AsStringWasm {
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(wasm))]
 struct Attributes {
-    wasm_bindgen: Option<Path>,
-    bomboni_wasm: Option<Path>,
+    wasm_bindgen_crate: Option<Path>,
+    js_sys_crate: Option<Path>,
+    bomboni_wasm_crate: Option<Path>,
     wasm_abi: Option<bool>,
     into_wasm_abi: Option<bool>,
     from_wasm_abi: Option<bool>,
-    as_enum: Option<bool>,
-    as_string: Option<AsStringWasm>,
+    enum_value: Option<bool>,
+    js_value: Option<JsValueWasm>,
     proxy: Option<ProxyWasm>,
     rename: Option<String>,
     change_ref: Option<ReferenceChangeMap>,
@@ -171,14 +172,40 @@ impl<'a> WasmOptions<'a> {
             Vec::new()
         };
 
+        if attributes.enum_value.unwrap_or_default()
+            && (attributes.js_value.is_some() || attributes.proxy.is_some())
+        {
+            return Err(syn::Error::new_spanned(
+                input,
+                "`enum_value` cannot be used with `js_value` or `proxy`",
+            ));
+        }
+        if attributes.js_value.is_some()
+            && (attributes.enum_value.unwrap_or_default() || attributes.proxy.is_some())
+        {
+            return Err(syn::Error::new_spanned(
+                input,
+                "`js_value` cannot be used with `enum_value` or `proxy`",
+            ));
+        }
+        if attributes.proxy.is_some()
+            && (attributes.enum_value.unwrap_or_default() || attributes.js_value.is_some())
+        {
+            return Err(syn::Error::new_spanned(
+                input,
+                "`proxy` cannot be used with `enum_value` or `js_value`",
+            ));
+        }
+
         Ok(Self {
             serde_container,
-            wasm_bindgen: attributes.wasm_bindgen,
-            bomboni_wasm: attributes.bomboni_wasm,
+            wasm_bindgen_crate: attributes.wasm_bindgen_crate,
+            js_sys_crate: attributes.js_sys_crate,
+            bomboni_wasm_crate: attributes.bomboni_wasm_crate,
             into_wasm_abi: attributes.into_wasm_abi.unwrap_or(wasm_abi),
             from_wasm_abi: attributes.from_wasm_abi.unwrap_or(wasm_abi),
-            as_enum: attributes.as_enum.unwrap_or_default(),
-            as_string: attributes.as_string,
+            enum_value: attributes.enum_value.unwrap_or_default(),
+            js_value: attributes.js_value,
             proxy: attributes.proxy,
             rename: attributes.rename,
             reference_change: attributes
@@ -302,46 +329,45 @@ impl FromMeta for ProxyWasm {
                 })) => {
                     if path.is_ident("source") {
                         if proxy.is_some() {
-                            return Err(darling::Error::custom("proxy source already specified")
+                            return Err(darling::Error::custom("proxy `source` already specified")
                                 .with_span(item));
                         }
                         proxy = Some(value.path.clone());
                     } else if path.is_ident("into") {
                         if into.is_some() {
                             return Err(
-                                darling::Error::custom("into already specified").with_span(item)
+                                darling::Error::custom("`into` already specified").with_span(item)
                             );
                         }
                         into = Some(value.path.clone());
                     } else if path.is_ident("try_from") {
                         if try_from.is_some() {
-                            return Err(darling::Error::custom("try_from already specified")
+                            return Err(darling::Error::custom("`try_from` already specified")
                                 .with_span(item));
                         }
                         try_from = Some(value.path.clone());
                     } else {
-                        return Err(
-                            darling::Error::custom("expected into or try_from").with_span(item)
-                        );
+                        return Err(darling::Error::custom("invalid option").with_span(item));
                     }
                 }
                 _ => {
-                    return Err(darling::Error::custom("expected proxy path").with_span(item));
+                    return Err(darling::Error::custom("invalid options").with_span(item));
                 }
             }
         }
         Ok(Self {
-            proxy: proxy.ok_or_else(|| darling::Error::custom("proxy source not specified"))?,
+            proxy: proxy.ok_or_else(|| darling::Error::custom("proxy `source` not specified"))?,
             into,
             try_from,
         })
     }
 }
 
-impl FromMeta for AsStringWasm {
+impl FromMeta for JsValueWasm {
     fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
         let mut into = None;
         let mut try_from = None;
+        let mut convert_string = false;
         for item in items {
             match item {
                 darling::ast::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
@@ -352,34 +378,46 @@ impl FromMeta for AsStringWasm {
                     if path.is_ident("into") {
                         if into.is_some() {
                             return Err(
-                                darling::Error::custom("into already specified").with_span(item)
+                                darling::Error::custom("`into` already specified").with_span(item)
                             );
                         }
                         into = Some(value.path.clone());
                     } else if path.is_ident("try_from") {
                         if try_from.is_some() {
-                            return Err(darling::Error::custom("try_from already specified")
+                            return Err(darling::Error::custom("`try_from` already specified")
                                 .with_span(item));
                         }
                         try_from = Some(value.path.clone());
                     } else {
                         return Err(
-                            darling::Error::custom("expected into or try_from").with_span(item)
+                            darling::Error::custom("expected `into` or `try_from`").with_span(item)
                         );
                     }
                 }
+                darling::ast::NestedMeta::Meta(syn::Meta::Path(path)) => {
+                    if path.is_ident("convert_string") {
+                        convert_string = true;
+                    } else {
+                        return Err(darling::Error::custom("invalid option").with_span(item));
+                    }
+                }
                 _ => {
-                    return Err(darling::Error::custom("expected proxy path").with_span(item));
+                    return Err(darling::Error::custom("invalid options").with_span(item));
                 }
             }
         }
-        Ok(Self { into, try_from })
+        Ok(Self {
+            into,
+            try_from,
+            convert_string,
+        })
     }
 
     fn from_word() -> darling::Result<Self> {
         Ok(Self {
             into: None,
             try_from: None,
+            convert_string: false,
         })
     }
 }
@@ -408,16 +446,6 @@ fn get_fields(
             );
         }
 
-        let mut as_string = false;
-        if let Some(with) = serde_field.attrs.serialize_with() {
-            as_string |= matches!(
-                with.path.segments.iter().rev().nth(1),
-                Some(
-                    syn::PathSegment { ident, .. }
-                ) if ident == "as_string"
-            );
-        }
-
         let Some((_, field)) =
             field_attributes
                 .iter()
@@ -440,7 +468,6 @@ fn get_fields(
         fields.push(FieldWasm {
             member: serde_field.member.clone(),
             optional,
-            as_string,
             reference_change,
             override_type: field.override_type.clone(),
             rename_wrapper,
@@ -459,16 +486,6 @@ fn get_variants(
     let mut variants = Vec::new();
 
     for serde_variant in serde_variants {
-        let mut as_string = false;
-        if let Some(with) = serde_variant.attrs.serialize_with() {
-            as_string |= matches!(
-                with.path.segments.iter().rev().nth(1),
-                Some(
-                    syn::PathSegment { ident, .. }
-                ) if ident == "as_string"
-            );
-        }
-
         let Some(variant) = variant_attributes
             .iter()
             .find(|variant| variant.ident == serde_variant.ident)
@@ -485,7 +502,6 @@ fn get_variants(
 
         variants.push(VariantWasm {
             ident: serde_variant.ident.clone(),
-            as_string,
             reference_change,
             override_type: variant.override_type.clone(),
             rename_wrapper,

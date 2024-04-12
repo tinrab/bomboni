@@ -1,15 +1,5 @@
 use crate::google::protobuf::Empty;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
-    describe::WasmDescribe,
-    prelude::*,
-};
 
 impl Empty {
     #[must_use]
@@ -41,11 +31,11 @@ impl<'de> Deserialize<'de> for Empty {
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm",
 ))]
-mod wasm {
-    use super::*;
+const _: () = {
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen(typescript_custom_section)]
     const TS_APPEND_CONTENT: &'static str = r#"
         export type Empty = {};
     "#;
-}
+};

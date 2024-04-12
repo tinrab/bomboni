@@ -42,7 +42,7 @@ pub struct EnumTsDecl {
     pub type_params: Vec<String>,
     pub members: Vec<TypeAliasTsDecl>,
     pub external_tag: bool,
-    pub as_enum: bool,
+    pub enum_value: bool,
 }
 
 pub struct TsDeclParser<'a> {
@@ -120,7 +120,7 @@ impl From<EnumTsDecl> for TsDecl {
 
 impl Display for EnumTsDecl {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.as_enum {
+        if self.enum_value {
             assert!(
                 self.type_params.is_empty(),
                 "enum with type params not supported"
@@ -276,7 +276,7 @@ impl<'a> TsDeclParser<'a> {
             ),
             members,
             external_tag: matches!(tag_type, TagType::External),
-            as_enum: self.options.as_enum,
+            enum_value: self.options.enum_value,
         }
     }
 
@@ -378,9 +378,9 @@ impl<'a> TsDeclParser<'a> {
         }
 
         let mut field_type = TsType::from_type(field.ty);
-        if wasm_field.as_string {
-            field_type = TsType::STRING;
-        }
+        // if wasm_field.as_string {
+        //     field_type = TsType::STRING;
+        // }
         if wasm_field.always_some.unwrap_or_default() {
             if let TsType::Option(some_type) = field_type {
                 field_type = *some_type;
@@ -426,18 +426,9 @@ impl<'a> TsDeclParser<'a> {
             return self.make_type_alias(TsType::Override(override_type));
         }
 
-        let variant_type: TsType = {
-            if wasm_variant.as_string {
-                TsType::STRING
-            } else {
-                TsType::from(self.parse_fields(
-                    variant.style,
-                    &variant.fields,
-                    &wasm_variant.fields,
-                ))
-            }
-        }
-        .with_tag_type(tag_type, &name, variant.style);
+        let variant_type =
+            TsType::from(self.parse_fields(variant.style, &variant.fields, &wasm_variant.fields))
+                .with_tag_type(tag_type, &name, variant.style);
 
         let mut alias_type = self.make_type_alias(variant_type);
         alias_type.name = name;

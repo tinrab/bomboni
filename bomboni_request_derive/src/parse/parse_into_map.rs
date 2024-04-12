@@ -118,7 +118,10 @@ pub fn expand(options: ParseIntoMap) -> syn::Result<TokenStream> {
             {
                 values
                     .into_iter()
-                    .map(|item| { #write_body })
+                    .map(|item| {
+                        #[allow(unused_braces)]
+                        #write_body
+                    })
                     .collect()
             }
         }
@@ -137,6 +140,7 @@ pub fn expand(options: ParseIntoMap) -> syn::Result<TokenStream> {
                 let mut m = #map_type::new();
                 for item in values.into_iter() {
                     let (k, v): (#key_type, #value_type) = {
+                        #[allow(unused_braces)]
                         #parse_expr
                     };
                     if m.insert(k, v).is_some() {

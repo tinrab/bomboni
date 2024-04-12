@@ -6,18 +6,38 @@ use thiserror::Error;
 use time::convert::{Nanosecond, Second};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
-    describe::WasmDescribe,
-    prelude::*,
-};
+pub use time::Month;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    all(
+        target_family = "wasm",
+        not(any(target_os = "emscripten", target_os = "wasi")),
+        feature = "wasm",
+        not(feature = "js"),
+    ),
+    derive(bomboni_wasm::Wasm),
+    wasm(
+        bomboni_wasm_crate = bomboni_wasm,
+        wasm_abi,
+        js_value { convert_string },
+    )
+)]
+#[cfg_attr(
+    all(
+        target_family = "wasm",
+        not(any(target_os = "emscripten", target_os = "wasi")),
+        feature = "wasm",
+        feature = "js",
+    ),
+    derive(bomboni_wasm::Wasm),
+    wasm(
+        bomboni_wasm_crate = bomboni_wasm,
+        wasm_abi,
+        js_value,
+        override_type = "Date",
+    )
+)]
 pub struct UtcDateTime(OffsetDateTime);
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
@@ -45,19 +65,19 @@ impl UtcDateTime {
         .map(Self)
     }
 
-    pub fn from_ymd(year: i32, month: u8, day: u8) -> Result<Self, UtcDateTimeError> {
+    pub fn from_ymd(year: i32, month: Month, day: u8) -> Result<Self, UtcDateTimeError> {
         OffsetDateTime::UNIX_EPOCH
             .replace_year(year)
-            .and_then(|dt| dt.replace_month(month.try_into().unwrap()))
+            .and_then(|dt| dt.replace_month(month))
             .and_then(|dt| dt.replace_day(day))
             .map_err(|_| UtcDateTimeError::NotUtc)
             .map(Self)
     }
 
-    pub fn with_ymd(self, year: i32, month: u8, day: u8) -> Result<Self, UtcDateTimeError> {
+    pub fn with_ymd(self, year: i32, month: Month, day: u8) -> Result<Self, UtcDateTimeError> {
         self.0
             .replace_year(year)
-            .and_then(|dt| dt.replace_month(month.try_into().unwrap()))
+            .and_then(|dt| dt.replace_month(month))
             .and_then(|dt| dt.replace_day(day))
             .map_err(|_| UtcDateTimeError::NotUtc)
             .map(Self)
@@ -154,8 +174,7 @@ impl TryFrom<SystemTime> for UtcDateTime {
 }
 
 #[cfg(feature = "chrono")]
-mod chrono_impl {
-    use super::{UtcDateTime, UtcDateTimeError};
+const _: () = {
     use chrono::{DateTime, NaiveDateTime, Utc};
 
     impl TryFrom<NaiveDateTime> for UtcDateTime {
@@ -191,13 +210,11 @@ mod chrono_impl {
             DateTime::from_timestamp(seconds, nanoseconds).ok_or(UtcDateTimeError::NotUtc)
         }
     }
-}
+};
 
 #[cfg(feature = "serde")]
-mod serde_impl {
-    use super::UtcDateTime;
+const _: () = {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::str::FromStr;
 
     impl Serialize for UtcDateTime {
         fn serialize<S>(
@@ -222,70 +239,7 @@ mod serde_impl {
             Self::from_str(&s).map_err(de::Error::custom)
         }
     }
-}
-
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm",
-    not(feature = "js")
-))]
-mod wasm_as_string {
-    use super::*;
-
-    impl WasmDescribe for UtcDateTime {
-        fn describe() {
-            <js_sys::JsString as WasmDescribe>::describe()
-        }
-    }
-
-    impl IntoWasmAbi for UtcDateTime {
-        type Abi = <js_sys::JsString as IntoWasmAbi>::Abi;
-
-        fn into_abi(self) -> Self::Abi {
-            js_sys::JsString::from(self.format_rfc3339().unwrap()).into_abi()
-        }
-    }
-
-    impl OptionIntoWasmAbi for UtcDateTime {
-        #[inline]
-        fn none() -> Self::Abi {
-            <js_sys::JsString as OptionIntoWasmAbi>::none()
-        }
-    }
-
-    impl FromWasmAbi for UtcDateTime {
-        type Abi = <js_sys::JsString as FromWasmAbi>::Abi;
-
-        unsafe fn from_abi(js: Self::Abi) -> Self {
-            match js_sys::JsString::from_abi(js)
-                .as_string()
-                .as_ref()
-                .map(|s| Self::parse_rfc3339(s))
-            {
-                Some(Ok(value)) => value,
-                Some(Err(err)) => {
-                    wasm_bindgen::throw_str(&err.to_string());
-                }
-                None => {
-                    wasm_bindgen::throw_str("expected RFC 3339 date string");
-                }
-            }
-        }
-    }
-
-    impl OptionFromWasmAbi for UtcDateTime {
-        #[inline]
-        fn is_none(js: &Self::Abi) -> bool {
-            <js_sys::JsString as OptionFromWasmAbi>::is_none(js)
-        }
-    }
-
-    #[wasm_bindgen(typescript_custom_section)]
-    const TS_APPEND_CONTENT: &'static str = r#"
-        export type UtcDateTime = string;
-    "#;
-}
+};
 
 #[cfg(all(
     target_family = "wasm",
@@ -293,50 +247,45 @@ mod wasm_as_string {
     feature = "wasm",
     feature = "js"
 ))]
-mod wasm_as_date {
-    use super::*;
+const _: () = {
+    use wasm_bindgen::{JsCast, JsValue};
 
-    impl WasmDescribe for UtcDateTime {
-        fn describe() {
-            <js_sys::Date as WasmDescribe>::describe()
+    impl From<UtcDateTime> for JsValue {
+        fn from(value: UtcDateTime) -> Self {
+            let mut date = js_sys::Date::new_with_year_month_day_hr_min_sec(
+                value.year() as u32,
+                Into::<u8>::into(value.month()) as i32 - 1,
+                value.day() as i32,
+                value.hour() as i32 + 1,
+                value.minute() as i32,
+                value.second() as i32,
+            );
+
+            let milliseconds = value.millisecond();
+            if milliseconds > 0 {
+                date.set_utc_milliseconds(milliseconds as u32);
+            }
+
+            date.into()
         }
     }
 
-    impl IntoWasmAbi for UtcDateTime {
-        type Abi = <js_sys::Date as IntoWasmAbi>::Abi;
+    impl TryFrom<JsValue> for UtcDateTime {
+        type Error = JsValue;
 
-        fn into_abi(self) -> Self::Abi {
-            js_sys::Date::from(self.0).into_abi()
+        fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+            let date: js_sys::Date = value.unchecked_into();
+
+            let iso = date
+                .to_iso_string()
+                .as_string()
+                .ok_or_else(|| js_sys::Error::new("invalid date"))?;
+
+            Ok(UtcDateTime::parse_rfc3339(iso)
+                .map_err(|err| js_sys::Error::new(&err.to_string()))?)
         }
     }
-
-    impl OptionIntoWasmAbi for UtcDateTime {
-        #[inline]
-        fn none() -> Self::Abi {
-            <js_sys::Date as OptionIntoWasmAbi>::none()
-        }
-    }
-
-    impl FromWasmAbi for UtcDateTime {
-        type Abi = <js_sys::Date as FromWasmAbi>::Abi;
-
-        unsafe fn from_abi(js: Self::Abi) -> Self {
-            OffsetDateTime::from(js_sys::Date::from_abi(js)).into()
-        }
-    }
-
-    impl OptionFromWasmAbi for UtcDateTime {
-        #[inline]
-        fn is_none(js: &Self::Abi) -> bool {
-            <js_sys::Date as OptionFromWasmAbi>::is_none(js)
-        }
-    }
-
-    #[wasm_bindgen(typescript_custom_section)]
-    const TS_APPEND_CONTENT: &'static str = r#"
-        export type UtcDateTime = Date;
-    "#;
-}
+};
 
 #[cfg(test)]
 mod tests {

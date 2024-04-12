@@ -453,6 +453,7 @@ impl Display for FilterComparator {
 }
 
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests {
     use crate::testing::schema::{RequestItem, TaskItem, UserItem};
 

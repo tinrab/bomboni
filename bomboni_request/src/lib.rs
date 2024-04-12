@@ -9,7 +9,7 @@ pub mod query;
 pub mod schema;
 pub mod value;
 
-#[cfg(any(feature = "testing", debug_assertions))]
+#[cfg(feature = "testing")]
 pub mod testing;
 
 #[cfg(feature = "derive")]

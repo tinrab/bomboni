@@ -17,6 +17,7 @@ proc-macro = true
 [dependencies]
 bomboni_core = { path = "../bomboni_core", version = "0.1.55" }
 bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.55" }
+
 proc-macro2 = { version = "1.0.79", features = ["proc-macro"] }
 syn = "2.0.58"
 quote = "1.0.35"

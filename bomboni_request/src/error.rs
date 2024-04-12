@@ -1,26 +1,28 @@
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
 use crate::query::error::QueryError;
 use bomboni_proto::google::protobuf::Any;
 use bomboni_proto::google::rpc::bad_request::FieldViolation;
 use bomboni_proto::google::rpc::BadRequest;
 use bomboni_proto::google::rpc::{Code, Status};
 use prost::{DecodeError, EncodeError};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi, ReturnWasmAbi},
-    describe::WasmDescribe,
-    prelude::*,
-};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[cfg_attr(
+    all(
+        target_family = "wasm",
+        not(any(target_os = "emscripten", target_os = "wasi")),
+        feature = "wasm",
+    ),
+    derive(bomboni_wasm::Wasm),
+    wasm(
+        bomboni_wasm_crate = bomboni_wasm,
+        into_wasm_abi,
+        proxy { source = Status, try_from = RequestParse::parse },
+    )
+)]
 pub enum RequestError {
     #[error("invalid `{name}` request")]
     BadRequest {
@@ -519,43 +521,6 @@ where
 
     fn wrap_request<N: Display>(self, name: N) -> RequestError {
         RequestError::generic(self).wrap_request(name)
-    }
-}
-
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm",
-))]
-mod wasm {
-    use super::*;
-
-    impl WasmDescribe for RequestError {
-        fn describe() {
-            <Status as WasmDescribe>::describe()
-        }
-    }
-
-    impl From<RequestError> for JsValue {
-        fn from(value: RequestError) -> Self {
-            use bomboni_wasm::Wasm;
-            JsValue::from(Status::from(value).to_js().unwrap())
-        }
-    }
-
-    impl IntoWasmAbi for RequestError {
-        type Abi = <Status as IntoWasmAbi>::Abi;
-
-        fn into_abi(self) -> Self::Abi {
-            Status::from(self).into_abi()
-        }
-    }
-
-    impl OptionIntoWasmAbi for RequestError {
-        #[inline]
-        fn none() -> Self::Abi {
-            <Status as OptionIntoWasmAbi>::none()
-        }
     }
 }
 

@@ -6,11 +6,7 @@ use bomboni_common::id::Id;
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm"
 ))]
-use {
-    bomboni_wasm::Wasm,
-    serde::{Deserialize, Serialize},
-    wasm_bindgen::prelude::*,
-};
+use wasm_bindgen::prelude::*;
 
 pub mod helpers;
 
@@ -38,8 +34,6 @@ where
         not(any(target_os = "emscripten", target_os = "wasi")),
         feature = "wasm"
     ),
-    // derive(Wasm),
-    // wasm(rename = "IParsedResource"),
     wasm_bindgen(getter_with_clone, inspectable)
 )]
 pub struct ParsedResource {
@@ -53,20 +47,8 @@ pub struct ParsedResource {
     pub revision_create_time: Option<UtcDateTime>,
 }
 
-// #[cfg(all(
-//     target_family = "wasm",
-//     not(any(target_os = "emscripten", target_os = "wasi")),
-//     feature = "wasm"
-// ))]
-// #[wasm_bindgen]
-// impl ParsedResource {
-//     #[wasm_bindgen(constructor)]
-//     pub fn new() -> Self {
-//         Self::default()
-//     }
-// }
-
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests {
     use std::collections::{BTreeMap, HashMap};
     use std::fmt::Debug;
@@ -578,6 +560,7 @@ mod tests {
             #[parse(with = values_parse_hash)]
             values: HashMap<i32, i32>,
         }
+
         impl_parse_into_map!(
             values_parse_hash,
             HashMap,

@@ -26,8 +26,12 @@ const SEQUENCE_BITS: i64 = 16;
         not(any(target_os = "emscripten", target_os = "wasi")),
         feature = "wasm"
     ),
-    derive(bomboni_wasm_derive::Wasm),
-    wasm(as_string)
+    derive(bomboni_wasm::Wasm),
+    wasm(
+        bomboni_wasm_crate = bomboni_wasm,
+        wasm_abi,
+        js_value { convert_string },
+    )
 )]
 pub struct Id(u128);
 
@@ -108,6 +112,12 @@ macro_rules! impl_from {
 }
 impl_from!(i8, i16, i32, i64, i128, u8, u16, u32, u64);
 
+impl From<Id> for u128 {
+    fn from(id: Id) -> Self {
+        id.0
+    }
+}
+
 #[cfg(feature = "serde")]
 impl Serialize for Id {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
@@ -134,7 +144,6 @@ impl<'de> Deserialize<'de> for Id {
 
 #[cfg(test)]
 mod tests {
-
     use std::time::Duration;
 
     use super::*;

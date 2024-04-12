@@ -6,16 +6,6 @@ use std::{
     time::SystemTime,
 };
 use time::OffsetDateTime;
-#[cfg(all(
-    target_family = "wasm",
-    not(any(target_os = "emscripten", target_os = "wasi")),
-    feature = "wasm"
-))]
-use wasm_bindgen::{
-    convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi},
-    describe::WasmDescribe,
-    prelude::*,
-};
 
 use crate::google::protobuf::Timestamp;
 
@@ -118,8 +108,7 @@ impl TryFrom<Timestamp> for OffsetDateTime {
 }
 
 #[cfg(feature = "chrono")]
-mod chrono_impl {
-    use super::{Timestamp, UtcDateTime, UtcDateTimeError};
+const _: () = {
     use chrono::{DateTime, NaiveDateTime, Utc};
 
     impl TryFrom<NaiveDateTime> for Timestamp {
@@ -153,7 +142,7 @@ mod chrono_impl {
             UtcDateTime::try_from(value)?.try_into()
         }
     }
-}
+};
 
 impl TryFrom<SystemTime> for Timestamp {
     type Error = UtcDateTimeError;
@@ -208,56 +197,25 @@ impl<'de> Deserialize<'de> for Timestamp {
     target_family = "wasm",
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm",
+    feature = "js",
 ))]
-mod wasm {
-    use super::*;
+const _: () = {
+    use wasm_bindgen::JsValue;
 
-    impl WasmDescribe for Timestamp {
-        fn describe() {
-            <UtcDateTime as WasmDescribe>::describe()
+    impl From<Timestamp> for JsValue {
+        fn from(value: Timestamp) -> Self {
+            UtcDateTime::try_from(value).unwrap().into()
         }
     }
 
-    impl IntoWasmAbi for Timestamp {
-        type Abi = <UtcDateTime as IntoWasmAbi>::Abi;
+    impl TryFrom<JsValue> for Timestamp {
+        type Error = JsValue;
 
-        fn into_abi(self) -> Self::Abi {
-            UtcDateTime::try_from(self).unwrap().into_abi()
+        fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+            UtcDateTime::try_from(value).map(Into::into)
         }
     }
-
-    impl OptionIntoWasmAbi for Timestamp {
-        #[inline]
-        fn none() -> Self::Abi {
-            <UtcDateTime as OptionIntoWasmAbi>::none()
-        }
-    }
-
-    impl FromWasmAbi for Timestamp {
-        type Abi = <UtcDateTime as FromWasmAbi>::Abi;
-
-        unsafe fn from_abi(js: Self::Abi) -> Self {
-            UtcDateTime::from_abi(js).into()
-        }
-    }
-
-    impl OptionFromWasmAbi for Timestamp {
-        #[inline]
-        fn is_none(js: &Self::Abi) -> bool {
-            <UtcDateTime as OptionFromWasmAbi>::is_none(js)
-        }
-    }
-
-    #[cfg_attr(feature = "js", wasm_bindgen(typescript_custom_section))]
-    const TS_APPEND_CONTENT: &'static str = r#"
-        export type Timestamp = Date;
-    "#;
-
-    #[cfg_attr(not(feature = "js"), wasm_bindgen(typescript_custom_section))]
-    const TS_APPEND_CONTENT: &'static str = r#"
-        export type Timestamp = string;
-    "#;
-}
+};
 
 #[cfg(test)]
 mod tests {

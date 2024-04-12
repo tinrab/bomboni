@@ -127,8 +127,7 @@ impl TryFrom<Duration> for TimeDuration {
 }
 
 #[cfg(feature = "chrono")]
-mod chrono_impl {
-    use super::{Duration, DurationError, StdDuration};
+const _: () = {
     use chrono::Duration as ChronoDuration;
 
     impl TryFrom<ChronoDuration> for Duration {
@@ -149,7 +148,7 @@ mod chrono_impl {
             Self::from_std(StdDuration::try_from(duration)?).map_err(|_| DurationError::OutOfRange)
         }
     }
-}
+};
 
 impl Display for Duration {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

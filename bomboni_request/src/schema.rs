@@ -126,6 +126,7 @@ impl Display for ValueType {
 }
 
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests {
     use crate::testing::schema::RequestItem;
 

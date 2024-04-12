@@ -147,6 +147,7 @@ impl Display for OrderingDirection {
 }
 
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests {
     use crate::ordering::OrderingDirection::{Ascending, Descending};
     use crate::testing::schema::UserItem;
