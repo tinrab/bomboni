@@ -37,6 +37,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
                 || field.options.keep_primitive
                 || field.options.derive.is_some()
                 || field.options.enumeration
+                || field.options.try_from.is_some()
                 || field.resource.is_some()
                 || field.oneof
                 || field.list_query.is_some()
@@ -59,6 +60,23 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
             return Err(syn::Error::new_spanned(
                 &field.ident,
                 "query fields cannot be used with these options",
+            ));
+        }
+
+        if field.options.try_from.is_some()
+            && (field.options.keep
+                || field.options.keep_primitive
+                || field.options.derive.is_some()
+                || field.options.enumeration
+                || field.options.convert.is_some()
+                || field.resource.is_some()
+                || field.oneof
+                || field.list_query.is_some()
+                || field.search_query.is_some())
+        {
+            return Err(syn::Error::new_spanned(
+                &field.ident,
+                "`try_from` cannot be used with these options",
             ));
         }
     }

@@ -7,7 +7,7 @@ use proc_macro2::Ident;
 use quote::format_ident;
 use syn::{
     self, parse_quote, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr, Meta,
-    MetaList, MetaNameValue, Path, Type,
+    MetaList, MetaNameValue, Path, Type, TypePath,
 };
 
 #[derive(Debug, FromDeriveInput)]
@@ -137,8 +137,18 @@ pub struct ParseFieldOptions {
     /// Check string against RegEx.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,
+
+    /// Convert field to a custom type.
+    /// Used for `try_from` and `try_into` conversions.
+    #[darling(with = parse_type_path, map = Some)]
+    pub try_from: Option<TypePath>,
+    /// Use custom conversion and writing functions.
+    #[darling(default)]
+    pub convert: Option<ParseConvert>,
+
     /// Make this field derived.
     /// Use this for custom, non-opinionated parsing.
+    #[darling(default)]
     pub derive: Option<ParseDerive>,
 }
 
@@ -165,6 +175,13 @@ pub struct ParseDerive {
     pub module: Option<ExprPath>,
     pub source_borrow: bool,
     pub target_borrow: bool,
+}
+
+#[derive(Debug)]
+pub struct ParseConvert {
+    pub parse: Option<ExprPath>,
+    pub write: Option<ExprPath>,
+    pub module: Option<ExprPath>,
 }
 
 #[derive(Debug)]
@@ -335,6 +352,45 @@ impl FromMeta for ParseDerive {
                 module: Some(path.clone()),
                 source_borrow: false,
                 target_borrow: false,
+            }),
+            _ => Err(darling::Error::custom("expected path").with_span(expr)),
+        }
+    }
+}
+
+impl FromMeta for ParseConvert {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        #[derive(FromMeta)]
+        struct Options {
+            #[darling(default)]
+            parse: Option<ExprPath>,
+            #[darling(default)]
+            write: Option<ExprPath>,
+            #[darling(default)]
+            module: Option<ExprPath>,
+        }
+
+        let options = Options::from_list(items)?;
+
+        if options.parse.is_none() && options.write.is_none() && options.module.is_none()
+            || options.module.is_some() && (options.parse.is_some() || options.write.is_some())
+        {
+            return Err(darling::Error::custom("invalid options"));
+        }
+
+        Ok(Self {
+            parse: options.parse,
+            write: options.write,
+            module: options.module,
+        })
+    }
+
+    fn from_expr(expr: &Expr) -> darling::Result<Self> {
+        match expr {
+            Expr::Path(path) => Ok(Self {
+                parse: None,
+                write: None,
+                module: Some(path.clone()),
             }),
             _ => Err(darling::Error::custom("expected path").with_span(expr)),
         }
@@ -570,5 +626,18 @@ impl FromMeta for ParseQueryField {
             }
             _ => Err(darling::Error::custom("invalid query field").with_span(item)),
         }
+    }
+}
+
+fn parse_type_path(meta: &Meta) -> darling::Result<TypePath> {
+    match meta {
+        Meta::NameValue(MetaNameValue { value, .. }) => match value {
+            Expr::Path(path) => Ok(TypePath {
+                qself: None,
+                path: path.path.clone(),
+            }),
+            expr => TypePath::from_expr(expr),
+        },
+        _ => Err(darling::Error::custom("expected type path").with_span(meta)),
     }
 }

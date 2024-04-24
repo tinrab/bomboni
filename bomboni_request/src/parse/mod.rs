@@ -58,6 +58,7 @@ mod tests {
         error::{CommonError, PathError, PathErrorStep, RequestError, RequestResult},
         filter::Filter,
         ordering::{Ordering, OrderingDirection, OrderingTerm},
+        parse::helpers::id_convert,
         query::{
             list::{ListQuery, ListQueryBuilder, ListQueryConfig},
             page_token::{plain::PlainPageTokenBuilder, FilterPageToken, PageTokenBuilder},
@@ -1842,6 +1843,46 @@ mod tests {
                     deleted: true,
                     ..Default::default()
                 }
+            }
+        );
+    }
+
+    #[test]
+    fn parse_convert() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            value: i32,
+            id: Option<String>,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItem {
+            #[parse(try_from = i32)]
+            value: u64,
+            #[parse(convert = id_convert)]
+            id: Option<Id>,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                value: 42,
+                id: Some("2a".into()),
+            })
+            .unwrap(),
+            ParsedItem {
+                value: 42,
+                id: Some(Id::new(42)),
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                value: 42,
+                id: Some(Id::new(42)),
+            }),
+            Item {
+                value: 42,
+                id: Some("2a".into()),
             }
         );
     }

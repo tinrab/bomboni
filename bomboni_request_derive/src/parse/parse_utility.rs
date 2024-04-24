@@ -1,11 +1,13 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use std::collections::BTreeSet;
 
 use crate::parse::{
     field_type_info::FieldTypeInfo,
     options::{FieldExtract, FieldExtractStep, ParseFieldOptions},
 };
+
+use super::options::ParseConvert;
 
 pub fn expand_field_extract(
     extract: &FieldExtract,
@@ -155,7 +157,6 @@ pub fn expand_field_parse_type(
     field_type_info: &FieldTypeInfo,
     field_error_path: TokenStream,
 ) -> TokenStream {
-    let check_empty = true;
     let mut parse_impl = quote!();
 
     if let Some(regex) = field_options.regex.as_ref() {
@@ -175,68 +176,79 @@ pub fn expand_field_parse_type(
         _ => quote!(),
     };
 
-    if !field_options.keep_primitive {
-        if field_options.enumeration {
-            if check_empty {
-                parse_impl = quote! {
-                    if target == 0 {
-                        return Err(RequestError::path(
-                            #field_error_path,
-                            CommonError::RequiredFieldMissing,
-                        ) #inner_wrap_err);
-                    }
-                };
+    if let Some(try_from) = field_options.try_from.as_ref() {
+        parse_impl.extend(quote! {
+            let target = TryFrom::<#try_from>::try_from(target)
+                .map_err(|_| RequestError::path(#field_error_path, CommonError::FailedConvertValue) #inner_wrap_err)?;
+        });
+    } else if let Some(ParseConvert { parse, module, .. }) = field_options.convert.as_ref() {
+        let convert_impl = parse
+            .as_ref()
+            .map(ToTokens::to_token_stream)
+            .or_else(|| module.as_ref().map(|module| quote!(#module::parse)))
+            .unwrap();
+        parse_impl.extend(quote! {
+            let target = #convert_impl(target)
+                .map_err(|err: RequestError| err.wrap_path(#field_error_path) #inner_wrap_err)?;
+        });
+    } else if field_options.enumeration {
+        parse_impl = quote! {
+            if target == 0 {
+                return Err(RequestError::path(
+                    #field_error_path,
+                    CommonError::RequiredFieldMissing,
+                ) #inner_wrap_err);
             }
+        };
+        if !field_options.keep_primitive {
             parse_impl.extend(quote! {
                 let target = target.try_into()
                     .map_err(|_| RequestError::path(#field_error_path, CommonError::InvalidEnumValue) #inner_wrap_err)?;
             });
-        } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
-            if field_options.wrapper {
-                if matches!(
-                    primitive_ident.as_str(),
-                    "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "isize" | "usize"
-                ) {
-                    let target_type_ident = format_ident!("{}", primitive_ident);
-                    parse_impl = quote! {
-                        let target = target.value as #target_type_ident;
-                    };
-                } else {
-                    parse_impl = quote! {
-                        let target = target.value;
-                    };
-                }
+        }
+    } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
+        if field_options.wrapper {
+            if matches!(
+                primitive_ident.as_str(),
+                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "isize" | "usize"
+            ) {
+                let target_type_ident = format_ident!("{}", primitive_ident);
+                parse_impl = quote! {
+                    let target = target.value as #target_type_ident;
+                };
+            } else {
+                parse_impl = quote! {
+                    let target = target.value;
+                };
             }
+        }
 
-            if primitive_ident == "String" {
-                if check_empty {
-                    parse_impl.extend(quote! {
-                        if target.is_empty() {
-                            return Err(RequestError::path(
-                                #field_error_path,
-                                CommonError::RequiredFieldMissing,
-                            ) #inner_wrap_err);
-                        }
-                    });
+        if primitive_ident == "String" {
+            parse_impl.extend(quote! {
+                if target.is_empty() {
+                    return Err(RequestError::path(
+                        #field_error_path,
+                        CommonError::RequiredFieldMissing,
+                    ) #inner_wrap_err);
                 }
-                if let Some(regex) = field_options.regex.as_ref() {
-                    parse_impl.extend(quote! {
-                        if !re.is_match(&target) {
-                            return Err(RequestError::path(
-                                #field_error_path,
-                                CommonError::InvalidStringFormat {
-                                    expected: #regex.into(),
-                                },
-                            ) #inner_wrap_err);
-                        }
-                    });
-                }
-            } else if field_type_info.primitive_message {
+            });
+            if let Some(regex) = field_options.regex.as_ref() {
                 parse_impl.extend(quote! {
-                    let target = target.parse_into()
-                        .map_err(|err: RequestError| err.wrap_path(#field_error_path) #inner_wrap_err)?;
+                    if !re.is_match(&target) {
+                        return Err(RequestError::path(
+                            #field_error_path,
+                            CommonError::InvalidStringFormat {
+                                expected: #regex.into(),
+                            },
+                        ) #inner_wrap_err);
+                    }
                 });
             }
+        } else if field_type_info.primitive_message && !field_options.keep_primitive {
+            parse_impl.extend(quote! {
+                let target = target.parse_into()
+                    .map_err(|err: RequestError| err.wrap_path(#field_error_path) #inner_wrap_err)?;
+            });
         }
     }
 

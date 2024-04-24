@@ -1,47 +1,63 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 
 use crate::parse::{field_type_info::FieldTypeInfo, options::ParseFieldOptions};
+
+use super::options::ParseConvert;
 
 pub fn expand_field_write_type(
     field_options: &ParseFieldOptions,
     field_type_info: &FieldTypeInfo,
 ) -> TokenStream {
     let mut write_impl = quote!();
-    if !field_options.keep_primitive {
-        if field_options.enumeration {
+
+    if let Some(try_from) = field_options.try_from.as_ref() {
+        let err_literal = format!("failed to convert to `{}`", try_from.to_token_stream());
+        write_impl.extend(quote! {
+            let source_field = TryInto::<#try_from>::try_into(source_field)
+                .expect(#err_literal);
+        });
+    } else if let Some(ParseConvert { write, module, .. }) = field_options.convert.as_ref() {
+        let convert_impl = write
+            .as_ref()
+            .map(ToTokens::to_token_stream)
+            .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
+            .unwrap();
+        write_impl.extend(quote! {
+            let source_field = #convert_impl(source_field);
+        });
+    } else if field_options.enumeration && !field_options.keep_primitive {
+        write_impl.extend(quote! {
+            /// Write enumeration
+            let source_field = source_field as i32;
+        });
+    } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
+        if field_type_info.primitive_message && !field_options.keep_primitive {
             write_impl.extend(quote! {
-                /// Write enumeration
-                let source_field = source_field as i32;
+                /// Write primitive message
+                let source_field = source_field.into();
             });
-        } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
-            if field_type_info.primitive_message {
-                write_impl.extend(quote! {
-                    /// Write primitive message
-                    let source_field = source_field.into();
-                });
-            }
+        }
 
-            if field_options.wrapper {
-                let wrapper_ident = format_ident!(
-                    "{}",
-                    match primitive_ident.as_str() {
-                        "String" => "StringValue",
-                        "bool" => "BoolValue",
-                        "f32" => "FloatValue",
-                        "f64" => "DoubleValue",
-                        "i8" | "i16" | "i32" => "Int32Value",
-                        "u8" | "u16" | "u32" => "UInt32Value",
-                        "i64" | "isize" => "Int64Value",
-                        "u64" | "usize" => "UInt64Value",
-                        _ => unreachable!(),
-                    }
-                );
+        if field_options.wrapper {
+            let wrapper_ident = format_ident!(
+                "{}",
+                match primitive_ident.as_str() {
+                    "String" => "StringValue",
+                    "bool" => "BoolValue",
+                    "f32" => "FloatValue",
+                    "f64" => "DoubleValue",
+                    "i8" | "i16" | "i32" => "Int32Value",
+                    "u8" | "u16" | "u32" => "UInt32Value",
+                    "i64" | "isize" => "Int64Value",
+                    "u64" | "usize" => "UInt64Value",
+                    _ => unreachable!(),
+                }
+            );
 
-                write_impl.extend(quote! {
-                    let source_field: #wrapper_ident = source_field.into();
-                });
-            }
+            write_impl.extend(quote! {
+                let source_field: #wrapper_ident = source_field.into();
+            });
         }
     }
 

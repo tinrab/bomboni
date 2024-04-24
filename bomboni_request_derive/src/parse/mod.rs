@@ -52,18 +52,19 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
 
     result.extend(quote! {
         use _bomboni::{
+            proto::google::protobuf::{
+                BoolValue, DoubleValue, FloatValue, Int32Value, Int64Value, StringValue, Timestamp,
+                UInt32Value, UInt64Value,
+            },
             request::{
                 error::{CommonError, PathError, PathErrorStep, RequestError, RequestResult},
-                filter::{Filter},
+                filter::Filter,
                 ordering::{Ordering, OrderingDirection, OrderingTerm},
                 query::{
                     list::{ListQuery, ListQueryBuilder, ListQueryConfig},
                     page_token::{plain::PlainPageTokenBuilder, FilterPageToken, PageTokenBuilder},
                     search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig},
-                }
-            },
-            proto::google::protobuf::{
-                FloatValue, Int32Value, Int64Value, StringValue, Timestamp, UInt32Value, UInt64Value,
+                },
             },
         };
     });

@@ -147,6 +147,8 @@ mod tests {
             wrapper: false,
             enumeration: false,
             regex: None,
+            try_from: None,
+            convert: None,
             derive: None,
         };
 
