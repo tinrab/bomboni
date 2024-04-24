@@ -617,7 +617,7 @@ mod tests {
         struct Item {
             x: i32,
             y: i32,
-            id: String,
+            name: String,
         }
 
         #[derive(Debug, PartialEq)]
@@ -643,15 +643,9 @@ mod tests {
         struct ParsedItem {
             #[parse(derive { parse = pos_parse, write = pos_write })]
             pos: String,
-            #[parse(derive { parse = id_parse, write = id_write, field = id })]
+            name: String,
+            #[parse(derive { parse = id_parse, write = id_write, source_field = name, target_field = id })]
             id: u64,
-        }
-
-        #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
-        enum ParsedOneof {
-            #[parse(derive { parse = pos_oneof_parse, write = pos_oneof_write })]
-            Pos(String),
         }
 
         #[allow(clippy::unnecessary_wraps)]
@@ -666,16 +660,6 @@ mod tests {
         }
 
         #[allow(clippy::unnecessary_wraps)]
-        fn pos_oneof_parse(item: (i32, i32)) -> RequestResult<String> {
-            Ok(format!("{}, {}", item.0, item.1))
-        }
-
-        fn pos_oneof_write(target: String) -> (i32, i32) {
-            let parts: Vec<&str> = target.split(", ").collect();
-            (parts[0].parse().unwrap(), parts[1].parse().unwrap())
-        }
-
-        #[allow(clippy::unnecessary_wraps)]
         fn id_parse(id: String) -> RequestResult<u64> {
             if id.is_empty() {
                 return Err(CommonError::RequiredFieldMissing.into());
@@ -687,33 +671,52 @@ mod tests {
             id.to_string()
         }
 
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
+        enum ParsedOneof {
+            #[parse(derive { parse = pos_oneof_parse, write = pos_oneof_write })]
+            Pos(String),
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        fn pos_oneof_parse(item: (i32, i32)) -> RequestResult<String> {
+            Ok(format!("{}, {}", item.0, item.1))
+        }
+
+        fn pos_oneof_write(target: String) -> (i32, i32) {
+            let parts: Vec<&str> = target.split(", ").collect();
+            (parts[0].parse().unwrap(), parts[1].parse().unwrap())
+        }
+
         assert_eq!(
             ParsedItem::parse(Item {
                 x: 1,
                 y: 2,
-                id: "42".into(),
+                name: "42".into(),
             })
             .unwrap(),
             ParsedItem {
                 pos: "1, 2".into(),
                 id: 42,
+                name: "42".into(),
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
                 pos: "1, 2".into(),
                 id: 42,
+                name: "42".into(),
             }),
             Item {
                 x: 1,
                 y: 2,
-                id: "42".into(),
+                name: "42".into(),
             }
         );
 
         assert!(matches!(
             ParsedItem::parse(Item {
-                id: String::new(),
+                name: String::new(),
                 ..Default::default()
             }).unwrap_err(),
             RequestError::Path(PathError {
@@ -723,7 +726,7 @@ mod tests {
             }) if matches!(
                 error.as_any().downcast_ref::<CommonError>().unwrap(),
                 CommonError::RequiredFieldMissing
-            ) && path[0] == PathErrorStep::Field("id".into())
+            ) && path[0] == PathErrorStep::Field("name".into())
         ));
 
         assert_eq!(

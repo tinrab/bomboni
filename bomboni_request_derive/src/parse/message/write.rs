@@ -12,6 +12,14 @@ use crate::parse::{
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<TokenStream> {
     let mut write_fields = quote!();
 
+    // Write derived fields
+    for field in fields
+        .iter()
+        .filter(|field| !field.options.skip && field.options.derive.is_some())
+    {
+        write_fields.extend(expand_write_field(options, field)?);
+    }
+
     for field in fields.iter().filter(|field| {
         !field.options.skip && !type_is_phantom(&field.ty) && field.options.derive.is_none()
     }) {
@@ -26,14 +34,6 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         } else {
             write_fields.extend(expand_write_field(options, field)?);
         }
-    }
-
-    // Write derived fields
-    for field in fields
-        .iter()
-        .filter(|field| !field.options.skip && field.options.derive.is_some())
-    {
-        write_fields.extend(expand_write_field(options, field)?);
     }
 
     let source = &options.source;
@@ -59,7 +59,7 @@ fn expand_write_field(options: &ParseOptions, field: &ParseField) -> syn::Result
         module,
         source_field,
         target_field,
-        borrowed,
+        target_borrow,
         ..
     }) = field.options.derive.as_ref()
     {
@@ -69,7 +69,7 @@ fn expand_write_field(options: &ParseOptions, field: &ParseField) -> syn::Result
             .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
         {
             let target_value = if let Some(target_field) = target_field.as_ref() {
-                if *borrowed {
+                if *target_borrow {
                     quote!(&target.#target_field)
                 } else {
                     quote!(target.#target_field)

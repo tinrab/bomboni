@@ -146,7 +146,7 @@ fn expand_write_variant(
     if let Some(ParseDerive {
         write,
         module,
-        borrowed,
+        target_borrow,
         ..
     }) = variant.options.derive.as_ref()
     {
@@ -155,7 +155,7 @@ fn expand_write_variant(
             .map(ToTokens::to_token_stream)
             .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
         {
-            let value = if *borrowed {
+            let value = if *target_borrow {
                 quote!(&target)
             } else {
                 quote!(target)

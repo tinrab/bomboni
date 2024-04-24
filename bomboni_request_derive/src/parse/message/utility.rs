@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use syn::{GenericArgument, PathArguments, Type, TypePath};
 
 use crate::parse::{
-    options::{FieldExtract, FieldExtractStep, ParseField},
+    options::{FieldExtract, FieldExtractStep, ParseDerive, ParseField},
     parse_utility::parse_field_source_extract,
 };
 
@@ -56,6 +56,43 @@ pub fn get_field_clone_set(fields: &[ParseField]) -> syn::Result<BTreeSet<String
                         clone_set.insert(path.clone());
                     }
                     visited.insert(path.clone());
+                }
+            }
+        }
+    }
+
+    // Clone non-borrowed derived fields.
+    // TODO: Optimize.
+    for field in fields.iter().filter(|field| !field.options.skip) {
+        if let Some(ParseDerive {
+            source_field,
+            source_borrow,
+            ..
+        }) = field.options.derive.as_ref()
+        {
+            if *source_borrow {
+                continue;
+            }
+
+            let Some(source_field_name) = source_field.as_ref().map(ToString::to_string) else {
+                continue;
+            };
+
+            for other_field in fields.iter().filter(|other_field| {
+                other_field.options.derive.is_none()
+                    && other_field.resource.is_none()
+                    && !other_field.options.skip
+                    && !type_is_phantom(&other_field.ty)
+                    && other_field.list_query.is_none()
+                    && other_field.search_query.is_none()
+            }) {
+                let extract = get_field_extract(other_field)?;
+                for step in extract.steps {
+                    if let FieldExtractStep::Field(field_name) = step {
+                        if field_name == source_field_name {
+                            clone_set.insert(field_name);
+                        }
+                    }
                 }
             }
         }

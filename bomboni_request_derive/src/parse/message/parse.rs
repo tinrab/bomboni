@@ -13,13 +13,15 @@ use crate::parse::{
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<TokenStream> {
     let mut parse_fields = quote!();
 
+    let field_clone_set = get_field_clone_set(fields)?;
+
     // Parse fields in order, starting with derived ones.
     // This is needed because derived fields may depend on other fields, and we want to avoid unnecessary cloning.
     for field in fields
         .iter()
         .filter(|field| !field.options.skip && field.options.derive.is_some())
     {
-        parse_fields.extend(expand_parse_field(options, field, &BTreeSet::default())?);
+        parse_fields.extend(expand_parse_field(options, field, &field_clone_set)?);
     }
 
     // Parse resource fields
@@ -30,7 +32,6 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
     }
 
     // Parse regular fields
-    let field_clone_set = get_field_clone_set(fields)?;
     for field in fields.iter().filter(|field| {
         !field.options.skip
             && field.options.derive.is_none()
@@ -166,7 +167,7 @@ fn expand_parse_field(
         parse,
         module,
         source_field,
-        borrowed,
+        source_borrow,
         ..
     }) = field.options.derive.as_ref()
     {
@@ -176,11 +177,15 @@ fn expand_parse_field(
             .or_else(|| module.as_ref().map(|module| quote!(#module::parse)))
         {
             return Ok(if let Some(source_field) = source_field.as_ref() {
-                let value = if *borrowed {
+                let mut value = if *source_borrow {
                     quote!(&source.#source_field)
                 } else {
                     quote!(source.#source_field)
                 };
+                let source_field_name = source_field.to_string();
+                if field_clone_set.contains(&source_field_name) {
+                    value = quote! { #value.clone() };
+                }
                 let source_field_name = source_field.to_string();
                 quote! {
                     #target_ident: {

@@ -1,4 +1,4 @@
-pub mod derive_id {
+pub mod id_derive {
     use bomboni_common::id::Id;
 
     use crate::error::{CommonError, RequestResult};
@@ -32,14 +32,14 @@ mod tests {
         #[derive(Parse, Debug, PartialEq)]
         #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            #[parse(derive { module = derive_id, field = id })]
+            #[parse(derive { module = id_derive, field = id })]
             id: Id,
         }
 
-        assert_eq!(derive_id::parse("F").unwrap(), Id::new(15));
-        assert!(derive_id::parse("-1").is_err());
-        assert!(derive_id::parse("x").is_err());
-        assert!(derive_id::parse(String::new()).is_err());
+        assert_eq!(id_derive::parse("F").unwrap(), Id::new(15));
+        assert!(id_derive::parse("-1").is_err());
+        assert!(id_derive::parse("x").is_err());
+        assert!(id_derive::parse(String::new()).is_err());
 
         assert_eq!(
             ParsedItem::parse(Item {

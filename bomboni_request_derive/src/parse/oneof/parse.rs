@@ -151,7 +151,7 @@ fn expand_parse_variant(
     if let Some(ParseDerive {
         parse,
         module,
-        borrowed,
+        source_borrow,
         ..
     }) = variant.options.derive.as_ref()
     {
@@ -160,7 +160,7 @@ fn expand_parse_variant(
             .map(ToTokens::to_token_stream)
             .or_else(|| module.as_ref().map(|module| quote!(#module::parse)))
         {
-            let value = if *borrowed {
+            let value = if *source_borrow {
                 quote!(&source)
             } else {
                 quote!(source)

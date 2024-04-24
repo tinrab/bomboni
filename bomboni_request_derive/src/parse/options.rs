@@ -164,8 +164,9 @@ pub struct ParseDerive {
     pub write: Option<ExprPath>,
     pub module: Option<ExprPath>,
     pub source_field: Option<Ident>,
+    pub source_borrow: bool,
     pub target_field: Option<Ident>,
-    pub borrowed: bool,
+    pub target_borrow: bool,
 }
 
 #[derive(Debug)]
@@ -308,9 +309,13 @@ impl FromMeta for ParseDerive {
             #[darling(default)]
             source_field: Option<Ident>,
             #[darling(default)]
+            source_borrow: bool,
+            #[darling(default)]
             target_field: Option<Ident>,
             #[darling(default)]
-            borrowed: bool,
+            target_borrow: bool,
+            #[darling(default)]
+            borrow: bool,
         }
 
         let options = Options::from_list(items)?;
@@ -328,8 +333,9 @@ impl FromMeta for ParseDerive {
             write: options.write,
             module: options.module,
             source_field: options.source_field.or(options.field.clone()),
+            source_borrow: options.source_borrow || options.borrow,
             target_field: options.target_field.or(options.field),
-            borrowed: options.borrowed,
+            target_borrow: options.target_borrow || options.borrow,
         })
     }
 
@@ -340,8 +346,9 @@ impl FromMeta for ParseDerive {
                 write: None,
                 module: Some(path.clone()),
                 source_field: None,
+                source_borrow: false,
                 target_field: None,
-                borrowed: false,
+                target_borrow: false,
             }),
             _ => Err(darling::Error::custom("expected path").with_span(expr)),
         }
