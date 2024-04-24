@@ -9,7 +9,7 @@ use syn::{
 };
 
 #[derive(Debug)]
-pub struct ParseIntoMap {
+pub struct DerivedMap {
     vis: Visibility,
     ident: Ident,
     parse_item_closure: ExprClosure,
@@ -17,8 +17,8 @@ pub struct ParseIntoMap {
     map_type: Option<Type>,
 }
 
-pub fn expand(options: ParseIntoMap) -> syn::Result<TokenStream> {
-    let ParseIntoMap {
+pub fn expand(options: DerivedMap) -> syn::Result<TokenStream> {
+    let DerivedMap {
         vis,
         ident,
         parse_item_closure,
@@ -155,7 +155,7 @@ pub fn expand(options: ParseIntoMap) -> syn::Result<TokenStream> {
     })
 }
 
-impl Parse for ParseIntoMap {
+impl Parse for DerivedMap {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let vis = input.parse()?;
         let ident: Ident = input.parse()?;

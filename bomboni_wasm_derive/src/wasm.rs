@@ -623,27 +623,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
 }
 
 fn expand_usage(options: &WasmOptions) -> TokenStream {
-    let wasm_bindgen_mod = options
-        .wasm_bindgen_crate
-        .as_ref()
-        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
-    let js_sys_mod = options
-        .js_sys_crate
-        .as_ref()
-        .map_or_else(|| quote!(js_sys), ToTokens::to_token_stream);
-
-    let mut result = quote! {
-        use #wasm_bindgen_mod::{
-            prelude::*,
-            convert::{
-                IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi, LongRefFromWasmAbi,
-                TryFromJsValue, VectorFromWasmAbi, VectorIntoWasmAbi,
-            },
-            describe::{WasmDescribe, WasmDescribeVector},
-            JsObject, JsValue,
-        };
-        use #js_sys_mod::JsString;
-    };
+    let mut result = quote!();
 
     result.extend(if let Some(path) = options.wasm_bindgen_crate.as_ref() {
         quote! {
@@ -651,6 +631,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
         }
     } else {
         quote! {
+            #[allow(unused_extern_crates, clippy::useless_attribute)]
             extern crate wasm_bindgen as _wasm_bindgen;
         }
     });
@@ -661,6 +642,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
         }
     } else {
         quote! {
+            #[allow(unused_extern_crates, clippy::useless_attribute)]
             extern crate js_sys as _js_sys;
         }
     });
@@ -672,18 +654,46 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
             }
         } else {
             quote! {
+                #[allow(unused_extern_crates, clippy::useless_attribute)]
                 extern crate serde as _serde;
             }
         },
     );
 
-    if let Some(path) = options.bomboni_wasm_crate.as_ref() {
-        result.extend(quote! {
-            use #path::Wasm;
-        });
-    }
+    result.extend(if let Some(path) = options.bomboni_crate.as_ref() {
+        quote! {
+            use #path as _bomboni;
+        }
+    } else {
+        quote! {
+            #[allow(unused_extern_crates, clippy::useless_attribute)]
+            extern crate bomboni as _bomboni;
+        }
+    });
 
-    result
+    let wasm_bindgen_mod = options
+        .wasm_bindgen_crate
+        .as_ref()
+        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
+    let js_sys_mod = options
+        .js_sys_crate
+        .as_ref()
+        .map_or_else(|| quote!(js_sys), ToTokens::to_token_stream);
+
+    quote! {
+        #result
+        use #wasm_bindgen_mod::{
+            prelude::*,
+            convert::{
+                IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi, LongRefFromWasmAbi,
+                TryFromJsValue, VectorFromWasmAbi, VectorIntoWasmAbi,
+            },
+            describe::{WasmDescribe, WasmDescribeVector},
+            JsObject, JsValue,
+        };
+        use #js_sys_mod::JsString;
+        use _bomboni::wasm::Wasm;
+    }
 }
 
 fn expand_wasm_error_handler(ident: &syn::Ident) -> TokenStream {

@@ -18,7 +18,7 @@ pub use time::Month;
     ),
     derive(bomboni_wasm::Wasm),
     wasm(
-        bomboni_wasm_crate = bomboni_wasm,
+        bomboni_crate = crate::bomboni,
         wasm_abi,
         js_value { convert_string },
     )
@@ -32,7 +32,7 @@ pub use time::Month;
     ),
     derive(bomboni_wasm::Wasm),
     wasm(
-        bomboni_wasm_crate = bomboni_wasm,
+        bomboni_crate = crate::bomboni,
         wasm_abi,
         js_value,
         override_type = "Date",
@@ -294,12 +294,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let dt = UtcDateTime::now();
-        let js = serde_json::to_string_pretty(&dt).unwrap();
-        let parsed: UtcDateTime = serde_json::from_str(&js).unwrap();
-        assert_eq!(dt, parsed);
-
+    fn convert() {
         assert_eq!(
             UtcDateTime::try_from(UNIX_EPOCH + Duration::from_secs(1)).unwrap(),
             UtcDateTime::from_str("1970-01-01T00:00:01Z").unwrap()
@@ -313,6 +308,15 @@ mod tests {
             UtcDateTime::from_timestamp(10, 20).unwrap().timestamp(),
             (10, 20)
         );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialize() {
+        let dt = UtcDateTime::now();
+        let js = serde_json::to_string_pretty(&dt).unwrap();
+        let parsed: UtcDateTime = serde_json::from_str(&js).unwrap();
+        assert_eq!(dt, parsed);
     }
 
     #[cfg(feature = "chrono")]

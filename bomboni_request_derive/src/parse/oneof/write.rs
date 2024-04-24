@@ -1,11 +1,15 @@
-use darling::FromMeta;
-use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens};
+use bomboni_core::format_comment;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote, ToTokens};
 
-use crate::parse::{ParseOptions, ParseTaggedUnion, ParseVariant};
-use crate::utility::{get_proto_type_info, ProtoTypeInfo};
+use crate::parse::{
+    field_type_info::get_field_type_info,
+    oneof::utility::{get_variant_extract, get_variant_source_ident},
+    options::{FieldExtractStep, ParseDerive, ParseOptions, ParseTaggedUnion, ParseVariant},
+    write_utility::expand_field_write_type,
+};
 
-pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
+pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
     if let Some(tagged_union) = options.tagged_union.as_ref() {
         expand_write_tagged_union(options, variants, tagged_union)
     } else {
@@ -13,26 +17,22 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream 
     }
 }
 
-fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStream {
+fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
     let source = &options.source;
     let ident = &options.ident;
 
     let mut write_variants = quote!();
 
     for variant in variants {
-        if variant.skip {
+        if variant.options.skip {
             continue;
         }
 
-        let source_variant_ident = if let Some(name) = variant.source_name.as_ref() {
-            Ident::from_string(name).unwrap()
-        } else {
-            variant.ident.clone()
-        };
+        let source_variant_ident = get_variant_source_ident(variant)?;
         let target_variant_ident = &variant.ident;
 
         if variant.fields.is_empty() {
-            write_variants.extend(if variant.source_empty {
+            write_variants.extend(if variant.source_unit {
                 quote! {
                     #ident::#target_variant_ident => {
                         #source::#source_variant_ident
@@ -46,12 +46,14 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStrea
                 }
             });
         } else {
-            let write_variant = expand_write_variant(options, variant);
+            let write_variant = expand_write_variant(options, variant)?;
             write_variants.extend(quote! {
-                #ident::#target_variant_ident(value) => {
-                    #source::#source_variant_ident({
+                #ident::#target_variant_ident(target) => {
+                    let mut source = #source::#source_variant_ident(Default::default());
+                    if let #source::#source_variant_ident(source) = &mut source {
                         #write_variant
-                    })
+                    }
+                    source
                 }
             });
         }
@@ -59,41 +61,39 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> TokenStrea
 
     let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
 
-    quote! {
+    Ok(quote! {
+        #[automatically_derived]
         impl #impl_generics From<#ident #type_generics> for #source #where_clause {
-            fn from(value: #ident #type_generics) -> Self {
-                match value {
+            fn from(target: #ident #type_generics) -> Self {
+                match target {
                     #write_variants
                     _ => panic!("unknown oneof variant"),
                 }
             }
         }
-    }
+    })
 }
 
 fn expand_write_tagged_union(
     options: &ParseOptions,
     variants: &[ParseVariant],
     tagged_union: &ParseTaggedUnion,
-) -> TokenStream {
+) -> syn::Result<TokenStream> {
+    // let source = &options.source;
     let ident = &options.ident;
     let oneof_ident = &tagged_union.oneof;
 
     let mut write_variants = quote!();
     for variant in variants {
-        if variant.skip {
+        if variant.options.skip {
             continue;
         }
 
-        let source_variant_ident = if let Some(name) = variant.source_name.as_ref() {
-            Ident::from_string(name).unwrap()
-        } else {
-            variant.ident.clone()
-        };
+        let source_variant_ident = get_variant_source_ident(variant)?;
         let target_variant_ident = &variant.ident;
 
         if variant.fields.is_empty() {
-            write_variants.extend(if variant.source_empty {
+            write_variants.extend(if variant.source_unit {
                 quote! {
                     #ident::#target_variant_ident => {
                         #oneof_ident::#source_variant_ident
@@ -107,12 +107,14 @@ fn expand_write_tagged_union(
                 }
             });
         } else {
-            let write_variant = expand_write_variant(options, variant);
+            let write_variant = expand_write_variant(options, variant)?;
             write_variants.extend(quote! {
-                #ident::#target_variant_ident(value) => {
-                    #oneof_ident::#source_variant_ident({
+                #ident::#target_variant_ident(target) => {
+                    let mut source = #oneof_ident::#source_variant_ident(Default::default());
+                    if let #oneof_ident::#source_variant_ident(source) = &mut source {
                         #write_variant
-                    })
+                    }
+                    source
                 }
             });
         }
@@ -122,143 +124,126 @@ fn expand_write_tagged_union(
     let field_ident = &tagged_union.field;
     let (impl_generics, type_generics, where_clause) = options.generics.split_for_impl();
 
-    quote! {
+    Ok(quote! {
+        #[automatically_derived]
         impl #impl_generics From<#ident #type_generics> for #source #where_clause {
-            fn from(value: #ident #type_generics) -> Self {
+            fn from(target: #ident #type_generics) -> Self {
                 #source {
-                    #field_ident: Some(match value {
+                    #field_ident: Some(match target {
                         #write_variants
                         _ => panic!("unknown oneof variant"),
                     }),
                 }
             }
         }
-    }
+    })
 }
 
-fn expand_write_variant(options: &ParseOptions, variant: &ParseVariant) -> TokenStream {
-    let variant_type = variant.fields.iter().next().unwrap();
-    let ProtoTypeInfo {
-        is_option,
-        is_nested,
-        is_box,
-        is_generic,
+fn expand_write_variant(
+    options: &ParseOptions,
+    variant: &ParseVariant,
+) -> syn::Result<TokenStream> {
+    if let Some(ParseDerive {
+        write,
+        module,
+        borrowed,
         ..
-    } = get_proto_type_info(options, variant_type);
+    }) = variant.options.derive.as_ref()
+    {
+        if let Some(write_impl) = write
+            .as_ref()
+            .map(ToTokens::to_token_stream)
+            .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
+        {
+            let value = if *borrowed {
+                quote!(&target)
+            } else {
+                quote!(target)
+            };
+            return Ok(quote! {
+                *source = #write_impl(#value);
+            });
+        }
 
-    let mut write_target = if variant.keep {
-        if is_box {
-            quote! {
-                let source = *source;
-            }
-        } else {
-            quote!()
-        }
-    } else if variant.with.is_some() || variant.write_with.is_some() {
-        let write_with = if let Some(with) = variant.with.as_ref() {
-            quote! {
-                #with::write
-            }
-        } else {
-            variant.write_with.as_ref().unwrap().to_token_stream()
-        };
-        quote! {
-            let source = #write_with(source);
-        }
-    } else if variant.enumeration {
-        quote! {
-            let source = source as i32;
-        }
-    } else if is_nested || is_generic {
-        let write_target = if is_box {
-            quote! {
-                let source = *source;
-            }
-        } else {
-            quote!()
-        };
-        quote! {
-            #write_target
-            let source = source.into();
-        }
-    } else if is_box {
-        quote! {
-            let source = *source;
-        }
-    } else {
-        quote!()
-    };
-
-    if let Some(source_try_from) = variant.source_try_from.as_ref() {
-        let err_literal = format!(
-            "failed to convert `{}` to `{}`",
+        return Err(syn::Error::new_spanned(
             &variant.ident,
-            source_try_from.to_token_stream(),
-        );
-        write_target.extend(quote! {
-            let source: #source_try_from = source.try_into()
-                .expect(#err_literal);
-        });
+            "missing derive write implementation",
+        ));
     }
 
-    let mut write = quote! {
-        let source = value;
-    };
-
-    let source_option = variant.source_option || is_option;
-
-    if is_option {
-        write.extend(if source_option {
-            quote! {
-                let source = if let Some(source) = source {
-                    #write_target
-                    Some(source)
-                } else {
-                    None
-                };
-            }
-        } else {
-            quote! {
-                let source = if let Some(source) = source {
-                    #write_target
-                    source
-                } else {
-                    Default::default()
-                };
-            }
-        });
+    let extract = get_variant_extract(variant)?;
+    let mut inject_impl = if matches!(
+        extract.steps.last(),
+        Some(
+            FieldExtractStep::Unwrap
+                | FieldExtractStep::UnwrapOr(_)
+                | FieldExtractStep::UnwrapOrDefault
+                | FieldExtractStep::Unbox
+        )
+    ) || extract.steps.is_empty()
+    {
+        quote!(*source)
     } else {
-        write.extend(if source_option {
-            quote! {
-                #write_target
-                let source = Some(source);
+        quote!(source)
+    };
+    let mut set_impl = quote!();
+    for step in &extract.steps {
+        match step {
+            FieldExtractStep::Field(field_name) => {
+                let field_ident = format_ident!("{}", field_name);
+                inject_impl.extend(quote! {
+                    .#field_ident
+                });
             }
-        } else {
-            write_target
-        });
-    }
-
-    if is_box || variant.source_box {
-        if source_option {
-            write.extend(quote! {
-                let source = source.map(Box::new);
-            });
-        } else {
-            write.extend(quote! {
-                let source = Box::new(source);
-            });
+            FieldExtractStep::Unwrap
+            | FieldExtractStep::UnwrapOr(_)
+            | FieldExtractStep::UnwrapOrDefault => {
+                set_impl.extend(quote! {
+                    let source_field = Some(source_field);
+                });
+            }
+            FieldExtractStep::Unbox => {
+                set_impl.extend(quote! {
+                    let source_field = Box::new(source_field);
+                });
+            }
+            FieldExtractStep::StringFilterEmpty => {
+                set_impl.extend(quote! {
+                    let source_field = source_field
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_default();
+                });
+            }
+            FieldExtractStep::EnumerationFilterUnspecified => {
+                set_impl.extend(quote! {
+                    let source_field = source_field
+                        .filter(|s| *s != 0)
+                        .unwrap_or(0);
+                });
+            }
         }
     }
 
-    if variant.wrapper {
-        write.extend(quote! {
-            let source: #variant_type = source;
-            let source = source.into();
-        });
-    }
+    let target_ident = &variant.ident;
+    let variant_type = variant.fields.iter().next().unwrap();
+    let field_type_info = get_field_type_info(options, &variant.options, variant_type)?;
 
-    quote! {
-        #write
-        source
-    }
+    let write_inner_impl = expand_field_write_type(&variant.options, &field_type_info);
+
+    let comment = format_comment!(
+        "\n Write variant `{}`\n{:#?}\n{:#?}",
+        target_ident,
+        field_type_info,
+        &extract.steps
+    );
+
+    Ok(quote! {
+        #comment
+        {
+            let source_field = target;
+            #write_inner_impl
+            #set_impl
+            #inject_impl = source_field;
+        }
+    })
 }

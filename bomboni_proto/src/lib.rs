@@ -35,3 +35,15 @@ pub mod google {
         crate::include_proto!("google.rpc.plus");
     }
 }
+
+#[doc(hidden)]
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm"
+))]
+pub mod bomboni {
+    pub mod wasm {
+        pub use bomboni_wasm::*;
+    }
+}

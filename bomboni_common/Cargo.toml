@@ -31,19 +31,19 @@ bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.55", features = [
   "derive",
 ], optional = true }
 
-thiserror = "1.0.58"
+thiserror = "1.0.59"
 regex = "1.10.4"
-time = { version = "0.3.34", features = ["formatting", "parsing"] }
+time = { version = "0.3.36", features = ["formatting", "parsing"] }
 
 tokio = { version = "1.37.0", features = ["time", "sync"], optional = true }
-serde = { version = "1.0.197", features = ["derive"], optional = true }
+serde = { version = "1.0.198", features = ["derive"], optional = true }
 sqlx = { version = "0.7", features = ["mysql"], optional = true }
-chrono = { version = "0.4.37", optional = true }
+chrono = { version = "0.4.38", optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
 js-sys = { version = "0.3.69", optional = true }
 
 [dev-dependencies]
-serde_json = "1.0.115"
+serde_json = "1.0.116"
 tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros"] }

@@ -28,7 +28,7 @@ const SEQUENCE_BITS: i64 = 16;
     ),
     derive(bomboni_wasm::Wasm),
     wasm(
-        bomboni_wasm_crate = bomboni_wasm,
+        bomboni_crate = crate::bomboni,
         wasm_abi,
         js_value { convert_string },
     )

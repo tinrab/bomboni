@@ -1,9 +1,7 @@
 use pest::error::InputLocation;
 use thiserror::Error;
 
-use crate::schema::ValueType;
-
-use super::parser::Rule;
+use crate::{filter::Rule, schema::ValueType};
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum FilterError {

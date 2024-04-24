@@ -1,13 +1,12 @@
 //! # A procedural macro crate for the Bomboni library.
 
 use parse::{
-    parse_into_map::{self, ParseIntoMap},
+    derived_map::{self, DerivedMap},
     parse_resource_name::{self, ParseResourceName},
 };
 use proc_macro::TokenStream;
 
 mod parse;
-mod utility;
 
 use syn::{parse_macro_input, DeriveInput};
 
@@ -37,18 +36,18 @@ pub fn parse_resource_name(input: TokenStream) -> TokenStream {
         .into()
 }
 
-#[proc_macro_derive(Parse, attributes(parse))]
-pub fn derive_parse(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    parse::expand(input)
+#[proc_macro]
+pub fn derived_map(input: TokenStream) -> TokenStream {
+    let options = parse_macro_input!(input as DerivedMap);
+    derived_map::expand(options)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-#[proc_macro]
-pub fn impl_parse_into_map(input: TokenStream) -> TokenStream {
-    let options = parse_macro_input!(input as ParseIntoMap);
-    parse_into_map::expand(options)
+#[proc_macro_derive(Parse, attributes(parse))]
+pub fn derive_parse(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    parse::expand(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

@@ -1,6 +1,9 @@
-use crate::{filter::Filter, ordering::Ordering, schema::Schema};
-
-use super::error::{QueryError, QueryResult};
+use crate::{
+    filter::Filter,
+    ordering::Ordering,
+    query::error::{QueryError, QueryResult},
+    schema::Schema,
+};
 
 pub fn parse_query_filter(
     filter: Option<&str>,

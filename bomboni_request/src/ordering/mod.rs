@@ -5,11 +5,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::schema::Schema;
-
-use self::error::{OrderingError, OrderingResult};
-
-use super::schema::SchemaMapped;
+use crate::{
+    ordering::error::{OrderingError, OrderingResult},
+    schema::{Schema, SchemaMapped},
+};
 
 pub mod error;
 

@@ -27,14 +27,22 @@ pub trait Wasm {
 #[cfg(feature = "derive")]
 pub use bomboni_wasm_derive::*;
 
-#[cfg(all(test, feature = "derive"))]
+#[cfg(feature = "derive")]
+#[cfg(test)]
 mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
 
+    pub mod bomboni {
+        pub mod wasm {
+            pub use crate::Wasm;
+        }
+    }
+
     #[test]
     fn structs() {
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_crate = bomboni)]
         pub struct Simple {
             a: String,
             b: i32,
@@ -51,7 +59,7 @@ mod tests {
     #[test]
     fn renames() {
         #[derive(Serialize, Deserialize, Wasm)]
-        #[wasm(rename_all = "camelCase")]
+        #[wasm(bomboni_crate = bomboni, rename_all = "camelCase")]
         struct Item {
             test_name: String,
             #[wasm(rename = "x")]
@@ -67,12 +75,14 @@ mod tests {
     #[test]
     fn enums() {
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_crate = bomboni)]
         pub enum ExternalTag {
             String(String),
             Number(f64),
         }
 
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_crate = bomboni)]
         #[serde(tag = "kind", content = "data")]
         pub enum AdjacentTag {
             String(String),
@@ -80,6 +90,7 @@ mod tests {
         }
 
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_crate = bomboni)]
         #[serde(tag = "kind")]
         pub enum InternalTag {
             String { value: String },

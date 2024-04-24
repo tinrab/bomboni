@@ -1,3 +1,9 @@
+//! # Utilities for working with API requests.
+//!
+//! This crate provides utilities for working API requests based on Google's AIP resource-oriented gRPC API conventions [1].
+//!
+//! [1]: https://google.aip.dev
+
 #[allow(unused_extern_crates)]
 extern crate regex;
 
@@ -15,4 +21,16 @@ pub mod testing;
 #[cfg(feature = "derive")]
 pub mod derive {
     pub use bomboni_request_derive::*;
+}
+
+#[doc(hidden)]
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm"
+))]
+pub mod bomboni {
+    pub mod wasm {
+        pub use bomboni_wasm::*;
+    }
 }

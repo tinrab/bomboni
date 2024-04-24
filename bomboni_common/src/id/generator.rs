@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use super::Id;
+use crate::id::Id;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Generator {

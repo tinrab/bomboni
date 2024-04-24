@@ -18,7 +18,7 @@ bomboni_core = { path = "../bomboni_core", version = "0.1.55" }
 
 prost = "0.12.4"
 prost-types = "0.12.4"
-proc-macro2 = "1.0.79"
-syn = { version = "2.0.58", features = ["full"] }
-quote = "1.0.35"
-prettyplease = "0.2.17"
+proc-macro2 = "1.0.81"
+syn = { version = "2.0.60", features = ["full"] }
+quote = "1.0.36"
+prettyplease = "0.2.19"

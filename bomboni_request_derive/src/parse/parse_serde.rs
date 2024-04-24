@@ -1,4 +1,4 @@
-use crate::parse::ParseOptions;
+use crate::parse::options::ParseOptions;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -7,22 +7,13 @@ pub fn expand(options: &ParseOptions) -> syn::Result<TokenStream> {
         return Ok(quote!());
     }
 
-    let mut result = if let Some(path) = options.serde_crate.as_ref() {
-        quote! {
-            use #path as _serde;
-        }
-    } else {
-        quote! {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate serde as _serde;
-        }
-    };
+    let mut result = quote!();
 
     if options.serde_as || options.serialize_as {
         if !options.write {
             return Err(syn::Error::new_spanned(
                 &options.ident,
-                "Cannot use `serde_as` or `serialize_as` without `write`",
+                "cannot use `serde_as` or `serialize_as` without `write`",
             ));
         }
 
@@ -63,11 +54,5 @@ pub fn expand(options: &ParseOptions) -> syn::Result<TokenStream> {
         });
     }
 
-    Ok(quote! {
-        #[doc(hidden)]
-        #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
-        const _ : () = {
-            #result
-        };
-    })
+    Ok(result)
 }

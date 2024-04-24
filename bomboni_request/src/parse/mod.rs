@@ -54,32 +54,30 @@ mod tests {
     use std::fmt::Debug;
     use std::marker::PhantomData;
 
-    use crate::error::PathError;
-    use crate::ordering::Ordering;
-    use crate::query::page_token::PageTokenBuilder;
-    use crate::query::search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig};
     use crate::{
-        error::{CommonError, RequestError, RequestResult},
+        error::{CommonError, PathError, PathErrorStep, RequestError, RequestResult},
         filter::Filter,
-        ordering::{OrderingDirection, OrderingTerm},
+        ordering::{Ordering, OrderingDirection, OrderingTerm},
         query::{
             list::{ListQuery, ListQueryBuilder, ListQueryConfig},
-            page_token::{plain::PlainPageTokenBuilder, FilterPageToken},
+            page_token::{plain::PlainPageTokenBuilder, FilterPageToken, PageTokenBuilder},
+            search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig},
         },
-        testing::schema::UserItem,
+        testing::{bomboni, schema::UserItem},
     };
     use bomboni_common::{btree_map, btree_map_into, hash_map_into};
     use bomboni_proto::google::protobuf::{
-        Int32Value, Int64Value, StringValue, Timestamp, UInt32Value,
+        FloatValue, Int32Value, Int64Value, StringValue, Timestamp, UInt32Value, UInt64Value,
     };
-    use bomboni_request_derive::{impl_parse_into_map, parse_resource_name, Parse};
+    use bomboni_request_derive::{derived_map, parse_resource_name, Parse};
     use serde::{Deserialize, Serialize};
 
     use super::*;
 
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
     #[repr(i32)]
     enum DataTypeEnum {
+        #[default]
         Unspecified = 0,
         String = 1,
         Boolean = 2,
@@ -112,27 +110,71 @@ mod tests {
             optional_nested: Option<NestedItem>,
             default_nested: Option<NestedItem>,
             default_default_nested: Option<NestedItem>,
-            custom_parse: String,
             enum_value: i32,
             oneof: Option<OneofKind>,
             kept_nested: Option<NestedItem>,
         }
 
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItem {
+            #[parse(source = "string")]
+            s: String,
+            #[parse(source = "optional_string")]
+            opt_s: Option<String>,
+            required_string: String,
+            #[parse(extract = [Unwrap])]
+            required_string_optional: String,
+            #[parse(extract = [Unwrap])]
+            nested: ParsedNestedItem,
+            optional_nested: Option<ParsedNestedItem>,
+            #[parse(extract = [UnwrapOr(NestedItem::default())])]
+            default_nested: ParsedNestedItem,
+            #[parse(extract = [UnwrapOrDefault])]
+            default_default_nested: ParsedNestedItem,
+            #[parse(enumeration)]
+            enum_value: DataTypeEnum,
+            #[parse(oneof, extract = [Unwrap])]
+            oneof: ParsedOneofKind,
+            #[parse(keep_primitive)]
+            kept_nested: Option<NestedItem>,
+            #[parse(skip)]
+            extra: i32,
+        }
+
         impl Default for Item {
             fn default() -> Self {
                 Self {
-                    string: "abc".into(),
-                    optional_string: Some("abc".into()),
-                    required_string: "abc".into(),
-                    required_string_optional: Some("abc".into()),
+                    string: "string".into(),
+                    optional_string: Some("optional_string".into()),
+                    required_string: "required_string".into(),
+                    required_string_optional: Some("required_string_optional".into()),
                     nested: Some(NestedItem {}),
                     optional_nested: Some(NestedItem {}),
                     default_nested: Some(NestedItem {}),
                     default_default_nested: Some(NestedItem {}),
-                    custom_parse: "42".into(),
                     enum_value: 1,
-                    oneof: Some(OneofKind::String("abc".into())),
+                    oneof: Some(OneofKind::String("oneof".into())),
                     kept_nested: Some(NestedItem {}),
+                }
+            }
+        }
+
+        impl Default for ParsedItem {
+            fn default() -> Self {
+                Self {
+                    s: "string".into(),
+                    opt_s: Some("optional_string".into()),
+                    required_string: "required_string".into(),
+                    required_string_optional: "required_string_optional".into(),
+                    nested: ParsedNestedItem {},
+                    optional_nested: Some(ParsedNestedItem {}),
+                    default_nested: ParsedNestedItem {},
+                    default_default_nested: ParsedNestedItem {},
+                    enum_value: DataTypeEnum::String,
+                    oneof: ParsedOneofKind::String("oneof".into()),
+                    kept_nested: Some(NestedItem {}),
+                    extra: 0,
                 }
             }
         }
@@ -140,72 +182,9 @@ mod tests {
         #[derive(Debug, PartialEq, Default)]
         struct NestedItem {}
 
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, write)]
-        struct ParsedItem {
-            #[parse(source_name = "string")]
-            s: String,
-            #[parse(source_name = "optional_string")]
-            opt_s: Option<String>,
-            required_string: String,
-            #[parse(source_option)]
-            required_string_optional: String,
-            nested: ParsedNestedItem,
-            optional_nested: Option<ParsedNestedItem>,
-            #[parse(default = ParsedNestedItem::default())]
-            default_nested: ParsedNestedItem,
-            #[parse(default)]
-            default_default_nested: ParsedNestedItem,
-            #[parse(with = custom_parse)]
-            custom_parse: u64,
-            #[parse(enumeration)]
-            enum_value: Enum,
-            #[parse(oneof)]
-            oneof: ParsedOneofKind,
-            #[parse(keep)]
-            kept_nested: Option<NestedItem>,
-            #[parse(skip)]
-            extra: i32,
-        }
-
         #[derive(Parse, Debug, Default, PartialEq)]
-        #[parse(source = NestedItem, write)]
+        #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
         struct ParsedNestedItem {}
-
-        mod custom_parse {
-            use super::*;
-
-            pub fn parse(value: String) -> RequestResult<u64> {
-                value
-                    .parse()
-                    .map_err(|_| CommonError::InvalidNumericValue.into())
-            }
-
-            pub fn write(value: u64) -> String {
-                value.to_string()
-            }
-        }
-
-        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-        #[repr(i32)]
-        enum Enum {
-            Unspecified = 0,
-            A = 1,
-            B = 2,
-        }
-
-        impl TryFrom<i32> for Enum {
-            type Error = ();
-
-            fn try_from(value: i32) -> Result<Self, Self::Error> {
-                match value {
-                    0 => Ok(Self::Unspecified),
-                    1 => Ok(Self::A),
-                    2 => Ok(Self::B),
-                    _ => Err(()),
-                }
-            }
-        }
 
         #[derive(Debug, PartialEq)]
         #[allow(dead_code)]
@@ -217,7 +196,7 @@ mod tests {
 
         #[derive(Parse, Debug, PartialEq)]
         #[allow(dead_code)]
-        #[parse(source = OneofKind, write)]
+        #[parse(bomboni_crate = bomboni, source = OneofKind, write)]
         enum ParsedOneofKind {
             String(String),
             Boolean(bool),
@@ -231,6 +210,12 @@ mod tests {
                     Self::Boolean(_) => "boolean",
                     Self::Nested(_) => "nested",
                 }
+            }
+        }
+
+        impl Default for OneofKind {
+            fn default() -> Self {
+                Self::Boolean(false)
             }
         }
 
@@ -297,14 +282,6 @@ mod tests {
         );
         assert_parse_field_err!(
             Item {
-                custom_parse: "abc".into(),
-                ..Default::default()
-            },
-            "custom_parse",
-            &CommonError::InvalidNumericValue
-        );
-        assert_parse_field_err!(
-            Item {
                 enum_value: 99,
                 ..Default::default()
             },
@@ -338,7 +315,6 @@ mod tests {
                 optional_nested: Some(NestedItem {}),
                 default_nested: None,
                 default_default_nested: None,
-                custom_parse: "42".into(),
                 enum_value: 1,
                 oneof: Some(OneofKind::String("abc".into())),
                 kept_nested: Some(NestedItem {}),
@@ -353,14 +329,12 @@ mod tests {
                 optional_nested: Some(ParsedNestedItem {}),
                 default_nested: ParsedNestedItem {},
                 default_default_nested: ParsedNestedItem {},
-                custom_parse: 42,
-                enum_value: Enum::A,
+                enum_value: DataTypeEnum::String,
                 oneof: ParsedOneofKind::String("abc".into()),
                 kept_nested: Some(NestedItem {}),
                 extra: 0,
             }
         );
-
         assert_eq!(
             Item::from(ParsedItem {
                 s: "abc".into(),
@@ -371,8 +345,7 @@ mod tests {
                 optional_nested: Some(ParsedNestedItem {}),
                 default_nested: ParsedNestedItem {},
                 default_default_nested: ParsedNestedItem {},
-                custom_parse: 1337,
-                enum_value: Enum::B,
+                enum_value: DataTypeEnum::Boolean,
                 oneof: ParsedOneofKind::String("abc".into()),
                 kept_nested: Some(NestedItem {}),
                 extra: 0,
@@ -386,7 +359,6 @@ mod tests {
                 optional_nested: Some(NestedItem {}),
                 default_nested: Some(NestedItem {}),
                 default_default_nested: Some(NestedItem {}),
-                custom_parse: "1337".into(),
                 enum_value: 2,
                 oneof: Some(OneofKind::String("abc".into())),
                 kept_nested: Some(NestedItem {}),
@@ -395,284 +367,246 @@ mod tests {
     }
 
     #[test]
-    fn parse_regex() {
-        #[derive(Debug)]
+    fn extracts() {
+        #[derive(Debug, PartialEq)]
         struct Item {
-            value: String,
-        }
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item)]
-        struct ParsedItem {
-            #[parse(regex = "^[a-z]+$")]
-            value: String,
+            value: i32,
+            optional_value: Option<i32>,
+            nested: Option<NestedItem>,
+            default_value: Option<i32>,
+            source_box: Box<i32>,
+            target_box: i32,
+            keep_box: Box<i32>,
         }
 
-        assert!(ParsedItem::parse(Item {
-            value: "abc".into(),
-        })
-        .is_ok());
-        assert!(matches!(
-            ParsedItem::parse(Item {
-                value: "123".into(),
-            })
-            .unwrap_err(),
-            RequestError::Path(PathError {
-                error, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::InvalidStringFormat { .. }
-            )
-        ));
-    }
-
-    #[test]
-    fn custom_parse_fields() {
-        #[derive(Debug)]
-        struct Item {
+        #[derive(Debug, PartialEq, Clone)]
+        struct NestedItem {
             name: String,
-            value: String,
+            description: Option<String>,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItem {
+            value: i32,
+            #[parse(extract = [Unwrap])]
+            optional_value: i32,
+            #[parse(source = "nested?.name")]
+            name: String,
+            #[parse(source = "nested?.description")]
+            description: Option<String>,
+            #[parse(extract = [UnwrapOr(42i32)])]
+            default_value: i32,
+            #[parse(extract = [Unbox])]
+            source_box: i32,
+            target_box: Box<i32>,
+            #[parse(extract = [Unbox])]
+            keep_box: Box<i32>,
         }
 
         impl Default for Item {
             fn default() -> Self {
                 Self {
-                    name: "a/1/b/1".into(),
-                    value: "42".into(),
+                    value: 1,
+                    optional_value: Some(1),
+                    nested: Some(NestedItem::default()),
+                    default_value: Some(1),
+                    source_box: Box::new(1),
+                    target_box: 1,
+                    keep_box: Box::new(1),
                 }
             }
         }
 
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item)]
-        struct ParsedItem {
-            #[parse(parse_with = parse_name)]
-            name: (u32, u64),
-            #[parse(parse_with = parse_value)]
-            value: i32,
+        impl Default for NestedItem {
+            fn default() -> Self {
+                Self {
+                    name: "abc".into(),
+                    description: Some("abc".into()),
+                }
+            }
         }
 
         impl Default for ParsedItem {
             fn default() -> Self {
                 Self {
-                    name: (1, 1),
-                    value: 42,
+                    value: 1,
+                    optional_value: 1,
+                    name: "abc".into(),
+                    description: Some("abc".into()),
+                    default_value: 1,
+                    source_box: 1,
+                    target_box: Box::new(1),
+                    keep_box: Box::new(1),
                 }
             }
         }
 
-        fn parse_name<S: ToString>(name: S) -> RequestResult<(u32, u64)> {
-            let name = name.to_string();
-            Ok(parse_resource_name!({
-                "a": u32,
-                "b": u64,
-            })(&name)
-            .ok_or_else(|| CommonError::InvalidName {
-                expected_format: "...".into(),
-                name,
-            })?)
-        }
-
-        fn parse_value<S: ToString>(value: S) -> RequestResult<i32> {
-            let value = value.to_string();
-            Ok(value
-                .parse()
-                .map_err(|_| CommonError::InvalidNumericValue)?)
-        }
-
         assert_eq!(
             ParsedItem::parse(Item {
-                name: "a/42/b/1337".into(),
-                ..Default::default()
+                value: 42,
+                optional_value: Some(42),
+                nested: Some(NestedItem {
+                    name: "name".into(),
+                    description: Some("description".into()),
+                }),
+                default_value: Some(42),
+                source_box: Box::new(42),
+                target_box: 42,
+                keep_box: Box::new(42),
             })
             .unwrap(),
             ParsedItem {
-                name: (42, 1337),
-                ..Default::default()
-            }
-        );
-        assert!(matches!(
-            ParsedItem::parse(Item {
-                name: "123".into(),
-                ..Default::default()
-            })
-            .unwrap_err(),
-            RequestError::Path(PathError {
-                error, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::InvalidName { .. }
-            )
-        ));
-    }
-
-    #[test]
-    fn parse_maps() {
-        impl_parse_into_map!(
-            pub parse1,
-            |item: i32| -> (i32, String) { (item, item.to_string()) },
-        );
-        assert_eq!(
-            parse1::parse(vec![1, 2, 3]).unwrap(),
-            btree_map_into! {
-                1 => "1",
-                2 => "2",
-                3 => "3",
-            }
-        );
-
-        impl_parse_into_map!(
-            parse2,
-            |item: &'static str| -> RequestResult<(i32, String)> {
-                let value: i32 = item.parse().map_err(|_| CommonError::InvalidNumericValue)?;
-                Ok((value, item.to_string()))
-            },
-        );
-        assert_eq!(
-            parse2::parse(vec!["1", "2", "3"]).unwrap(),
-            btree_map_into! {
-                1 => "1",
-                2 => "2",
-                3 => "3",
-            }
-        );
-
-        impl_parse_into_map!(
-            parse3,
-            |item| (item, ""),
-            |item: (i32, &'static str)| -> i32 { item.0 },
-        );
-        assert_eq!(
-            parse3::write(btree_map! {
-                1 => "1",
-                2 => "2",
-                3 => "3",
-            }),
-            vec![1, 2, 3]
-        );
-
-        #[derive(Debug, Default)]
-        struct Item {
-            values: Vec<(i32, i32)>,
-        }
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item)]
-        struct ParsedItem {
-            #[parse(with = values_parse_hash)]
-            values: HashMap<i32, i32>,
-        }
-
-        impl_parse_into_map!(
-            values_parse_hash,
-            HashMap,
-            |item: (i32, i32)| -> (i32, i32) { item },
-        );
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                values: vec![(1, 2), (2, 4), (3, 9)],
-            })
-            .unwrap(),
-            ParsedItem {
-                values: hash_map_into! {
-                    1 => 2,
-                    2 => 4,
-                    3 => 9,
-                },
-            }
-        );
-        assert!(matches!(
-            ParsedItem::parse(Item {
-                values: vec![(1, 2), (1, 4)],
-            })
-            .unwrap_err(),
-            RequestError::Path(PathError {
-                error, ..
-            }) if matches!(
-                error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::DuplicateValue
-            )
-        ));
-    }
-
-    #[test]
-    fn parse_resource() {
-        #[derive(Debug, PartialEq, Default)]
-        struct Item {
-            name: String,
-            create_time: Option<Timestamp>,
-            update_time: Option<Timestamp>,
-            delete_time: Option<Timestamp>,
-            deleted: bool,
-            etag: Option<String>,
-        }
-
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, write)]
-        struct ParsedItem {
-            #[parse(resource {
-                fields = [name, create_time, deleted, etag],
-            })]
-            resource: ParsedResource,
-        }
-
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, write)]
-        struct ParsedItemDefaultResource {
-            #[parse(resource)]
-            resource: ParsedResource,
-        }
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                name: "items/42".into(),
-                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
-                deleted: true,
-                etag: Some("abc".into()),
-                ..Default::default()
-            })
-            .unwrap(),
-            ParsedItem {
-                resource: ParsedResource {
-                    name: "items/42".into(),
-                    create_time: Some(UtcDateTime::UNIX_EPOCH),
-                    deleted: true,
-                    etag: Some("abc".into()),
-                    ..Default::default()
-                }
+                value: 42,
+                optional_value: 42,
+                name: "name".into(),
+                description: Some("description".into()),
+                default_value: 42,
+                source_box: 42,
+                target_box: Box::new(42),
+                keep_box: Box::new(42),
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
-                resource: ParsedResource {
-                    name: "items/42".into(),
-                    create_time: Some(UtcDateTime::UNIX_EPOCH),
-                    deleted: true,
-                    ..Default::default()
-                },
+                value: 42,
+                optional_value: 42,
+                name: "name".into(),
+                description: Some("description".into()),
+                default_value: 42,
+                source_box: 42,
+                target_box: Box::new(42),
+                keep_box: Box::new(42),
             }),
             Item {
-                name: "items/42".into(),
-                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
-                deleted: true,
-                ..Default::default()
+                value: 42,
+                optional_value: Some(42),
+                nested: Some(NestedItem {
+                    name: "name".into(),
+                    description: Some("description".into()),
+                }),
+                default_value: Some(42),
+                source_box: Box::new(42),
+                target_box: 42,
+                keep_box: Box::new(42),
             }
         );
 
         assert_eq!(
-            ParsedItemDefaultResource::parse(Item {
-                name: "items/42".into(),
-                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
-                deleted: true,
+            ParsedItem::parse(Item {
+                default_value: None,
                 ..Default::default()
             })
             .unwrap(),
-            ParsedItemDefaultResource {
-                resource: ParsedResource {
-                    name: "items/42".into(),
-                    create_time: Some(UtcDateTime::UNIX_EPOCH),
-                    deleted: true,
-                    ..Default::default()
+            ParsedItem {
+                default_value: 42,
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn parse_strings() {
+        #[derive(Debug, PartialEq)]
+        struct Item {
+            required: String,
+            possibly_empty: String,
+            regex_validated: String,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItem {
+            required: String,
+            #[parse(extract = [StringFilterEmpty])]
+            possibly_empty: Option<String>,
+            #[parse(regex = "^[a-z]+$")]
+            regex_validated: String,
+        }
+
+        impl Default for Item {
+            fn default() -> Self {
+                Self {
+                    required: "required".into(),
+                    possibly_empty: "possibly_empty".into(),
+                    regex_validated: "regex".into(),
                 }
+            }
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item::default()).unwrap(),
+            ParsedItem {
+                required: "required".into(),
+                possibly_empty: Some("possibly_empty".into()),
+                regex_validated: "regex".into(),
+            }
+        );
+
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                required: String::new(),
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error, path, ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("required".into())
+        ));
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                regex_validated: "123".into(),
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error, path, ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::InvalidStringFormat { .. }
+            ) && path[0] == PathErrorStep::Field("regex_validated".into())
+        ));
+    }
+
+    #[test]
+    fn parse_enumerations() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            required: i32,
+            optional: i32,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItem {
+            #[parse(enumeration)]
+            required: DataTypeEnum,
+            #[parse(enumeration, extract = [EnumerationFilterUnspecified])]
+            optional: Option<DataTypeEnum>,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                required: 1,
+                optional: 0,
+            })
+            .unwrap(),
+            ParsedItem {
+                required: DataTypeEnum::String,
+                optional: None,
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                required: DataTypeEnum::String,
+                optional: None,
+            }),
+            Item {
+                required: 1,
+                optional: 0,
             }
         );
     }
@@ -683,103 +617,133 @@ mod tests {
         struct Item {
             x: i32,
             y: i32,
-            name: String,
+            id: String,
         }
-        #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, write)]
+
+        #[derive(Debug, PartialEq)]
+        struct Oneof {
+            kind: Option<OneofKind>,
+        }
+
+        #[derive(Debug, PartialEq)]
+        enum OneofKind {
+            Pos((i32, i32)),
+        }
+
+        impl OneofKind {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::Pos(_) => "pos",
+                }
+            }
+        }
+
+        #[derive(Parse, Debug, PartialEq, Default)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            #[parse(derive = derive_value)]
-            z: i32,
-            name: String,
-            #[parse(derive = derive_upper_name)]
-            upper_name: String,
-            #[parse(derive = (derive_lower_name, name))]
-            lower_name: String,
+            #[parse(derive { parse = pos_parse, write = pos_write })]
+            pos: String,
+            #[parse(derive { parse = id_parse, write = id_write, field = id })]
+            id: u64,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
+        enum ParsedOneof {
+            #[parse(derive { parse = pos_oneof_parse, write = pos_oneof_write })]
+            Pos(String),
         }
 
         #[allow(clippy::unnecessary_wraps)]
-        fn derive_value(item: &Item) -> RequestResult<i32> {
-            Ok(item.x + item.y)
+        fn pos_parse(item: &Item) -> RequestResult<String> {
+            Ok(format!("{}, {}", item.x, item.y))
+        }
+
+        fn pos_write(target: &ParsedItem, source: &mut Item) {
+            let parts: Vec<&str> = target.pos.split(", ").collect();
+            source.x = parts[0].parse().unwrap();
+            source.y = parts[1].parse().unwrap();
         }
 
         #[allow(clippy::unnecessary_wraps)]
-        fn derive_upper_name(item: &Item) -> RequestResult<String> {
-            Ok(item.name.to_uppercase())
+        fn pos_oneof_parse(item: (i32, i32)) -> RequestResult<String> {
+            Ok(format!("{}, {}", item.0, item.1))
+        }
+
+        fn pos_oneof_write(target: String) -> (i32, i32) {
+            let parts: Vec<&str> = target.split(", ").collect();
+            (parts[0].parse().unwrap(), parts[1].parse().unwrap())
         }
 
         #[allow(clippy::unnecessary_wraps)]
-        fn derive_lower_name(name: &str, field_name: &str) -> RequestResult<String> {
-            assert_eq!(field_name, "name");
-            Ok(name.to_lowercase())
+        fn id_parse(id: String) -> RequestResult<u64> {
+            if id.is_empty() {
+                return Err(CommonError::RequiredFieldMissing.into());
+            }
+            Ok(id.parse().unwrap())
+        }
+
+        fn id_write(id: u64) -> String {
+            id.to_string()
         }
 
         assert_eq!(
             ParsedItem::parse(Item {
-                x: 3,
-                y: 5,
-                name: "Item".into()
-            })
-            .unwrap()
-            .z,
-            8
-        );
-        assert_eq!(
-            ParsedItem::parse(Item {
-                x: 3,
-                y: 5,
-                name: "Item".into()
+                x: 1,
+                y: 2,
+                id: "42".into(),
             })
             .unwrap(),
             ParsedItem {
-                z: 8,
-                name: "Item".into(),
-                upper_name: "ITEM".into(),
-                lower_name: "item".into(),
+                pos: "1, 2".into(),
+                id: 42,
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
-                z: 8,
-                name: "Item".into(),
-                upper_name: String::new(),
-                lower_name: String::new(),
+                pos: "1, 2".into(),
+                id: 42,
             }),
             Item {
-                x: 0,
-                y: 0,
-                name: "Item".into()
+                x: 1,
+                y: 2,
+                id: "42".into(),
+            }
+        );
+
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                id: String::new(),
+                ..Default::default()
+            }).unwrap_err(),
+            RequestError::Path(PathError {
+                error,
+                path,
+                ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("id".into())
+        ));
+
+        assert_eq!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::Pos((1, 2))),
+            })
+            .unwrap(),
+            ParsedOneof::Pos("1, 2".into())
+        );
+        assert_eq!(
+            Oneof::from(ParsedOneof::Pos("1, 2".into())),
+            Oneof {
+                kind: Some(OneofKind::Pos((1, 2))),
             }
         );
     }
 
     #[test]
-    fn parse_names() {
-        let f = parse_resource_name!({
-            "users": u32,
-            "projects": u64,
-            "revisions": Option<String>,
-        });
-
-        let (user_id, project_id, revision_id) = f("users/3/projects/5/revisions/1337").unwrap();
-        assert_eq!(user_id, 3);
-        assert_eq!(project_id, 5);
-        assert_eq!(revision_id, Some("1337".to_string()));
-
-        let (user_id, project_id, revision_id) = f("users/3/projects/5").unwrap();
-        assert_eq!(user_id, 3);
-        assert_eq!(project_id, 5);
-        assert!(revision_id.is_none());
-
-        assert!(parse_resource_name!({
-            "a": u32,
-            "b": u32,
-        })("a/1/b/1/c/1")
-        .is_none());
-    }
-
-    #[test]
     fn parse_collections() {
-        #[derive(Debug, PartialEq, Default)]
+        #[derive(Debug, PartialEq)]
         struct Item {
             values: Vec<i32>,
             strings: Vec<String>,
@@ -796,7 +760,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = Item, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
             values: Vec<i32>,
             #[parse(regex = "^[a-z]$")]
@@ -811,9 +775,53 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = NestedItem, write)]
+        #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
         struct ParsedNestedItem {
             value: i32,
+        }
+
+        impl Default for Item {
+            fn default() -> Self {
+                Item {
+                    values: vec![1, 2, 3],
+                    strings: vec!["a".into(), "b".into()],
+                    items: vec![NestedItem { value: 1 }, NestedItem { value: 2 }],
+                    values_map: btree_map_into! {
+                        "a" => 1,
+                        "b" => 2,
+                    },
+                    items_map: hash_map_into! {
+                        1 => NestedItem { value: 1 },
+                        2 => NestedItem { value: 2 },
+                    },
+                    enums: vec![1],
+                    enum_map: btree_map! {
+                        1 => 1,
+                    },
+                }
+            }
+        }
+
+        impl Default for ParsedItem {
+            fn default() -> Self {
+                ParsedItem {
+                    values: vec![1, 2, 3],
+                    strings: vec!["a".into(), "b".into()],
+                    items: vec![ParsedNestedItem { value: 1 }, ParsedNestedItem { value: 2 }],
+                    values_map: btree_map_into! {
+                        "a" => 1,
+                        "b" => 2,
+                    },
+                    items_map: hash_map_into! {
+                        1 => ParsedNestedItem { value: 1 },
+                        2 => ParsedNestedItem { value: 2 },
+                    },
+                    enums: vec![DataTypeEnum::String],
+                    enum_map: btree_map! {
+                        1 => DataTypeEnum::String,
+                    },
+                }
+            }
         }
 
         assert_eq!(
@@ -853,6 +861,7 @@ mod tests {
                 },
             }
         );
+
         assert!(matches!(
             ParsedItem::parse(Item {
                 strings: vec!["Hello".into()],
@@ -926,69 +935,22 @@ mod tests {
     }
 
     #[test]
-    fn parse_boxes() {
+    fn wrapper_types() {
         #[derive(Debug, PartialEq, Default)]
         struct Item {
-            value: Box<i32>,
-            item: Option<Box<NestedItem>>,
-            unboxed_item: Option<Box<NestedItem>>,
-            optional_item: Option<Box<NestedItem>>,
-        }
-
-        #[derive(Debug, PartialEq, Default)]
-        struct NestedItem {
-            value: i32,
+            value_f32: Option<FloatValue>,
+            integer_16: Int32Value,
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = Item, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            value: Box<i32>,
-            item: Box<ParsedNestedItem>,
-            #[parse(source_box)]
-            unboxed_item: ParsedNestedItem,
-            optional_item: Option<Box<ParsedNestedItem>>,
+            #[parse(wrapper)]
+            value_f32: Option<f32>,
+            #[parse(wrapper)]
+            integer_16: i16,
         }
 
-        #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = NestedItem, write)]
-        struct ParsedNestedItem {
-            value: i32,
-        }
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                value: Box::new(42),
-                item: Some(Box::new(NestedItem { value: 42 })),
-                unboxed_item: Some(Box::new(NestedItem { value: 42 })),
-                optional_item: Some(Box::new(NestedItem { value: 42 })),
-            })
-            .unwrap(),
-            ParsedItem {
-                value: Box::new(42),
-                item: Box::new(ParsedNestedItem { value: 42 }),
-                unboxed_item: ParsedNestedItem { value: 42 },
-                optional_item: Some(Box::new(ParsedNestedItem { value: 42 })),
-            }
-        );
-        assert_eq!(
-            Item::from(ParsedItem {
-                value: Box::new(42),
-                item: Box::new(ParsedNestedItem { value: 42 }),
-                unboxed_item: ParsedNestedItem { value: 42 },
-                optional_item: Some(Box::new(ParsedNestedItem { value: 42 })),
-            }),
-            Item {
-                value: Box::new(42),
-                item: Some(Box::new(NestedItem { value: 42 })),
-                unboxed_item: Some(Box::new(NestedItem { value: 42 })),
-                optional_item: Some(Box::new(NestedItem { value: 42 })),
-            }
-        );
-    }
-
-    #[test]
-    fn variant_wrapper_value() {
         #[derive(Debug, Clone, PartialEq)]
         struct Value {
             kind: Option<ValueKind>,
@@ -1000,7 +962,7 @@ mod tests {
             U16(UInt32Value),
             String(StringValue),
             ISize(Int64Value),
-            USize(UInt32Value),
+            USize(UInt64Value),
         }
 
         impl ValueKind {
@@ -1016,7 +978,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
+        #[parse(bomboni_crate = bomboni, source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
         enum ParsedValue {
             #[parse(wrapper)]
             I32(i32),
@@ -1029,11 +991,116 @@ mod tests {
             #[parse(wrapper)]
             USize(usize),
         }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                value_f32: Some(FloatValue { value: 42.0 }),
+                integer_16: Int32Value { value: 42 },
+            })
+            .unwrap(),
+            ParsedItem {
+                value_f32: Some(42.0),
+                integer_16: 42,
+            }
+        );
+        assert_eq!(
+            Item::from(ParsedItem {
+                value_f32: Some(42.0),
+                integer_16: 42,
+            }),
+            Item {
+                value_f32: Some(FloatValue { value: 42.0 }),
+                integer_16: Int32Value { value: 42 },
+            }
+        );
+    }
+
+    #[test]
+    fn parse_oneof() {
+        #[derive(Debug, Clone, PartialEq)]
+        enum Item {
+            String(String),
+            Data(Data),
+            DataValue(Data),
+            Null(()),
+            Empty,
+            Dropped(i32),
+        }
+
+        impl Item {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::String(_) => "string",
+                    Self::Data(_) => "data",
+                    Self::DataValue(_) => "data_value",
+                    Self::Null(()) => "null",
+                    Self::Empty => "empty",
+                    Self::Dropped(_) => "dropped",
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, Default, PartialEq)]
+        struct Data {
+            value: i32,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        enum ParsedItem {
+            String(String),
+            Data(ParsedData),
+            #[parse(extract = [Field("value")])]
+            DataValue(i32),
+            Null(()),
+            #[parse(source_unit)]
+            Empty,
+            Dropped,
+        }
+
+        #[derive(Debug, Clone, Default, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Data, write)]
+        struct ParsedData {
+            value: i32,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item::String("abc".into())).unwrap(),
+            ParsedItem::String("abc".into())
+        );
+        assert_eq!(
+            Item::from(ParsedItem::String("abc".into())),
+            Item::String("abc".into())
+        );
+
+        assert!(matches!(
+            ParsedItem::parse(Item::String(String::new())).unwrap_err(),
+            RequestError::Path(PathError {
+                error,
+                path,
+                ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("string".into())
+        ));
+
+        assert_eq!(
+            ParsedItem::parse(Item::Data(Data { value: 42 })).unwrap(),
+            ParsedItem::Data(ParsedData { value: 42 })
+        );
+        assert_eq!(
+            Item::from(ParsedItem::Data(ParsedData { value: 42 })),
+            Item::Data(Data { value: 42 })
+        );
+
+        assert_eq!(ParsedItem::parse(Item::Empty).unwrap(), ParsedItem::Empty);
+        assert_eq!(Item::from(ParsedItem::Empty), Item::Empty);
     }
 
     #[test]
     fn parse_tagged_union() {
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone, PartialEq, Default)]
         struct Value {
             kind: Option<ValueKind>,
         }
@@ -1043,6 +1110,8 @@ mod tests {
             Number(i32),
             Inner(Box<Value>),
             Nested(NestedValue),
+            OptionalNested(Option<NestedValue>),
+            DefaultNested(Option<NestedValue>),
         }
 
         #[derive(Debug, Clone, Default, PartialEq)]
@@ -1056,20 +1125,26 @@ mod tests {
                     Self::Number(_) => "number",
                     Self::Inner(_) => "inner",
                     Self::Nested(_) => "nested",
+                    Self::OptionalNested(_) => "optional_nested",
+                    Self::DefaultNested(_) => "default_nested",
                 }
             }
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
+        #[parse(bomboni_crate = bomboni, source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
         enum ParsedValue {
             Number(i32),
+            #[parse(extract = [Unbox])]
             Inner(Box<ParsedValue>),
             Nested(ParsedNestedValue),
+            OptionalNested(Option<ParsedNestedValue>),
+            #[parse(extract = [UnwrapOrDefault])]
+            DefaultNested(ParsedNestedValue),
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(source = NestedValue, write)]
+        #[parse(bomboni_crate = bomboni, source = NestedValue, write)]
         struct ParsedNestedValue {
             value: i32,
         }
@@ -1119,154 +1194,44 @@ mod tests {
                 kind: Some(ValueKind::Nested(NestedValue { value: 42 })),
             }
         );
-    }
-
-    #[test]
-    fn parse_oneof() {
-        #[derive(Debug, Clone, PartialEq)]
-        enum Item {
-            String(String),
-            Data(Data),
-            Null(()),
-            Empty,
-            Dropped(i32),
-        }
-
-        impl Item {
-            pub fn get_variant_name(&self) -> &'static str {
-                match self {
-                    Self::String(_) => "string",
-                    Self::Data(_) => "data",
-                    Self::Null(()) => "null",
-                    Self::Empty => "empty",
-                    Self::Dropped(_) => "dropped",
-                }
-            }
-        }
-
-        #[derive(Debug, Clone, Default, PartialEq)]
-        struct Data {
-            value: i32,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source= Item, write)]
-        enum ParsedItem {
-            String(String),
-            Data(ParsedData),
-            Null(()),
-            #[parse(source_empty)]
-            Empty,
-            Dropped,
-        }
-
-        #[derive(Debug, Clone, Default, PartialEq, Parse)]
-        #[parse(source= Data, write)]
-        struct ParsedData {
-            value: i32,
-        }
 
         assert_eq!(
-            ParsedItem::parse(Item::String("abc".into())).unwrap(),
-            ParsedItem::String("abc".into())
-        );
-        assert_eq!(
-            Item::from(ParsedItem::String("abc".into())),
-            Item::String("abc".into())
-        );
-
-        assert_eq!(
-            ParsedItem::parse(Item::Data(Data { value: 42 })).unwrap(),
-            ParsedItem::Data(ParsedData { value: 42 })
-        );
-        assert_eq!(
-            Item::from(ParsedItem::Data(ParsedData { value: 42 })),
-            Item::Data(Data { value: 42 })
-        );
-
-        assert_eq!(ParsedItem::parse(Item::Empty).unwrap(), ParsedItem::Empty);
-        assert_eq!(Item::from(ParsedItem::Empty), Item::Empty);
-    }
-
-    #[test]
-    fn source_convert() {
-        #[derive(Debug, Clone, PartialEq, Default)]
-        struct Item {
-            casted_value: u32,
-            optional_casted: Option<u32>,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item, write)]
-        struct ParsedItem {
-            #[parse(source_try_from = u32)]
-            casted_value: usize,
-            #[parse(source_try_from = u32)]
-            optional_casted: Option<usize>,
-        }
-
-        #[derive(Debug, Clone, PartialEq)]
-        enum Union {
-            A(u32),
-            B(Option<u32>),
-        }
-
-        impl Union {
-            pub fn get_variant_name(&self) -> &'static str {
-                match self {
-                    Self::A(_) => "a",
-                    Self::B(_) => "b",
-                }
-            }
-        }
-
-        #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source = Union, write)]
-        enum ParsedUnion {
-            #[parse(source_try_from = u32)]
-            A(usize),
-            #[parse(source_try_from = u32)]
-            B(Option<usize>),
-        }
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                casted_value: 42,
-                optional_casted: Some(42),
+            ParsedValue::parse(Value {
+                kind: Some(ValueKind::OptionalNested(Some(NestedValue { value: 42 }))),
             })
             .unwrap(),
-            ParsedItem {
-                casted_value: 42,
-                optional_casted: Some(42),
+            ParsedValue::OptionalNested(Some(ParsedNestedValue { value: 42 }))
+        );
+        assert_eq!(
+            Value::from(ParsedValue::OptionalNested(Some(ParsedNestedValue {
+                value: 42
+            }))),
+            Value {
+                kind: Some(ValueKind::OptionalNested(Some(NestedValue { value: 42 }))),
             }
         );
         assert_eq!(
-            Item::from(ParsedItem {
-                casted_value: 42,
-                optional_casted: Some(42),
-            }),
-            Item {
-                casted_value: 42,
-                optional_casted: Some(42),
+            ParsedValue::parse(Value {
+                kind: Some(ValueKind::OptionalNested(None)),
+            })
+            .unwrap(),
+            ParsedValue::OptionalNested(None)
+        );
+        assert_eq!(
+            Value::from(ParsedValue::OptionalNested(None)),
+            Value {
+                kind: Some(ValueKind::OptionalNested(None)),
             }
         );
-
-        assert_eq!(
-            ParsedUnion::parse(Union::A(42)).unwrap(),
-            ParsedUnion::A(42)
-        );
-        assert_eq!(Union::from(ParsedUnion::A(42)), Union::A(42));
-        assert_eq!(Union::from(ParsedUnion::B(Some(42))), Union::B(Some(42)));
-        assert_eq!(Union::from(ParsedUnion::B(None)), Union::B(None));
     }
 
     #[test]
     fn parse_keep() {
         #[derive(Debug, Clone, PartialEq, Default)]
         struct Item {
+            value: i32,
             item: Option<NestedItem>,
-            default_item: Option<NestedItem>,
-            default_item_custom: Option<NestedItem>,
+            item_primitive: Option<NestedItem>,
         }
 
         #[derive(Debug, Clone, PartialEq, Default)]
@@ -1274,102 +1239,82 @@ mod tests {
             value: i32,
         }
 
+        #[derive(Debug, Clone, PartialEq)]
+        enum Oneof {
+            Item(NestedItem),
+            Vec(Vec<NestedItem>),
+        }
+
+        impl Oneof {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::Item(_) => "item",
+                    Self::Vec(_) => "vec",
+                }
+            }
+        }
+
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
+            #[parse(keep, source = "value")]
+            x: i32,
             #[parse(keep)]
-            item: NestedItem,
-            #[parse(keep, default)]
-            default_item: NestedItem,
-            #[parse(keep, default = get_default_item())]
-            default_item_custom: NestedItem,
+            item: Option<NestedItem>,
+            #[parse(keep_primitive, extract = [Unwrap])]
+            item_primitive: NestedItem,
         }
 
-        fn get_default_item() -> NestedItem {
-            NestedItem { value: 42 }
-        }
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                item: Some(NestedItem { value: 42 }),
-                default_item: None,
-                default_item_custom: None,
-            })
-            .unwrap(),
-            ParsedItem {
-                item: NestedItem { value: 42 },
-                default_item: NestedItem { value: 0 },
-                default_item_custom: NestedItem { value: 42 },
-            }
-        );
-        assert_eq!(
-            Item::from(ParsedItem {
-                item: NestedItem { value: 42 },
-                default_item: NestedItem { value: 0 },
-                default_item_custom: NestedItem { value: 42 },
-            }),
-            Item {
-                item: Some(NestedItem { value: 42 }),
-                default_item: Some(NestedItem { value: 0 }),
-                default_item_custom: Some(NestedItem { value: 42 }),
-            }
-        );
-    }
-
-    #[test]
-    fn parse_optional_vec() {
-        use values_parse::ItemValues;
-
-        #[derive(Debug, Clone, PartialEq, Default)]
-        struct Item {
-            values: Option<ItemValues>,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item, write)]
-        struct ParsedItem {
-            #[parse(with = values_parse)]
-            values: Option<Vec<i32>>,
-        }
-
-        mod values_parse {
-            use super::*;
-
-            #[derive(Debug, Clone, PartialEq, Default)]
-            pub struct ItemValues {
-                pub values: Vec<i32>,
-            }
-
-            #[allow(clippy::unnecessary_wraps)]
-            pub fn parse(values: ItemValues) -> RequestResult<Vec<i32>> {
-                Ok(values.values)
-            }
-
-            pub fn write(values: Vec<i32>) -> ItemValues {
-                ItemValues { values }
-            }
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Oneof, write)]
+        enum ParsedOneof {
+            #[parse(keep)]
+            Item(NestedItem),
+            #[parse(keep_primitive)]
+            Vec(Vec<NestedItem>),
         }
 
         assert_eq!(
             ParsedItem::parse(Item {
-                values: Some(ItemValues {
-                    values: vec![1, 2, 3],
-                }),
+                value: 42,
+                item: Some(NestedItem { value: 24 }),
+                item_primitive: Some(NestedItem { value: 24 }),
             })
             .unwrap(),
             ParsedItem {
-                values: Some(vec![1, 2, 3]),
+                x: 42,
+                item: Some(NestedItem { value: 24 }),
+                item_primitive: NestedItem { value: 24 },
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
-                values: Some(vec![1, 2, 3]),
+                x: 42,
+                item: Some(NestedItem { value: 24 }),
+                item_primitive: NestedItem { value: 24 },
             }),
             Item {
-                values: Some(ItemValues {
-                    values: vec![1, 2, 3],
-                }),
+                value: 42,
+                item: Some(NestedItem { value: 24 }),
+                item_primitive: Some(NestedItem { value: 24 }),
             }
+        );
+
+        assert_eq!(
+            ParsedOneof::parse(Oneof::Item(NestedItem { value: 42 })).unwrap(),
+            ParsedOneof::Item(NestedItem { value: 42 })
+        );
+        assert_eq!(
+            Oneof::from(ParsedOneof::Item(NestedItem { value: 42 })),
+            Oneof::Item(NestedItem { value: 42 })
+        );
+        assert_eq!(
+            ParsedOneof::parse(Oneof::Vec(vec![NestedItem { value: 42 }])).unwrap(),
+            ParsedOneof::Vec(vec![NestedItem { value: 42 }])
+        );
+        assert_eq!(
+            Oneof::from(ParsedOneof::Vec(vec![NestedItem { value: 42 }])),
+            Oneof::Vec(vec![NestedItem { value: 42 }])
         );
     }
 
@@ -1381,7 +1326,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item::<TSource>, write)]
+        #[parse(bomboni_crate = bomboni, source = Item::<TSource>, write)]
         struct ParsedItem<T, TSource, S = String>
         where
             T: Default + Debug + Clone + Into<TSource>,
@@ -1395,7 +1340,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item::<i32>, write)]
+        #[parse(bomboni_crate = bomboni, source = Item::<i32>, write)]
         struct ParsedItemI32<T>
         where
             T: Default + Debug + Clone + RequestParse<i32> + Into<i32>,
@@ -1445,26 +1390,30 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, list_query { field = list_query }, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedListQuery {
+            #[parse(list_query)]
             list_query: ListQuery,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, list_query { filter = false }, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedNoFilter {
+            #[parse(list_query { filter = false })]
             query: ListQuery,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, list_query, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedCustomToken {
+            #[parse(list_query)]
             query: ListQuery<u64>,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(source = Item, search_query { field = search_query }, write)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedSearchQuery {
+            #[parse(search_query)]
             search_query: SearchQuery,
         }
 
@@ -1728,92 +1677,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_source_nested() {
-        #[derive(Debug, Clone, PartialEq, Default)]
-        struct Item {
-            name: String,
-            item: Option<NestedItem>,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Default)]
-        struct NestedItem {
-            nested_value: Option<NestedValue>,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Default)]
-        struct NestedValue {
-            value: i32,
-            default_value: Option<i32>,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item, write)]
-        struct ParsedItem {
-            #[parse(keep)]
-            name: String,
-            #[parse(source_name = "item.nested_value.value")]
-            value: i32,
-            #[parse(source_option, source_name = "item.nested_value.default_value")]
-            default_value: i32,
-        }
-
-        assert_eq!(
-            ParsedItem::parse(Item {
-                name: String::new(),
-                item: Some(NestedItem {
-                    nested_value: Some(NestedValue {
-                        value: 42,
-                        default_value: Some(42)
-                    }),
-                }),
-            })
-            .unwrap(),
-            ParsedItem {
-                name: String::new(),
-                value: 42,
-                default_value: 42
-            }
-        );
-        assert_eq!(
-            Item::from(ParsedItem {
-                name: String::new(),
-                value: 42,
-                default_value: 42
-            }),
-            Item {
-                name: String::new(),
-                item: Some(NestedItem {
-                    nested_value: Some(NestedValue {
-                        value: 42,
-                        default_value: Some(42)
-                    }),
-                }),
-            }
-        );
-
-        assert!(matches!(
-            ParsedItem::parse(Item {
-                name: String::new(),
-                item: None,
-            }).unwrap_err(),
-            RequestError::Path(error) if matches!(
-                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::RequiredFieldMissing { .. }
-            ) && error.path_to_string() == "item"
-        ));
-        assert!(matches!(
-            ParsedItem::parse(Item {
-                name: String::new(),
-                item: Some(NestedItem{ nested_value: None }),
-            }).unwrap_err(),
-            RequestError::Path(error) if matches!(
-                error.error.as_any().downcast_ref::<CommonError>().unwrap(),
-                CommonError::RequiredFieldMissing { .. }
-            ) && error.path_to_string() == "item.nested_value"
-        ));
-    }
-
-    #[test]
     fn wrap_request_message() {
         #[derive(Debug, Clone, PartialEq, Default)]
         struct Request {
@@ -1825,16 +1688,16 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Request, request, write)]
+        #[parse(bomboni_crate = bomboni, source = Request, request, write)]
         struct ParsedRequest {
-            #[parse(source_option)]
+            #[parse(source = "value?")]
             value: i32,
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Request, request { name = "Test" }, write)]
+        #[parse(bomboni_crate = bomboni, source = Request, request { name = "Test" }, write)]
         struct ParsedCustomNameRequest {
-            #[parse(source_option)]
+            #[parse(source = "value?")]
             value: i32,
         }
 
@@ -1864,55 +1727,90 @@ mod tests {
     }
 
     #[test]
-    fn custom_default_field() {
-        #[derive(Debug, Clone, PartialEq, Default)]
+    fn parse_resource() {
+        #[derive(Debug, PartialEq, Default)]
         struct Item {
-            part: Option<Part>,
+            name: String,
+            create_time: Option<Timestamp>,
+            update_time: Option<Timestamp>,
+            delete_time: Option<Timestamp>,
+            deleted: bool,
+            etag: Option<String>,
         }
 
-        #[derive(Debug, Clone, PartialEq, Default)]
-        struct Part {
-            value: i32,
-        }
-
-        #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source = Item, write)]
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            #[parse(default = get_default_part())]
-            part: ParsedPart,
+            #[parse(resource {
+                fields {
+                    name = true,
+                    update_time {
+                        source = update_time,
+                        write = false,
+                    }
+                }
+            })]
+            resource: ParsedResource,
         }
 
-        #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source = Part, write)]
-        struct ParsedPart {
-            value: i32,
-        }
-
-        fn get_default_part() -> ParsedPart {
-            ParsedPart { value: 42 }
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItemDefaultResource {
+            #[parse(resource)]
+            resource: ParsedResource,
         }
 
         assert_eq!(
             ParsedItem::parse(Item {
-                part: Some(Part { value: 1337 }),
+                name: "items/42".into(),
+                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
+                deleted: true,
+                etag: Some("abc".into()),
+                ..Default::default()
             })
             .unwrap(),
             ParsedItem {
-                part: ParsedPart { value: 1337 },
-            }
-        );
-        assert_eq!(
-            ParsedItem::parse(Item { part: None }).unwrap(),
-            ParsedItem {
-                part: ParsedPart { value: 42 },
+                resource: ParsedResource {
+                    name: "items/42".into(),
+                    create_time: Some(UtcDateTime::UNIX_EPOCH),
+                    deleted: true,
+                    etag: Some("abc".into()),
+                    ..Default::default()
+                }
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
-                part: ParsedPart { value: 1337 },
+                resource: ParsedResource {
+                    name: "items/42".into(),
+                    create_time: Some(UtcDateTime::UNIX_EPOCH),
+                    deleted: true,
+                    ..Default::default()
+                },
             }),
             Item {
-                part: Some(Part { value: 1337 }),
+                name: "items/42".into(),
+                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
+                deleted: true,
+                ..Default::default()
+            }
+        );
+
+        assert_eq!(
+            ParsedItemDefaultResource::parse(Item {
+                name: "items/42".into(),
+                create_time: Some(UtcDateTime::UNIX_EPOCH.into()),
+                deleted: true,
+                ..Default::default()
+            })
+            .unwrap(),
+            ParsedItemDefaultResource {
+                resource: ParsedResource {
+                    name: "items/42".into(),
+                    create_time: Some(UtcDateTime::UNIX_EPOCH),
+                    deleted: true,
+                    ..Default::default()
+                }
             }
         );
     }
@@ -1925,7 +1823,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(source = Item, write, serde_as)]
+        #[parse(bomboni_crate = bomboni, source = Item, write, serde_as)]
         struct ParsedItem {
             value: i32,
         }
@@ -1936,5 +1834,121 @@ mod tests {
             serde_json::to_string_pretty(&ParsedItem { value: 42 }).unwrap(),
         );
         assert_eq!(serde_json::from_str::<ParsedItem>(&js).unwrap().value, 42);
+    }
+
+    #[test]
+    fn parse_names() {
+        let f = parse_resource_name!({
+            "users": u32,
+            "projects": u64,
+            "revisions": Option<String>,
+        });
+
+        let (user_id, project_id, revision_id) = f("users/3/projects/5/revisions/1337").unwrap();
+        assert_eq!(user_id, 3);
+        assert_eq!(project_id, 5);
+        assert_eq!(revision_id, Some("1337".to_string()));
+
+        let (user_id, project_id, revision_id) = f("users/3/projects/5").unwrap();
+        assert_eq!(user_id, 3);
+        assert_eq!(project_id, 5);
+        assert!(revision_id.is_none());
+
+        assert!(parse_resource_name!({
+            "a": u32,
+            "b": u32,
+        })("a/1/b/1/c/1")
+        .is_none());
+    }
+
+    #[test]
+    fn parse_maps() {
+        derived_map!(
+            pub parse1,
+            |item: i32| -> (i32, String) { (item, item.to_string()) },
+        );
+        assert_eq!(
+            parse1::parse(vec![1, 2, 3]).unwrap(),
+            btree_map_into! {
+                1 => "1",
+                2 => "2",
+                3 => "3",
+            }
+        );
+
+        derived_map!(
+            parse2,
+            |item: &'static str| -> RequestResult<(i32, String)> {
+                let value: i32 = item.parse().map_err(|_| CommonError::InvalidNumericValue)?;
+                Ok((value, item.to_string()))
+            },
+        );
+        assert_eq!(
+            parse2::parse(vec!["1", "2", "3"]).unwrap(),
+            btree_map_into! {
+                1 => "1",
+                2 => "2",
+                3 => "3",
+            }
+        );
+
+        derived_map!(
+            parse3,
+            |item| (item, ""),
+            |item: (i32, &'static str)| -> i32 { item.0 },
+        );
+        assert_eq!(
+            parse3::write(btree_map! {
+                1 => "1",
+                2 => "2",
+                3 => "3",
+            }),
+            vec![1, 2, 3]
+        );
+
+        #[derive(Debug, Default)]
+        struct Item {
+            values: Vec<(i32, i32)>,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        struct ParsedItem {
+            #[parse(derive { module = values_parse_hash, field = values })]
+            values: HashMap<i32, i32>,
+        }
+
+        derived_map!(
+            values_parse_hash,
+            HashMap,
+            |item: (i32, i32)| -> (i32, i32) { item },
+            |item: (i32, i32)| -> (i32, i32) { item },
+        );
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                values: vec![(1, 2), (2, 4), (3, 9)],
+            })
+            .unwrap(),
+            ParsedItem {
+                values: hash_map_into! {
+                    1 => 2,
+                    2 => 4,
+                    3 => 9,
+                },
+            }
+        );
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                values: vec![(1, 2), (1, 4)],
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error, ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::DuplicateValue
+            )
+        ));
     }
 }

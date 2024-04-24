@@ -66,31 +66,11 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         .compile_well_known_types()
         .protoc_arg("--experimental_allow_proto3_optional")
         .btree_map(["."]);
+
     build_serde(&mut config);
-
-    // #[cfg(all(
-    //     target_family = "wasm",
-    //     not(any(target_os = "emscripten", target_os = "wasi")),
-    //     // feature = "wasm",
-    // ))]
-    // panic!(
-    //     "FEATURES: {:?}, {:?}",
-    //     std::env::var("CARGO_FEATURE_FAKE"),
-    //     std::env::var("CARGO_FEATURE_WASM")
-    // );
-
-    // print target arch
-    // panic!(
-    //     "TARGET_FAMILY: {:?}",
-    //     std::env::var("CARGO_CFG_TARGET_FAMILY")
-    // );
-
+    build_copy_derive(&mut config);
     if std::env::var("CARGO_CFG_TARGET_FAMILY") == Ok("wasm".into()) && cfg!(feature = "wasm") {
         build_wasm(&mut config);
-    }
-
-    for type_path in get_copy_type_paths() {
-        config.message_attribute(type_path, r"#[derive(Copy)]");
     }
 
     config.compile_protos(&proto_paths, &["./proto"])?;
@@ -110,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
 fn build_serde(config: &mut Config) {
     // Camel cased
-    for type_name in [
+    for message_name in [
         "RetryInfo",
         "DebugInfo",
         "QuotaFailure",
@@ -123,7 +103,7 @@ fn build_serde(config: &mut Config) {
         "LocalizedMessage",
     ] {
         config.message_attribute(
-            format!(".google.rpc.{type_name}"),
+            format!(".google.rpc.{message_name}"),
             r#"
                 #[derive(::serde::Serialize, ::serde::Deserialize)]
                 #[serde(rename_all = "camelCase")]
@@ -151,10 +131,13 @@ fn build_serde(config: &mut Config) {
     );
 }
 
-fn get_copy_type_paths() -> impl Iterator<Item = String> {
-    ["Timestamp", "Empty", "Duration"]
-        .into_iter()
-        .map(|type_name| format!(".google.protobuf.{type_name}"))
+fn build_copy_derive(config: &mut Config) {
+    for message_name in ["Timestamp", "Empty", "Duration"] {
+        config.message_attribute(
+            format!(".google.protobuf.{message_name}"),
+            r"#[derive(Copy)]",
+        );
+    }
 }
 
 fn build_wasm(config: &mut Config) {
@@ -176,7 +159,7 @@ fn build_wasm(config: &mut Config) {
             format!(".google.rpc.{type_name}"),
             r"
                 #[derive(bomboni_wasm::Wasm)]
-                #[wasm(bomboni_wasm_crate = bomboni_wasm, wasm_abi)]
+                #[wasm(bomboni_crate = crate::bomboni, wasm_abi)]
             ",
         );
     }
@@ -204,7 +187,7 @@ fn build_wasm(config: &mut Config) {
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_wasm_crate = bomboni_wasm,
+                bomboni_crate = crate::bomboni,
                 wasm_abi,
                 js_value { convert_string },
                 override_type = "`${number}.${number}s` | `${number}s`",
@@ -216,7 +199,7 @@ fn build_wasm(config: &mut Config) {
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_wasm_crate = bomboni_wasm,
+                bomboni_crate = crate::bomboni,
                 wasm_abi,
                 js_value,
                 rename = "JsonObject",
@@ -229,7 +212,7 @@ fn build_wasm(config: &mut Config) {
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_wasm_crate = bomboni_wasm,
+                bomboni_crate = crate::bomboni,
                 wasm_abi,
                 js_value,
                 rename = "JsonValue",
@@ -244,7 +227,7 @@ fn build_wasm(config: &mut Config) {
             r#"
                 #[derive(bomboni_wasm::Wasm)]
                 #[wasm(
-                    bomboni_wasm_crate = bomboni_wasm,
+                    bomboni_crate = crate::bomboni,
                     wasm_abi,
                     js_value,
                     override_type = "Date",
@@ -257,7 +240,7 @@ fn build_wasm(config: &mut Config) {
             "
                 #[derive(bomboni_wasm::Wasm)]
                 #[wasm(
-                    bomboni_wasm_crate = bomboni_wasm,
+                    bomboni_crate = crate::bomboni,
                     wasm_abi,
                     js_value { convert_string },
                 )]

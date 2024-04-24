@@ -18,7 +18,7 @@ use thiserror::Error;
     ),
     derive(bomboni_wasm::Wasm),
     wasm(
-        bomboni_wasm_crate = bomboni_wasm,
+        bomboni_crate = crate::bomboni,
         into_wasm_abi,
         proxy { source = Status, try_from = RequestParse::parse },
     )
@@ -47,7 +47,7 @@ pub struct PathError {
     pub error: GenericErrorBox,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum PathErrorStep {
     Field(String),
     Index(usize),
@@ -149,41 +149,24 @@ impl RequestError {
     }
 
     #[must_use]
+    pub fn path<P, E>(path: P, error: E) -> Self
+    where
+        P: IntoIterator<Item = PathErrorStep>,
+        E: Into<GenericErrorBox>,
+    {
+        Self::Path(PathError {
+            path: path.into_iter().collect(),
+            error: error.into(),
+        })
+    }
+
+    #[must_use]
     pub fn field<F, E>(field: F, error: E) -> Self
     where
         F: Display,
         E: Into<GenericErrorBox>,
     {
-        PathError {
-            path: vec![PathErrorStep::Field(field.to_string())],
-            error: error.into(),
-        }
-        .into()
-    }
-
-    #[must_use]
-    pub fn index<E>(index: usize, error: E) -> Self
-    where
-        E: Into<GenericErrorBox>,
-    {
-        PathError {
-            path: vec![PathErrorStep::Index(index)],
-            error: error.into(),
-        }
-        .into()
-    }
-
-    #[must_use]
-    pub fn key<K, E>(key: K, error: E) -> Self
-    where
-        K: Display,
-        E: Into<GenericErrorBox>,
-    {
-        PathError {
-            path: vec![PathErrorStep::Key(key.to_string())],
-            error: error.into(),
-        }
-        .into()
+        Self::path([PathErrorStep::Field(field.to_string())], error)
     }
 
     #[must_use]
@@ -192,14 +175,13 @@ impl RequestError {
         F: Display,
         E: Into<GenericErrorBox>,
     {
-        PathError {
-            path: vec![
+        Self::path(
+            [
                 PathErrorStep::Field(field.to_string()),
                 PathErrorStep::Index(index),
             ],
-            error: error.into(),
-        }
-        .into()
+            error,
+        )
     }
 
     #[must_use]
@@ -209,66 +191,95 @@ impl RequestError {
         K: Display,
         E: Into<GenericErrorBox>,
     {
-        PathError {
-            path: vec![
+        Self::path(
+            [
                 PathErrorStep::Field(field.to_string()),
                 PathErrorStep::Key(key.to_string()),
             ],
-            error: error.into(),
-        }
-        .into()
+            error,
+        )
     }
 
     #[must_use]
-    pub fn wrap<F: Display>(self, field: F) -> Self {
+    pub fn field_parse<F, E>(field: F, error: E) -> Self
+    where
+        F: Display,
+        E: Into<GenericErrorBox>,
+    {
+        Self::path(PathError::parse_path(field.to_string()), error)
+    }
+
+    #[must_use]
+    pub fn index<E>(index: usize, error: E) -> Self
+    where
+        E: Into<GenericErrorBox>,
+    {
+        Self::path([PathErrorStep::Index(index)], error)
+    }
+
+    #[must_use]
+    pub fn key<K, E>(key: K, error: E) -> Self
+    where
+        K: Display,
+        E: Into<GenericErrorBox>,
+    {
+        Self::path([PathErrorStep::Key(key.to_string())], error)
+    }
+
+    #[must_use]
+    pub fn wrap_path<P>(self, path: P) -> Self
+    where
+        P: IntoIterator<Item = PathErrorStep>,
+    {
+        let mut path: Vec<_> = path.into_iter().collect();
+        match self {
+            Self::Path(error) => PathError {
+                path: {
+                    path.extend(error.path);
+                    path
+                },
+                error: error.error,
+            }
+            .into(),
+            Self::Generic(error) => Self::path(path, error),
+            err => panic!("cannot wrap error path `{path:?}` for: {err:?}"),
+        }
+    }
+
+    #[must_use]
+    pub fn insert_path<P>(self, path: P, index: usize) -> Self
+    where
+        P: IntoIterator<Item = PathErrorStep>,
+    {
+        let path: Vec<_> = path.into_iter().collect();
         match self {
             Self::Path(mut error) => PathError {
                 path: {
-                    error
-                        .path
-                        .insert(0, PathErrorStep::Field(field.to_string()));
+                    let tail: Vec<_> = error.path.splice(index.., path).collect();
+                    error.path.extend(tail);
                     error.path
                 },
                 error: error.error,
             }
             .into(),
-            Self::Generic(error) => Self::field(field, error),
-            // TODO: skip or panic?
-            err => err,
-            // _ => unreachable!(),
+            Self::Generic(error) => Self::path(path, error),
+            err => panic!("cannot insert error path `{path:?}` for: {err:?}"),
         }
+    }
+
+    #[must_use]
+    pub fn wrap_field<F: Display>(self, field: F) -> Self {
+        self.wrap_path([PathErrorStep::Field(field.to_string())])
     }
 
     #[must_use]
     pub fn wrap_index(self, index: usize) -> Self {
-        match self {
-            Self::Path(mut error) => PathError {
-                path: {
-                    error.path.insert(0, PathErrorStep::Index(index));
-                    error.path
-                },
-                error: error.error,
-            }
-            .into(),
-            Self::Generic(error) => Self::index(index, error),
-            err => err,
-        }
+        self.wrap_path([PathErrorStep::Index(index)])
     }
 
     #[must_use]
     pub fn wrap_key<K: Display>(self, key: K) -> Self {
-        match self {
-            Self::Path(mut error) => PathError {
-                path: {
-                    error.path.insert(0, PathErrorStep::Key(key.to_string()));
-                    error.path
-                },
-                error: error.error,
-            }
-            .into(),
-            Self::Generic(error) => Self::key(key, error),
-            err => err,
-        }
+        self.wrap_path([PathErrorStep::Key(key.to_string())])
     }
 
     #[must_use]
@@ -276,22 +287,10 @@ impl RequestError {
     where
         F: Display,
     {
-        match self {
-            Self::Path(error) => PathError {
-                path: {
-                    let mut path = vec![
-                        PathErrorStep::Field(field.to_string()),
-                        PathErrorStep::Index(index),
-                    ];
-                    path.extend(error.path);
-                    path
-                },
-                error: error.error,
-            }
-            .into(),
-            Self::Generic(error) => Self::field_index(field, index, error),
-            err => err,
-        }
+        self.wrap_path([
+            PathErrorStep::Field(field.to_string()),
+            PathErrorStep::Index(index),
+        ])
     }
 
     #[must_use]
@@ -300,22 +299,10 @@ impl RequestError {
         F: Display,
         K: Display,
     {
-        match self {
-            Self::Path(error) => PathError {
-                path: {
-                    let mut path = vec![
-                        PathErrorStep::Field(field.to_string()),
-                        PathErrorStep::Key(key.to_string()),
-                    ];
-                    path.extend(error.path);
-                    path
-                },
-                error: error.error,
-            }
-            .into(),
-            Self::Generic(error) => Self::field_key(field, key, error),
-            err => err,
-        }
+        self.wrap_path([
+            PathErrorStep::Field(field.to_string()),
+            PathErrorStep::Key(key.to_string()),
+        ])
     }
 
     #[must_use]
@@ -420,6 +407,26 @@ impl PathError {
         }
         path
     }
+
+    pub fn parse_path<P: AsRef<str>>(path: P) -> Vec<PathErrorStep> {
+        let parts: Vec<_> = path.as_ref().split('.').collect();
+        let mut steps = Vec::with_capacity(parts.len());
+        for part in parts {
+            let part = part.trim();
+            if let Some(index) = part.find('[') {
+                let field = &part[..index];
+                let index = part[index + 1..part.len() - 1].parse().unwrap();
+                steps.push(PathErrorStep::Field(field.to_string()));
+                steps.push(PathErrorStep::Index(index));
+            } else if let Some(index) = part.find('{') {
+                let key = &part[index + 1..part.len() - 1];
+                steps.push(PathErrorStep::Key(key.to_string()));
+            } else {
+                steps.push(PathErrorStep::Field(part.to_string()));
+            }
+        }
+        steps
+    }
 }
 
 impl Error for PathError {}
@@ -500,7 +507,7 @@ where
     T: 'static + GenericError + Send + Sync,
 {
     fn wrap<F: Display>(self, field: F) -> RequestError {
-        RequestError::generic(self).wrap(field)
+        RequestError::generic(self).wrap_field(field)
     }
 
     fn wrap_index(self, index: usize) -> RequestError {
@@ -575,16 +582,16 @@ mod tests {
     fn field_paths() {
         assert_eq!(
             RequestError::generic(CommonError::NotFound)
-                .wrap("value")
+                .wrap_field("value")
                 .wrap_index(42)
-                .wrap("root")
+                .wrap_field("root")
                 .to_string(),
             "field `root[42].value` error: `not found`"
         );
         assert!(matches!(
             RequestError::generic(CommonError::NotFound)
                 .wrap_index(42)
-                .wrap("value")
+                .wrap_field("value")
                 .wrap_request("Test"),
             RequestError::BadRequest { name, violations }
             if name == "Test" && violations.len() == 1
@@ -596,5 +603,56 @@ mod tests {
             if name == "Test" && violations.len() == 1
                 && violations[0].to_string() == "field `id` error: `invalid ID format`"
         ));
+    }
+
+    #[test]
+    fn parse_error_field_path() {
+        assert_eq!(
+            PathError::parse_path("test.x.field[42].y.{key}.value"),
+            vec![
+                PathErrorStep::Field("test".into()),
+                PathErrorStep::Field("x".into()),
+                PathErrorStep::Field("field".into()),
+                PathErrorStep::Index(42),
+                PathErrorStep::Field("y".into()),
+                PathErrorStep::Key("key".into()),
+                PathErrorStep::Field("value".into()),
+            ],
+        );
+
+        dbg!(
+            RequestError::field("x", CommonError::RequiredFieldMissing)
+                .wrap_index(42)
+                .wrap_key("abc")
+                .wrap_field("values")
+                .wrap_field("root"),
+            RequestError::field("x", CommonError::RequiredFieldMissing)
+                .wrap_index(42)
+                .wrap_key("abc")
+                .insert_path(
+                    [
+                        PathErrorStep::Field("root".into()),
+                        PathErrorStep::Field("values".into()),
+                    ],
+                    0
+                ),
+            RequestError::field("x", CommonError::RequiredFieldMissing)
+                .wrap_index(42)
+                .wrap_key("abc")
+                .insert_path(
+                    [
+                        PathErrorStep::Field("root".into()),
+                        PathErrorStep::Field("values".into()),
+                    ],
+                    1
+                ),
+        );
+
+        if let RequestError::Path(err) = RequestError::field("x", CommonError::RequiredFieldMissing)
+            .wrap_index(42)
+            .wrap_field("values")
+        {
+            println!("path: {}", err.path_to_string());
+        }
     }
 }
