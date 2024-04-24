@@ -26,13 +26,6 @@ pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<
                 "`wrapper` cannot be used with these options`",
             ));
         }
-
-        if variant.options.derive.is_some() && variant.options.source.is_some() {
-            return Err(syn::Error::new_spanned(
-                &variant.ident,
-                "`derive` and `source` cannot be used together",
-            ));
-        }
     }
 
     let mut result = parse::expand(options, variants)?;

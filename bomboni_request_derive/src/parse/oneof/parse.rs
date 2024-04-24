@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use bomboni_core::format_comment;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
@@ -148,6 +147,11 @@ fn expand_parse_variant(
     options: &ParseOptions,
     variant: &ParseVariant,
 ) -> syn::Result<TokenStream> {
+    let extract = get_variant_extract(variant)?;
+    let field_error_path_wrapper = quote! {
+        PathErrorStep::Field(variant_name.into())
+    };
+
     if let Some(ParseDerive {
         parse,
         module,
@@ -155,21 +159,40 @@ fn expand_parse_variant(
         ..
     }) = variant.options.derive.as_ref()
     {
-        if let Some(parse_impl) = parse
+        let parse_impl = parse
             .as_ref()
             .map(ToTokens::to_token_stream)
             .or_else(|| module.as_ref().map(|module| quote!(#module::parse)))
-        {
-            let value = if *source_borrow {
-                quote!(&source)
-            } else {
-                quote!(source)
-            };
+            .unwrap();
+
+        if variant.options.source.is_some() || variant.options.extract.is_some() {
+            let (extract_impl, field_path) = expand_field_extract(
+                &extract,
+                &BTreeSet::new(),
+                Some(&field_error_path_wrapper),
+                *source_borrow,
+            );
+            let field_error_path =
+                make_field_error_path(&field_path, Some(&field_error_path_wrapper));
+
             return Ok(quote! {
-                #parse_impl(#value)
-                    .map_err(|err: RequestError| err.wrap_field(variant_name))?
+                #extract_impl
+                let target = #parse_impl(target)
+                    .map_err(|err: RequestError| err.wrap_path(#field_error_path))?;
+                target
             });
         }
+
+        let source_value = if *source_borrow {
+            quote!(&source)
+        } else {
+            quote!(source)
+        };
+
+        return Ok(quote! {
+            #parse_impl(#source_value)
+                .map_err(|err: RequestError| err.wrap_field(variant_name))?
+        });
     }
 
     if variant.options.keep {
@@ -181,30 +204,20 @@ fn expand_parse_variant(
     let variant_type = variant.fields.iter().next().unwrap();
     let field_type_info = get_field_type_info(options, &variant.options, variant_type)?;
 
-    let extract = get_variant_extract(variant)?;
-    let field_error_path_wrapper = quote! {
-        PathErrorStep::Field(variant_name.into())
-    };
-    let (extract_impl, field_path) =
-        expand_field_extract(&extract, &BTreeSet::new(), Some(&field_error_path_wrapper));
+    let (extract_impl, field_path) = expand_field_extract(
+        &extract,
+        &BTreeSet::new(),
+        Some(&field_error_path_wrapper),
+        false,
+    );
 
     let field_error_path = make_field_error_path(&field_path, Some(&field_error_path_wrapper));
     let parse_inner_impl =
         expand_field_parse_type(&variant.options, &field_type_info, field_error_path);
 
-    let comment = format_comment!(
-        "\nParse variant `{}`\n{:#?}\n{:#?}",
-        &variant.ident,
-        field_type_info,
-        extract,
-    );
-
     Ok(quote! {
-        #comment
-        {
-            #extract_impl
-            #parse_inner_impl
-            target
-        }
+        #extract_impl
+        #parse_inner_impl
+        target
     })
 }

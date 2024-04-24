@@ -1,4 +1,4 @@
-use bomboni_core::{format_comment, syn::type_is_phantom};
+use bomboni_core::syn::type_is_phantom;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use std::collections::BTreeSet;
@@ -162,46 +162,40 @@ fn expand_parse_field(
     field_clone_set: &BTreeSet<String>,
 ) -> syn::Result<TokenStream> {
     let target_ident = field.ident.as_ref().unwrap();
+    let extract = get_field_extract(field)?;
 
     if let Some(ParseDerive {
         parse,
         module,
-        source_field,
         source_borrow,
         ..
     }) = field.options.derive.as_ref()
     {
-        if let Some(parse_impl) = parse
+        let parse_impl = parse
             .as_ref()
             .map(ToTokens::to_token_stream)
             .or_else(|| module.as_ref().map(|module| quote!(#module::parse)))
-        {
-            return Ok(if let Some(source_field) = source_field.as_ref() {
-                let mut value = if *source_borrow {
-                    quote!(&source.#source_field)
-                } else {
-                    quote!(source.#source_field)
-                };
-                let source_field_name = source_field.to_string();
-                if field_clone_set.contains(&source_field_name) {
-                    value = quote! { #value.clone() };
-                }
-                let source_field_name = source_field.to_string();
-                quote! {
-                    #target_ident: {
-                        #parse_impl(#value)
-                            .map_err(|err: RequestError| err.wrap_field(#source_field_name))?
-                    },
-                }
-            } else {
-                quote! {
-                    #target_ident: { #parse_impl(&source)? },
-                }
+            .unwrap();
+
+        if field.options.source.is_some() || field.options.extract.is_some() {
+            let (extract_impl, field_path) =
+                expand_field_extract(&extract, field_clone_set, None, *source_borrow);
+            let field_error_path = make_field_error_path(&field_path, None);
+
+            return Ok(quote! {
+                #target_ident: {
+                    #extract_impl
+                    #parse_impl(target)
+                        .map_err(|err: RequestError| err.wrap_path(#field_error_path))?
+                },
             });
         }
+
+        return Ok(quote! {
+            #target_ident: { #parse_impl(&source)? },
+        });
     }
 
-    let extract = get_field_extract(field)?;
     let field_type_info = get_field_type_info(options, &field.options, &field.ty)?;
 
     if field.options.keep {
@@ -223,21 +217,13 @@ fn expand_parse_field(
         ));
     }
 
-    let (extract_impl, field_path) = expand_field_extract(&extract, field_clone_set, None);
+    let (extract_impl, field_path) = expand_field_extract(&extract, field_clone_set, None, false);
 
     let field_error_path = make_field_error_path(&field_path, None);
     let parse_inner_impl =
         expand_field_parse_type(&field.options, &field_type_info, field_error_path);
 
-    let comment = format_comment!(
-        "\nParse field `{}`\n{:#?}\n{:#?}",
-        target_ident,
-        field_type_info,
-        extract
-    );
-
     Ok(quote! {
-        #comment
         #target_ident: {
             #extract_impl
             #parse_inner_impl
@@ -260,6 +246,7 @@ fn expand_parse_resource_field(options: &ParseResource, field: &ParseField) -> T
                     CommonError::RequiredFieldMissing,
                 ));
             }
+            // TODO: avoid clone
             result.name = source.#source_ident.clone();
         });
     }

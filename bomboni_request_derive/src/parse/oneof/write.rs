@@ -1,4 +1,3 @@
-use bomboni_core::format_comment;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
@@ -143,33 +142,7 @@ fn expand_write_variant(
     options: &ParseOptions,
     variant: &ParseVariant,
 ) -> syn::Result<TokenStream> {
-    if let Some(ParseDerive {
-        write,
-        module,
-        target_borrow,
-        ..
-    }) = variant.options.derive.as_ref()
-    {
-        if let Some(write_impl) = write
-            .as_ref()
-            .map(ToTokens::to_token_stream)
-            .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
-        {
-            let value = if *target_borrow {
-                quote!(&target)
-            } else {
-                quote!(target)
-            };
-            return Ok(quote! {
-                *source = #write_impl(#value);
-            });
-        }
-
-        return Err(syn::Error::new_spanned(
-            &variant.ident,
-            "missing derive write implementation",
-        ));
-    }
+    let target_ident = &variant.ident;
 
     let extract = get_variant_extract(variant)?;
     let mut inject_impl = if matches!(
@@ -224,26 +197,54 @@ fn expand_write_variant(
         }
     }
 
-    let target_ident = &variant.ident;
+    if let Some(ParseDerive {
+        write,
+        module,
+        target_borrow,
+        ..
+    }) = variant.options.derive.as_ref()
+    {
+        let write_impl = write
+            .as_ref()
+            .map(ToTokens::to_token_stream)
+            .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
+            .ok_or_else(|| {
+                syn::Error::new_spanned(target_ident, "missing derive write implementation")
+            })?;
+
+        if variant.options.source.is_some() || variant.options.extract.is_some() {
+            let source_value = if *target_borrow {
+                quote!(&target)
+            } else {
+                quote!(target)
+            };
+
+            return Ok(quote! {
+                let source_field = #write_impl(#source_value);
+                #set_impl
+                #inject_impl = source_field;
+            });
+        }
+
+        let target_value = if *target_borrow {
+            quote!(&target)
+        } else {
+            quote!(target)
+        };
+        return Ok(quote! {
+            *source = #write_impl(#target_value);
+        });
+    }
+
     let variant_type = variant.fields.iter().next().unwrap();
     let field_type_info = get_field_type_info(options, &variant.options, variant_type)?;
 
     let write_inner_impl = expand_field_write_type(&variant.options, &field_type_info);
 
-    let comment = format_comment!(
-        "\n Write variant `{}`\n{:#?}\n{:#?}",
-        target_ident,
-        field_type_info,
-        &extract.steps
-    );
-
     Ok(quote! {
-        #comment
-        {
-            let source_field = target;
-            #write_inner_impl
-            #set_impl
-            #inject_impl = source_field;
-        }
+        let source_field = target;
+        #write_inner_impl
+        #set_impl
+        #inject_impl = source_field;
     })
 }

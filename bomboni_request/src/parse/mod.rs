@@ -628,12 +628,14 @@ mod tests {
         #[derive(Debug, PartialEq)]
         enum OneofKind {
             Pos((i32, i32)),
+            Float(Option<FloatValue>),
         }
 
         impl OneofKind {
             pub fn get_variant_name(&self) -> &'static str {
                 match self {
                     Self::Pos(_) => "pos",
+                    Self::Float(_) => "float",
                 }
             }
         }
@@ -644,7 +646,7 @@ mod tests {
             #[parse(derive { parse = pos_parse, write = pos_write })]
             pos: String,
             name: String,
-            #[parse(derive { parse = id_parse, write = id_write, source_field = name, target_field = id })]
+            #[parse(source = "name", derive { parse = id_parse, write = id_write })]
             id: u64,
         }
 
@@ -676,6 +678,8 @@ mod tests {
         enum ParsedOneof {
             #[parse(derive { parse = pos_oneof_parse, write = pos_oneof_write })]
             Pos(String),
+            #[parse(extract = [UnwrapOrDefault], derive { parse = float_parse, write = float_write })]
+            Float(f64),
         }
 
         #[allow(clippy::unnecessary_wraps)]
@@ -686,6 +690,17 @@ mod tests {
         fn pos_oneof_write(target: String) -> (i32, i32) {
             let parts: Vec<&str> = target.split(", ").collect();
             (parts[0].parse().unwrap(), parts[1].parse().unwrap())
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        fn float_parse(value: FloatValue) -> RequestResult<f64> {
+            Ok(f64::from(value.value))
+        }
+
+        fn float_write(value: f64) -> FloatValue {
+            FloatValue {
+                value: value as f32,
+            }
         }
 
         assert_eq!(
@@ -740,6 +755,19 @@ mod tests {
             Oneof::from(ParsedOneof::Pos("1, 2".into())),
             Oneof {
                 kind: Some(OneofKind::Pos((1, 2))),
+            }
+        );
+        assert_eq!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::Float(Some(FloatValue { value: 1.0 }))),
+            })
+            .unwrap(),
+            ParsedOneof::Float(1.0)
+        );
+        assert_eq!(
+            Oneof::from(ParsedOneof::Float(1.0)),
+            Oneof {
+                kind: Some(OneofKind::Float(Some(FloatValue { value: 1.0 }))),
             }
         );
     }
@@ -1915,9 +1943,9 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(bomboni_crate = bomboni, source = Item)]
         struct ParsedItem {
-            #[parse(derive { module = values_parse_hash, field = values })]
+            #[parse(source = "values", derive = values_parse_hash)]
             values: HashMap<i32, i32>,
         }
 

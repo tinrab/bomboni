@@ -61,13 +61,6 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
                 "query fields cannot be used with these options",
             ));
         }
-
-        if field.options.derive.is_some() && field.options.source.is_some() {
-            return Err(syn::Error::new_spanned(
-                &field.ident,
-                "`derive` and `source` cannot be used together",
-            ));
-        }
     }
 
     let mut result = parse::expand(options, fields)?;

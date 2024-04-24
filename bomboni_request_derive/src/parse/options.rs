@@ -163,9 +163,7 @@ pub struct ParseDerive {
     pub parse: Option<ExprPath>,
     pub write: Option<ExprPath>,
     pub module: Option<ExprPath>,
-    pub source_field: Option<Ident>,
     pub source_borrow: bool,
-    pub target_field: Option<Ident>,
     pub target_borrow: bool,
 }
 
@@ -305,13 +303,7 @@ impl FromMeta for ParseDerive {
             #[darling(default)]
             module: Option<ExprPath>,
             #[darling(default)]
-            field: Option<Ident>,
-            #[darling(default)]
-            source_field: Option<Ident>,
-            #[darling(default)]
             source_borrow: bool,
-            #[darling(default)]
-            target_field: Option<Ident>,
             #[darling(default)]
             target_borrow: bool,
             #[darling(default)]
@@ -322,8 +314,6 @@ impl FromMeta for ParseDerive {
 
         if options.parse.is_none() && options.write.is_none() && options.module.is_none()
             || options.module.is_some() && (options.parse.is_some() || options.write.is_some())
-            || options.field.is_some()
-                && (options.source_field.is_some() || options.target_field.is_some())
         {
             return Err(darling::Error::custom("invalid options"));
         }
@@ -332,9 +322,7 @@ impl FromMeta for ParseDerive {
             parse: options.parse,
             write: options.write,
             module: options.module,
-            source_field: options.source_field.or(options.field.clone()),
             source_borrow: options.source_borrow || options.borrow,
-            target_field: options.target_field.or(options.field),
             target_borrow: options.target_borrow || options.borrow,
         })
     }
@@ -345,9 +333,7 @@ impl FromMeta for ParseDerive {
                 parse: None,
                 write: None,
                 module: Some(path.clone()),
-                source_field: None,
                 source_borrow: false,
-                target_field: None,
                 target_borrow: false,
             }),
             _ => Err(darling::Error::custom("expected path").with_span(expr)),

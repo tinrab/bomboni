@@ -27,12 +27,16 @@ pub fn get_field_clone_set(fields: &[ParseField]) -> syn::Result<BTreeSet<String
     let mut visited = BTreeSet::new();
 
     for field in fields.iter().filter(|field| {
-        field.options.derive.is_none()
+        !field.options.skip
             && field.resource.is_none()
-            && !field.options.skip
             && !type_is_phantom(&field.ty)
             && field.list_query.is_none()
             && field.search_query.is_none()
+            && (field.options.derive.is_none()
+                || matches!(
+                    field.options.derive.as_ref(),
+                    Some(ParseDerive { source_borrow, .. }) if !source_borrow,
+                ))
     }) {
         let mut field_path = String::new();
         let extract = get_field_extract(field)?;
@@ -61,39 +65,14 @@ pub fn get_field_clone_set(fields: &[ParseField]) -> syn::Result<BTreeSet<String
         }
     }
 
-    // Clone non-borrowed derived fields.
-    // TODO: Optimize.
     for field in fields.iter().filter(|field| !field.options.skip) {
-        if let Some(ParseDerive {
-            source_field,
-            source_borrow,
-            ..
-        }) = field.options.derive.as_ref()
-        {
-            if *source_borrow {
-                continue;
-            }
-
-            let Some(source_field_name) = source_field.as_ref().map(ToString::to_string) else {
-                continue;
-            };
-
-            for other_field in fields.iter().filter(|other_field| {
-                other_field.options.derive.is_none()
-                    && other_field.resource.is_none()
-                    && !other_field.options.skip
-                    && !type_is_phantom(&other_field.ty)
-                    && other_field.list_query.is_none()
-                    && other_field.search_query.is_none()
-            }) {
-                let extract = get_field_extract(other_field)?;
-                for step in extract.steps {
-                    if let FieldExtractStep::Field(field_name) = step {
-                        if field_name == source_field_name {
-                            clone_set.insert(field_name);
-                        }
-                    }
+        if let Some(resource) = field.resource.as_ref() {
+            if resource.name.parse {
+                let field_path = resource.name.source.to_string();
+                if visited.contains(&field_path) {
+                    clone_set.insert(field_path.clone());
                 }
+                visited.insert(field_path);
             }
         }
     }
@@ -114,4 +93,55 @@ pub fn get_query_field_token_type(ty: &Type) -> Option<&Type> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use darling::{ast::Data, FromDeriveInput};
+    use syn::parse_quote;
+
+    use crate::parse::options::ParseOptions;
+
+    use super::*;
+
+    #[test]
+    fn get_resource_clone_set() {
+        macro_rules! assert_clone_set {
+            ($source:expr, $set:expr $(,)?) => {{
+                let options = ParseOptions::from_derive_input(&$source).unwrap();
+                let Data::Struct(data) = &options.data else {
+                    unreachable!()
+                };
+                assert_eq!(
+                    get_field_clone_set(&data.fields).unwrap(),
+                    $set.into_iter().map(ToString::to_string).collect(),
+                );
+            }};
+        }
+
+        assert_clone_set!(
+            parse_quote! {
+                #[parse(source = Item)]
+                struct Item {
+                    #[parse(resource)]
+                    pub resource: ParsedResource,
+                    #[parse(source = "name", derive { module = derive_module })]
+                    pub id: String,
+                }
+            },
+            ["name"],
+        );
+        assert_clone_set!(
+            parse_quote! {
+                #[parse(source = Item)]
+                struct Item {
+                    #[parse(resource)]
+                    pub resource: ParsedResource,
+                    #[parse(source = "name", derive { module = derive_module, source_borrow })]
+                    pub id: String,
+                }
+            },
+            Vec::<&str>::new(),
+        );
+    }
 }

@@ -11,6 +11,7 @@ pub fn expand_field_extract(
     extract: &FieldExtract,
     field_clone_set: &BTreeSet<String>,
     field_path_wrapper: Option<&TokenStream>,
+    borrow: bool,
 ) -> (TokenStream, String) {
     let mut field_path = String::new();
     let mut extract_impl = quote!();
@@ -18,8 +19,14 @@ pub fn expand_field_extract(
 
     // In case of enums, the first "field" is the enum variant
     if !matches!(extract.steps.first(), Some(FieldExtractStep::Field(_))) {
-        extract_impl.extend(quote! {
-            let target = source;
+        extract_impl.extend(if borrow {
+            quote! {
+                let target = &source;
+            }
+        } else {
+            quote! {
+                let target = source;
+            }
         });
         extracted_source = true;
     }
@@ -37,7 +44,11 @@ pub fn expand_field_extract(
                     quote! { target }
                 } else {
                     extracted_source = true;
-                    quote! { source }
+                    if borrow {
+                        quote! { &source }
+                    } else {
+                        quote! { source }
+                    }
                 };
                 let field_ident = format_ident!("{field_name}");
 

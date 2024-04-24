@@ -1,4 +1,4 @@
-use bomboni_core::{format_comment, syn::type_is_phantom};
+use bomboni_core::syn::type_is_phantom;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
@@ -54,49 +54,9 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
 }
 
 fn expand_write_field(options: &ParseOptions, field: &ParseField) -> syn::Result<TokenStream> {
-    if let Some(ParseDerive {
-        write,
-        module,
-        source_field,
-        target_field,
-        target_borrow,
-        ..
-    }) = field.options.derive.as_ref()
-    {
-        if let Some(write_impl) = write
-            .as_ref()
-            .map(ToTokens::to_token_stream)
-            .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
-        {
-            let target_value = if let Some(target_field) = target_field.as_ref() {
-                if *target_borrow {
-                    quote!(&target.#target_field)
-                } else {
-                    quote!(target.#target_field)
-                }
-            } else {
-                quote!(&target)
-            };
-
-            return Ok(if let Some(source_field) = source_field.as_ref() {
-                quote! {
-                    source.#source_field = #write_impl(#target_value);
-                }
-            } else {
-                quote! {
-                    #write_impl(#target_value, &mut source);
-                }
-            });
-        }
-
-        return Err(syn::Error::new_spanned(
-            field.ident.as_ref().unwrap(),
-            "missing derive write implementation",
-        ));
-    }
+    let target_ident = field.ident.as_ref().unwrap();
 
     let extract = get_field_extract(field)?;
-
     let mut first_field = true;
     let last_item_unwrap = matches!(
         extract.steps.last(),
@@ -155,26 +115,49 @@ fn expand_write_field(options: &ParseOptions, field: &ParseField) -> syn::Result
         }
     }
 
-    let target_ident = field.ident.as_ref().unwrap();
+    if let Some(ParseDerive {
+        write,
+        module,
+        target_borrow,
+        ..
+    }) = field.options.derive.as_ref()
+    {
+        let write_impl = write
+            .as_ref()
+            .map(ToTokens::to_token_stream)
+            .or_else(|| module.as_ref().map(|module| quote!(#module::write)))
+            .ok_or_else(|| {
+                syn::Error::new_spanned(target_ident, "missing derive write implementation")
+            })?;
+
+        if field.options.source.is_some() || field.options.extract.is_some() {
+            let source_value = if *target_borrow {
+                quote!(&target.#target_ident)
+            } else {
+                quote!(target.#target_ident)
+            };
+
+            return Ok(quote! {
+                let source_field = #write_impl(#source_value);
+                #set_impl
+                #inject_impl = source_field;
+            });
+        }
+
+        return Ok(quote! {
+            #write_impl(&target, &mut source);
+        });
+    }
+
     let field_type_info = get_field_type_info(options, &field.options, &field.ty)?;
 
     let write_inner_impl = expand_field_write_type(&field.options, &field_type_info);
 
-    let comment = format_comment!(
-        "\n Write field `{}`\n{:#?}\n{:#?}",
-        target_ident,
-        field_type_info,
-        &extract.steps
-    );
-
     Ok(quote! {
-        #comment
-        {
-            let source_field = target.#target_ident;
-            #write_inner_impl
-            #set_impl
-            #inject_impl = source_field;
-        }
+        let source_field = target.#target_ident;
+        #write_inner_impl
+        #set_impl
+        #inject_impl = source_field;
     })
 }
 

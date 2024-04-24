@@ -32,7 +32,7 @@ mod tests {
         #[derive(Parse, Debug, PartialEq)]
         #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            #[parse(derive { module = id_derive, field = id })]
+            #[parse(source = "id", derive = id_derive)]
             id: Id,
         }
 
