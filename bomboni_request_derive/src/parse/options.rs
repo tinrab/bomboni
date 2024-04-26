@@ -1,14 +1,17 @@
+use bomboni_core::syn::type_is_phantom;
 use darling::{
-    ast::{Data, Fields, NestedMeta},
+    ast::{Data, Fields, NestedMeta, Style},
     util::parse_expr,
     FromDeriveInput, FromField, FromMeta, FromVariant,
 };
 use proc_macro2::Ident;
 use quote::format_ident;
 use syn::{
-    self, parse_quote, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr, Meta,
-    MetaList, MetaNameValue, Path, Type, TypePath,
+    self, parse_quote, DeriveInput, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr,
+    Meta, MetaList, MetaNameValue, Path, Type, TypePath,
 };
+
+use super::field_type_info::{get_field_type_info, FieldTypeInfo};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse), supports(struct_any, enum_any))]
@@ -58,7 +61,7 @@ pub struct ParseRequest {
     pub name: Option<Expr>,
 }
 
-#[derive(Debug, FromField)]
+#[derive(Debug, Clone, FromField)]
 #[darling(attributes(parse))]
 pub struct ParseField {
     pub ident: Option<Ident>,
@@ -79,9 +82,12 @@ pub struct ParseField {
     /// Parse search query fields.
     #[darling(default)]
     pub search_query: Option<ParseQuery>,
+
+    #[darling(skip)]
+    pub type_info: Option<FieldTypeInfo>,
 }
 
-#[derive(Debug, FromVariant)]
+#[derive(Debug, Clone, FromVariant)]
 #[darling(attributes(parse))]
 pub struct ParseVariant {
     pub ident: Ident,
@@ -92,15 +98,21 @@ pub struct ParseVariant {
     /// True if the source is an empty unit variant.
     #[darling(default)]
     pub source_unit: bool,
+
+    #[darling(skip)]
+    pub type_info: Option<FieldTypeInfo>,
 }
 
-#[derive(Debug, FromMeta)]
+#[derive(Debug, Clone, FromMeta)]
 pub struct ParseFieldOptions {
     /// Source field name.
     /// Can be a path to a nested field with conditional `?.` extraction.
     /// Example: `bio` or `address?.city`
     #[darling(default)]
     pub source: Option<String>,
+    /// Source field name is the same as the target.
+    #[darling(default)]
+    pub source_field: bool,
     /// Skip parsing field.
     #[darling(default)]
     pub skip: bool,
@@ -168,7 +180,7 @@ pub enum FieldExtractStep {
     EnumerationFilterUnspecified,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseDerive {
     pub parse: Option<ExprPath>,
     pub write: Option<ExprPath>,
@@ -177,14 +189,14 @@ pub struct ParseDerive {
     pub target_borrow: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseConvert {
     pub parse: Option<ExprPath>,
     pub write: Option<ExprPath>,
     pub module: Option<ExprPath>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseResource {
     pub name: ParseResourceField,
     pub create_time: ParseResourceField,
@@ -194,14 +206,14 @@ pub struct ParseResource {
     pub etag: ParseResourceField,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseResourceField {
     pub parse: bool,
     pub write: bool,
     pub source: Ident,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseQuery {
     pub query: ParseQueryField,
     pub page_size: ParseQueryField,
@@ -210,11 +222,79 @@ pub struct ParseQuery {
     pub order_by: ParseQueryField,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseQueryField {
     pub parse: bool,
     pub write: bool,
     pub source: Ident,
+}
+
+impl ParseOptions {
+    pub fn parse(input: &DeriveInput) -> syn::Result<Self> {
+        let mut options = Self::from_derive_input(input)?;
+
+        options.data = match &options.data {
+            Data::Struct(data) => {
+                let mut fields = Vec::new();
+                for mut field in data.fields.iter().cloned() {
+                    if field.options.source_field {
+                        field.options.source = Some(field.ident.as_ref().unwrap().to_string());
+                    }
+
+                    if field.options.skip
+                        || field.options.derive.is_some()
+                        || field.list_query.is_some()
+                        || field.search_query.is_some()
+                        || field.resource.is_some()
+                        || type_is_phantom(&field.ty)
+                    {
+                        fields.push(field);
+                        continue;
+                    }
+
+                    let field_type_info = get_field_type_info(&options, &field.options, &field.ty)?;
+                    fields.push(ParseField {
+                        type_info: Some(field_type_info),
+                        ..field
+                    });
+                }
+                Data::Struct(Fields::new(Style::Struct, fields))
+            }
+            Data::Enum(data) => {
+                let mut variants = Vec::new();
+                for mut variant in data.iter().cloned() {
+                    if variant.options.source_field {
+                        variant.options.source = Some(variant.ident.to_string());
+                    }
+
+                    if variant.options.skip
+                        || variant.options.derive.is_some()
+                        || variant.source_unit
+                    {
+                        variants.push(variant);
+                        continue;
+                    }
+
+                    match variant.fields.iter().next() {
+                        Some(variant_type) if !type_is_phantom(variant_type) => {
+                            let field_type_info =
+                                get_field_type_info(&options, &variant.options, variant_type)?;
+                            variants.push(ParseVariant {
+                                type_info: Some(field_type_info),
+                                ..variant
+                            });
+                        }
+                        _ => {
+                            variants.push(variant);
+                        }
+                    }
+                }
+                Data::Enum(variants)
+            }
+        };
+
+        Ok(options)
+    }
 }
 
 impl FromMeta for ParseRequest {

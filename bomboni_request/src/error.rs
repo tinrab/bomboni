@@ -619,40 +619,5 @@ mod tests {
                 PathErrorStep::Field("value".into()),
             ],
         );
-
-        dbg!(
-            RequestError::field("x", CommonError::RequiredFieldMissing)
-                .wrap_index(42)
-                .wrap_key("abc")
-                .wrap_field("values")
-                .wrap_field("root"),
-            RequestError::field("x", CommonError::RequiredFieldMissing)
-                .wrap_index(42)
-                .wrap_key("abc")
-                .insert_path(
-                    [
-                        PathErrorStep::Field("root".into()),
-                        PathErrorStep::Field("values".into()),
-                    ],
-                    0
-                ),
-            RequestError::field("x", CommonError::RequiredFieldMissing)
-                .wrap_index(42)
-                .wrap_key("abc")
-                .insert_path(
-                    [
-                        PathErrorStep::Field("root".into()),
-                        PathErrorStep::Field("values".into()),
-                    ],
-                    1
-                ),
-        );
-
-        if let RequestError::Path(err) = RequestError::field("x", CommonError::RequiredFieldMissing)
-            .wrap_index(42)
-            .wrap_field("values")
-        {
-            println!("path: {}", err.path_to_string());
-        }
     }
 }

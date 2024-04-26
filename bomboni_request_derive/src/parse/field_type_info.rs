@@ -4,12 +4,12 @@ use syn::{
 
 use crate::parse::options::{ParseFieldOptions, ParseOptions};
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct FieldTypeInfo {
     pub container_ident: Option<String>,
     pub primitive_ident: Option<String>,
-    pub generic_param: Option<String>,
     pub primitive_message: bool,
+    pub generic_param: Option<String>,
     pub unit: bool,
 }
 
@@ -69,13 +69,25 @@ fn get_segment_type_info(
                         ident_str.chars().next().unwrap().is_uppercase() && ident_str != "String";
                 }
 
-                if field_options.wrapper && !matches!(
-                    ident_str.as_str(),
-                    "String" | "f32" | "f64" | "bool"
-                    | "i8" | "i16" | "i32" | "i64"
-                    | "u8" | "u16" | "u32" | "u64"
-                    | "isize" | "usize"
-                ) {
+                if field_options.wrapper
+                    && !matches!(
+                        ident_str.as_str(),
+                        "String"
+                            | "f32"
+                            | "f64"
+                            | "bool"
+                            | "i8"
+                            | "i16"
+                            | "i32"
+                            | "i64"
+                            | "u8"
+                            | "u16"
+                            | "u32"
+                            | "u64"
+                            | "isize"
+                            | "usize"
+                    )
+                {
                     return Err(syn::Error::new_spanned(
                         segment,
                         format!("invalid wrapper type: `{ident_str}`"),
@@ -126,20 +138,20 @@ fn get_segment_type_info(
 
 #[cfg(test)]
 mod tests {
-    use darling::FromDeriveInput;
     use syn::parse_quote;
 
     use super::*;
 
     #[test]
     fn it_works() {
-        let options = ParseOptions::from_derive_input(&parse_quote! {
+        let options = ParseOptions::parse(&parse_quote! {
             #[parse(source = Item)]
             struct Item;
         })
         .unwrap();
         let field_options = ParseFieldOptions {
             source: None,
+            source_field: false,
             skip: false,
             keep: false,
             keep_primitive: false,
@@ -212,7 +224,7 @@ mod tests {
 
         assert_eq!(
             get_field_type_info(
-                &ParseOptions::from_derive_input(&parse_quote! {
+                &ParseOptions::parse(&parse_quote! {
                     #[parse(source = Item)]
                     struct Item<T> {}
                 })

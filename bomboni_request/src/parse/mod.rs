@@ -378,6 +378,7 @@ mod tests {
             source_box: Box<i32>,
             target_box: i32,
             keep_box: Box<i32>,
+            oneof: Option<Oneof>,
         }
 
         #[derive(Debug, PartialEq, Clone)]
@@ -386,12 +387,31 @@ mod tests {
             description: Option<String>,
         }
 
+        #[derive(Debug, PartialEq)]
+        struct Oneof {
+            kind: Option<OneofKind>,
+        }
+
+        #[derive(Debug, PartialEq)]
+        enum OneofKind {
+            Value(i32),
+        }
+
+        impl OneofKind {
+            pub fn get_variant_name(&self) -> &'static str {
+                match self {
+                    Self::Value(_) => "value",
+                }
+            }
+        }
+
         #[derive(Parse, Debug, PartialEq)]
         #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
             value: i32,
             #[parse(extract = [Unwrap])]
             optional_value: i32,
+            nested: ParsedNested,
             #[parse(source = "nested?.name")]
             name: String,
             #[parse(source = "nested?.description")]
@@ -403,6 +423,21 @@ mod tests {
             target_box: Box<i32>,
             #[parse(extract = [Unbox])]
             keep_box: Box<i32>,
+            #[parse(oneof, extract = [Unwrap])]
+            oneof: ParsedOneof,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
+        struct ParsedNested {
+            name: String,
+            description: Option<String>,
+        }
+
+        #[derive(Parse, Debug, PartialEq)]
+        #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
+        enum ParsedOneof {
+            Value(i32),
         }
 
         impl Default for Item {
@@ -415,6 +450,9 @@ mod tests {
                     source_box: Box::new(1),
                     target_box: 1,
                     keep_box: Box::new(1),
+                    oneof: Some(Oneof {
+                        kind: Some(OneofKind::Value(1)),
+                    }),
                 }
             }
         }
@@ -433,12 +471,23 @@ mod tests {
                 Self {
                     value: 1,
                     optional_value: 1,
+                    nested: ParsedNested::default(),
                     name: "abc".into(),
                     description: Some("abc".into()),
                     default_value: 1,
                     source_box: 1,
                     target_box: Box::new(1),
                     keep_box: Box::new(1),
+                    oneof: ParsedOneof::Value(1),
+                }
+            }
+        }
+
+        impl Default for ParsedNested {
+            fn default() -> Self {
+                Self {
+                    name: "abc".into(),
+                    description: Some("abc".into()),
                 }
             }
         }
@@ -455,29 +504,42 @@ mod tests {
                 source_box: Box::new(42),
                 target_box: 42,
                 keep_box: Box::new(42),
+                oneof: Some(Oneof {
+                    kind: Some(OneofKind::Value(1)),
+                }),
             })
             .unwrap(),
             ParsedItem {
                 value: 42,
                 optional_value: 42,
+                nested: ParsedNested {
+                    name: "name".into(),
+                    description: Some("description".into()),
+                },
                 name: "name".into(),
                 description: Some("description".into()),
                 default_value: 42,
                 source_box: 42,
                 target_box: Box::new(42),
                 keep_box: Box::new(42),
+                oneof: ParsedOneof::Value(1),
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
                 value: 42,
                 optional_value: 42,
+                nested: ParsedNested {
+                    name: "name".into(),
+                    description: Some("description".into()),
+                },
                 name: "name".into(),
                 description: Some("description".into()),
                 default_value: 42,
                 source_box: 42,
                 target_box: Box::new(42),
                 keep_box: Box::new(42),
+                oneof: ParsedOneof::Value(1),
             }),
             Item {
                 value: 42,
@@ -490,6 +552,9 @@ mod tests {
                 source_box: Box::new(42),
                 target_box: 42,
                 keep_box: Box::new(42),
+                oneof: Some(Oneof {
+                    kind: Some(OneofKind::Value(1)),
+                }),
             }
         );
 
@@ -619,6 +684,7 @@ mod tests {
             x: i32,
             y: i32,
             name: String,
+            nullable: Option<Vec<i32>>,
         }
 
         #[derive(Debug, PartialEq)]
@@ -649,6 +715,8 @@ mod tests {
             name: String,
             #[parse(source = "name", derive { parse = id_parse, write = id_write })]
             id: u64,
+            #[parse(source_field, derive = nullable_derive)]
+            nullable: Option<Vec<i32>>,
         }
 
         #[allow(clippy::unnecessary_wraps)]
@@ -672,6 +740,19 @@ mod tests {
 
         fn id_write(id: u64) -> String {
             id.to_string()
+        }
+
+        mod nullable_derive {
+            use super::*;
+
+            #[allow(clippy::unnecessary_wraps)]
+            pub fn parse(value: Option<Vec<i32>>) -> RequestResult<Option<Vec<i32>>> {
+                Ok(value.filter(|v| !v.is_empty()))
+            }
+
+            pub fn write(value: Option<Vec<i32>>) -> Option<Vec<i32>> {
+                value.filter(|v| !v.is_empty())
+            }
         }
 
         #[derive(Debug, PartialEq, Parse)]
@@ -709,12 +790,14 @@ mod tests {
                 x: 1,
                 y: 2,
                 name: "42".into(),
+                nullable: Some(vec![1, 2]),
             })
             .unwrap(),
             ParsedItem {
                 pos: "1, 2".into(),
                 id: 42,
                 name: "42".into(),
+                nullable: Some(vec![1, 2]),
             }
         );
         assert_eq!(
@@ -722,11 +805,13 @@ mod tests {
                 pos: "1, 2".into(),
                 id: 42,
                 name: "42".into(),
+                nullable: Some(Vec::new()),
             }),
             Item {
                 x: 1,
                 y: 2,
                 name: "42".into(),
+                nullable: None,
             }
         );
 

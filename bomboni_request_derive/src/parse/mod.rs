@@ -1,4 +1,4 @@
-use darling::{ast::Data, FromDeriveInput};
+use darling::ast::Data;
 use options::ParseOptions;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -16,7 +16,7 @@ pub mod options;
 pub mod parse_resource_name;
 
 pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
-    let options = ParseOptions::from_derive_input(&input)?;
+    let options = ParseOptions::parse(&input)?;
 
     let mut result = expand_usage(&options);
 

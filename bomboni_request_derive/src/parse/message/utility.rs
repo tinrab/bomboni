@@ -9,6 +9,7 @@ use crate::parse::{
 
 pub fn get_field_extract(field: &ParseField) -> syn::Result<FieldExtract> {
     let target_ident = field.ident.as_ref().unwrap();
+
     let mut steps = if let Some(source) = field.options.source.as_ref() {
         let source_extract = parse_field_source_extract(source)
             .ok_or_else(|| syn::Error::new_spanned(target_ident, "invalid source"))?;
@@ -16,9 +17,28 @@ pub fn get_field_extract(field: &ParseField) -> syn::Result<FieldExtract> {
     } else {
         vec![FieldExtractStep::Field(target_ident.to_string())]
     };
+
     if let Some(extract) = field.options.extract.clone() {
         steps.extend(extract.steps);
     }
+
+    // In proto3 generated code, primitive message fields are wrapped in an Option.
+    // Insert an unwrap step for these fields by default.
+    if let Some(field_type_info) = field.type_info.as_ref() {
+        if field.options.extract.is_none()
+            && field.options.source.is_none()
+            && field.options.derive.is_none()
+            && !field.options.enumeration
+            && !field.oneof
+            && field_type_info.primitive_message
+            && field_type_info.primitive_ident.is_some()
+            && field_type_info.container_ident.is_none()
+            && field_type_info.generic_param.is_none()
+        {
+            steps.insert(1, FieldExtractStep::Unwrap);
+        }
+    }
+
     Ok(FieldExtract { steps })
 }
 
@@ -38,8 +58,8 @@ pub fn get_field_clone_set(fields: &[ParseField]) -> syn::Result<BTreeSet<String
                     Some(ParseDerive { source_borrow, .. }) if !source_borrow,
                 ))
     }) {
-        let mut field_path = String::new();
         let extract = get_field_extract(field)?;
+        let mut field_path = String::new();
         for step in extract.steps {
             if let FieldExtractStep::Field(field_name) = step {
                 field_path = if field_path.is_empty() {
@@ -97,7 +117,7 @@ pub fn get_query_field_token_type(ty: &Type) -> Option<&Type> {
 
 #[cfg(test)]
 mod tests {
-    use darling::{ast::Data, FromDeriveInput};
+    use darling::ast::Data;
     use syn::parse_quote;
 
     use crate::parse::options::ParseOptions;
@@ -108,7 +128,7 @@ mod tests {
     fn get_resource_clone_set() {
         macro_rules! assert_clone_set {
             ($source:expr, $set:expr $(,)?) => {{
-                let options = ParseOptions::from_derive_input(&$source).unwrap();
+                let options = ParseOptions::parse(&$source).unwrap();
                 let Data::Struct(data) = &options.data else {
                     unreachable!()
                 };

@@ -4,7 +4,6 @@ use quote::{format_ident, quote, ToTokens};
 use std::collections::BTreeSet;
 
 use crate::parse::{
-    field_type_info::get_field_type_info,
     message::utility::{get_field_clone_set, get_field_extract, get_query_field_token_type},
     options::{FieldExtractStep, ParseDerive, ParseField, ParseOptions, ParseQuery, ParseResource},
     parse_utility::{expand_field_extract, expand_field_parse_type, make_field_error_path},
@@ -21,7 +20,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         .iter()
         .filter(|field| !field.options.skip && field.options.derive.is_some())
     {
-        parse_fields.extend(expand_parse_field(options, field, &field_clone_set)?);
+        parse_fields.extend(expand_parse_field(field, &field_clone_set)?);
     }
 
     // Parse resource fields
@@ -40,7 +39,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
             && field.search_query.is_none()
             && !type_is_phantom(&field.ty)
     }) {
-        parse_fields.extend(expand_parse_field(options, field, &field_clone_set)?);
+        parse_fields.extend(expand_parse_field(field, &field_clone_set)?);
     }
 
     // Set default for skipped fields
@@ -157,7 +156,6 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
 }
 
 fn expand_parse_field(
-    options: &ParseOptions,
     field: &ParseField,
     field_clone_set: &BTreeSet<String>,
 ) -> syn::Result<TokenStream> {
@@ -196,8 +194,6 @@ fn expand_parse_field(
         });
     }
 
-    let field_type_info = get_field_type_info(options, &field.options, &field.ty)?;
-
     if field.options.keep {
         if extract.steps.len() != 1 {
             return Err(syn::Error::new_spanned(
@@ -220,8 +216,9 @@ fn expand_parse_field(
     let (extract_impl, field_path) = expand_field_extract(&extract, field_clone_set, None, false);
 
     let field_error_path = make_field_error_path(&field_path, None);
+    let field_type_info = field.type_info.as_ref().unwrap();
     let parse_inner_impl =
-        expand_field_parse_type(&field.options, &field_type_info, field_error_path);
+        expand_field_parse_type(&field.options, field_type_info, field_error_path);
 
     Ok(quote! {
         #target_ident: {

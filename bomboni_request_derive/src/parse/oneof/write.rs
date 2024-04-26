@@ -2,7 +2,6 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
 use crate::parse::{
-    field_type_info::get_field_type_info,
     oneof::utility::{get_variant_extract, get_variant_source_ident},
     options::{FieldExtractStep, ParseDerive, ParseOptions, ParseTaggedUnion, ParseVariant},
     write_utility::expand_field_write_type,
@@ -45,7 +44,7 @@ fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
                 }
             });
         } else {
-            let write_variant = expand_write_variant(options, variant)?;
+            let write_variant = expand_write_variant(variant)?;
             write_variants.extend(quote! {
                 #ident::#target_variant_ident(target) => {
                     let mut source = #source::#source_variant_ident(Default::default());
@@ -78,7 +77,6 @@ fn expand_write_tagged_union(
     variants: &[ParseVariant],
     tagged_union: &ParseTaggedUnion,
 ) -> syn::Result<TokenStream> {
-    // let source = &options.source;
     let ident = &options.ident;
     let oneof_ident = &tagged_union.oneof;
 
@@ -106,7 +104,7 @@ fn expand_write_tagged_union(
                 }
             });
         } else {
-            let write_variant = expand_write_variant(options, variant)?;
+            let write_variant = expand_write_variant(variant)?;
             write_variants.extend(quote! {
                 #ident::#target_variant_ident(target) => {
                     let mut source = #oneof_ident::#source_variant_ident(Default::default());
@@ -138,10 +136,7 @@ fn expand_write_tagged_union(
     })
 }
 
-fn expand_write_variant(
-    options: &ParseOptions,
-    variant: &ParseVariant,
-) -> syn::Result<TokenStream> {
+fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
     let target_ident = &variant.ident;
 
     let extract = get_variant_extract(variant)?;
@@ -236,10 +231,8 @@ fn expand_write_variant(
         });
     }
 
-    let variant_type = variant.fields.iter().next().unwrap();
-    let field_type_info = get_field_type_info(options, &variant.options, variant_type)?;
-
-    let write_inner_impl = expand_field_write_type(&variant.options, &field_type_info);
+    let field_type_info = variant.type_info.as_ref().unwrap();
+    let write_inner_impl = expand_field_write_type(&variant.options, field_type_info);
 
     Ok(quote! {
         let source_field = target;

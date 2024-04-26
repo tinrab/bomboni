@@ -4,7 +4,6 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
 use crate::parse::{
-    field_type_info::get_field_type_info,
     oneof::utility::get_variant_extract,
     oneof::utility::get_variant_source_ident,
     options::{ParseDerive, ParseOptions, ParseTaggedUnion, ParseVariant},
@@ -47,7 +46,7 @@ fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Resul
                 }
             });
         } else {
-            let parse_variant = expand_parse_variant(options, variant)?;
+            let parse_variant = expand_parse_variant(variant)?;
             parse_variants.extend(quote! {
                 #source::#source_variant_ident(source) => {
                     #ident::#target_variant_ident({
@@ -108,7 +107,7 @@ fn expand_tagged_union(
                 }
             });
         } else {
-            let parse_variant = expand_parse_variant(options, variant)?;
+            let parse_variant = expand_parse_variant(variant)?;
             parse_variants.extend(quote! {
                 #oneof_ident::#source_variant_ident(source) => {
                     #ident::#target_variant_ident({
@@ -143,10 +142,7 @@ fn expand_tagged_union(
     })
 }
 
-fn expand_parse_variant(
-    options: &ParseOptions,
-    variant: &ParseVariant,
-) -> syn::Result<TokenStream> {
+fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
     let extract = get_variant_extract(variant)?;
     let field_error_path_wrapper = quote! {
         PathErrorStep::Field(variant_name.into())
@@ -201,9 +197,6 @@ fn expand_parse_variant(
         });
     }
 
-    let variant_type = variant.fields.iter().next().unwrap();
-    let field_type_info = get_field_type_info(options, &variant.options, variant_type)?;
-
     let (extract_impl, field_path) = expand_field_extract(
         &extract,
         &BTreeSet::new(),
@@ -212,8 +205,9 @@ fn expand_parse_variant(
     );
 
     let field_error_path = make_field_error_path(&field_path, Some(&field_error_path_wrapper));
+    let field_type_info = variant.type_info.as_ref().unwrap();
     let parse_inner_impl =
-        expand_field_parse_type(&variant.options, &field_type_info, field_error_path);
+        expand_field_parse_type(&variant.options, field_type_info, field_error_path);
 
     Ok(quote! {
         #extract_impl
