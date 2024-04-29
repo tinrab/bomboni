@@ -419,8 +419,8 @@ impl TsType {
             types: [
                 ("DoubleValue", "number"),
                 ("FloatValue", "number"),
-                ("Int64Value", "number"),
-                ("UInt64Value", "number"),
+                ("Int64Value", "string"),
+                ("UInt64Value", "string"),
                 ("Int32Value", "number"),
                 ("UInt32Value", "number"),
                 ("BoolValue", "boolean"),

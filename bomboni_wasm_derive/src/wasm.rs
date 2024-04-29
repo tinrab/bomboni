@@ -84,11 +84,10 @@ fn derive_serde_wasm(options: &WasmOptions) -> TokenStream {
 
         impls.extend(quote! {
             #[automatically_derived]
-            impl #impl_generics TryFromJsValue for #ident #type_generics #where_clause {
+            impl #impl_generics TryFrom<JsValue> for #ident #type_generics #where_clause {
                 type Error = JsValue;
 
-                #[inline]
-                fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
+                fn try_from(value: JsValue) -> Result<Self, Self::Error> {
                     Ok(Self::from_js(value)?)
                 }
             }
@@ -120,7 +119,15 @@ fn derive_serde_wasm(options: &WasmOptions) -> TokenStream {
 
                 #[inline]
                 unsafe fn vector_from_abi(js: Self::Abi) -> _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]> {
-                    _wasm_bindgen::convert::js_value_vector_from_abi(js)
+                    let values = <Vec<JsValue> as FromWasmAbi>::from_abi(js);
+                    let mut vector = Vec::<#ident #type_generics>::with_capacity(values.len());
+                    for value in values.into_iter() {
+                        match value.try_into() {
+                            Ok(value) => vector.push(value),
+                            Err(err) => #handle_error,
+                        }
+                    }
+                    vector.into_boxed_slice()
                 }
             }
 
@@ -189,7 +196,12 @@ fn derive_serde_wasm(options: &WasmOptions) -> TokenStream {
 
                 #[inline]
                 fn vector_into_abi(vector: _wasm_bindgen::__rt::std::boxed::Box<[#ident #type_generics]>) -> Self::Abi {
-                    _wasm_bindgen::convert::js_value_vector_into_abi(vector)
+                    let js_values: Box<[JsValue]> = vector
+                        .into_vec()
+                        .into_iter()
+                        .map(Into::into)
+                        .collect();
+                    js_values.into_abi()
                 }
             }
         });
@@ -266,12 +278,14 @@ fn derive_js_value(js_value: &JsValueWasm, options: &WasmOptions) -> TokenStream
 
     if js_value.convert_string {
         impls.extend(quote! {
+            #[automatically_derived]
             impl #impl_generics From<#ident #type_generics> for JsValue #where_clause {
                 fn from(value: #ident #type_generics) -> Self {
                     JsValue::from_str(&value.to_string())
                 }
             }
 
+            #[automatically_derived]
             impl #impl_generics TryFrom<JsValue> for #ident #type_generics #where_clause {
                 type Error = JsValue;
 
@@ -491,12 +505,12 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
 
         impls.extend(quote! {
             #[automatically_derived]
-            impl #impl_generics TryFromJsValue for #ident #type_generics #where_clause {
+            impl #impl_generics TryFrom<JsValue> for #ident #type_generics #where_clause {
                 type Error = JsValue;
 
-                #[inline]
-                fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
-                    Ok(#convert_try_from(#proxy_ident::from_js(value)?).unwrap_throw())
+                fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+                    let proxy_value = <#proxy_ident as TryFrom<JsValue>>::try_from(value)?;
+                    Ok(#convert_try_from(proxy_value).unwrap_throw())
                 }
             }
 
@@ -580,7 +594,7 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
                 #[inline]
                 fn from(value: #ident #type_generics) -> Self {
                     let proxy: #proxy_ident = #convert_into(value);
-                    proxy.to_js().unwrap_throw().into()
+                    JsValue::from(proxy)
                 }
             }
 
@@ -683,7 +697,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
             prelude::*,
             convert::{
                 IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi, LongRefFromWasmAbi,
-                TryFromJsValue, VectorFromWasmAbi, VectorIntoWasmAbi,
+                VectorFromWasmAbi, VectorIntoWasmAbi,
             },
             describe::{WasmDescribe, WasmDescribeVector},
             JsObject, JsValue,

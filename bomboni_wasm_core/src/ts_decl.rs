@@ -378,9 +378,6 @@ impl<'a> TsDeclParser<'a> {
         }
 
         let mut field_type = TsType::from_type(field.ty);
-        // if wasm_field.as_string {
-        //     field_type = TsType::STRING;
-        // }
         if wasm_field.always_some.unwrap_or_default() {
             if let TsType::Option(some_type) = field_type {
                 field_type = *some_type;
