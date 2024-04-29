@@ -435,13 +435,19 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
         }
     }
 
+    let usage = expand_usage(options);
     let js_literal = format!("export const {ts_decl_name} = Object.freeze({{\n  {variants}}});");
     let impls = derive_serde_wasm(options);
     Ok(quote! {
-        #[wasm_bindgen(inline_js = #js_literal)]
-        extern "C" {}
+        #[automatically_derived]
+        const _: () = {
+            #usage
 
-        #impls
+            #[wasm_bindgen(inline_js = #js_literal)]
+            extern "C" {}
+
+            #impls
+        };
     })
 }
 
@@ -671,18 +677,9 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
         }
     });
 
-    let wasm_bindgen_mod = options
-        .wasm_bindgen_crate
-        .as_ref()
-        .map_or_else(|| quote!(wasm_bindgen), ToTokens::to_token_stream);
-    let js_sys_mod = options
-        .js_sys_crate
-        .as_ref()
-        .map_or_else(|| quote!(js_sys), ToTokens::to_token_stream);
-
     quote! {
         #result
-        use #wasm_bindgen_mod::{
+        use _wasm_bindgen::{
             prelude::*,
             convert::{
                 IntoWasmAbi, FromWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi, RefFromWasmAbi, LongRefFromWasmAbi,
@@ -691,7 +688,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
             describe::{WasmDescribe, WasmDescribeVector},
             JsObject, JsValue,
         };
-        use #js_sys_mod::JsString;
+        use _js_sys::JsString;
         use _bomboni::wasm::Wasm;
     }
 }
