@@ -28,6 +28,7 @@ pub fn expand_field_inject(
     };
 
     let mut dereference_source = false;
+    let mut inserted_field = false;
 
     for (i, step) in extract.steps.iter().enumerate() {
         match step {
@@ -39,13 +40,16 @@ pub fn expand_field_inject(
                 dereference_source = false;
             }
             FieldExtractStep::Unwrap => {
-                if field_options.oneof
-                    || last_unwrap_step == Some(i) && target_option.take().is_some()
-                {
+                if last_unwrap_step == Some(i) && target_option.take().is_some() {
                     inject_impl = quote! {
                         let source_field = Some(source_field);
                         #inject_impl
                     };
+                } else if field_options.oneof && last_unwrap_step == Some(i) {
+                    set_impl.extend(quote! {
+                        .insert(source_field);
+                    });
+                    inserted_field = true;
                 } else {
                     set_impl.extend(quote! {
                         .get_or_insert_with(|| Default::default())
@@ -76,9 +80,16 @@ pub fn expand_field_inject(
         set_impl = quote!(source #set_impl);
     }
 
-    quote! {
-        #inject_impl
-        #set_impl = source_field;
+    if inserted_field {
+        quote! {
+            #inject_impl
+            #set_impl
+        }
+    } else {
+        quote! {
+            #inject_impl
+            #set_impl = source_field;
+        }
     }
 }
 

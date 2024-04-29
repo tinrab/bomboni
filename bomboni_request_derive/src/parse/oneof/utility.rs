@@ -2,7 +2,7 @@ use proc_macro2::Ident;
 use quote::format_ident;
 
 use crate::parse::{
-    options::{FieldExtract, ParseVariant},
+    options::{FieldExtract, FieldExtractStep, ParseVariant},
     parse_utility::parse_field_source_extract,
 };
 
@@ -18,9 +18,27 @@ pub fn get_variant_extract(variant: &ParseVariant) -> syn::Result<FieldExtract> 
     } else {
         Vec::new()
     };
+
     if let Some(extract) = variant.options.extract.clone() {
         steps.extend(extract.steps);
     }
+
+    if let Some(field_type_info) = variant.type_info.as_ref() {
+        if variant.options.extract.is_none()
+            && variant.options.source.is_none()
+            && variant.options.derive.is_none()
+            && !variant.options.oneof
+            && !variant.options.enumeration
+        {
+            if field_type_info.container_ident.as_deref() == Some("Option") {
+                steps.push(FieldExtractStep::Unwrap);
+            }
+            if field_type_info.container_ident.as_deref() == Some("Box") {
+                steps.push(FieldExtractStep::Unbox);
+            }
+        }
+    }
+
     Ok(FieldExtract { steps })
 }
 

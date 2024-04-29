@@ -22,23 +22,33 @@ pub fn get_field_extract(field: &ParseField) -> syn::Result<FieldExtract> {
         steps.extend(extract.steps);
     }
 
-    // In proto3 generated code, primitive message fields are wrapped in an Option.
-    // Insert an unwrap step for these fields by default.
     if let Some(field_type_info) = field.type_info.as_ref() {
         if field.options.extract.is_none()
             && field.options.source.is_none()
             && field.options.derive.is_none()
             && !field.options.oneof
             && !field.options.enumeration
-            && matches!(
-                field_type_info.container_ident.as_deref(),
-                None | Some("Option")
-            )
-            && field_type_info.primitive_message
-            && field_type_info.primitive_ident.is_some()
-            && field_type_info.generic_param.is_none()
         {
-            steps.insert(1, FieldExtractStep::Unwrap);
+            if
+            // In proto3 generated code, primitive message fields are wrapped in an Option.
+            // Insert an unwrap step for these fields by default.
+            field_type_info.primitive_message
+                    && field_type_info.primitive_ident.is_some()
+                    && field_type_info.generic_param.is_none()
+                    && matches!(
+                        field_type_info.container_ident.as_deref(),
+                        None | Some("Option"),
+                    )
+                    && field.options.convert.is_none()
+                // Insert Unwrap step by default if target is an Option.
+                || field_type_info.container_ident.as_deref() == Some("Option")
+            {
+                steps.push(FieldExtractStep::Unwrap);
+            }
+
+            if field_type_info.container_ident.as_deref() == Some("Box") {
+                steps.push(FieldExtractStep::Unbox);
+            }
         }
     }
 

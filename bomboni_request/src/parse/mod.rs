@@ -388,7 +388,6 @@ mod tests {
             default_value: Option<i32>,
             nested: Option<NestedItem>,
             source_box: Box<i32>,
-            target_box: i32,
             keep_box: Box<i32>,
             oneof: Option<Oneof>,
         }
@@ -423,7 +422,7 @@ mod tests {
             value: i32,
             #[parse(try_from = i32, extract = [Unwrap])]
             required_value: i64,
-            #[parse(try_from = i32, extract = [Unwrap])]
+            #[parse(try_from = i32)]
             optional_value: Option<i64>,
             #[parse(try_from = i32, extract = [Unwrap, Unbox, Unwrap, Unbox])]
             inner_optional_value: Option<i64>,
@@ -440,8 +439,6 @@ mod tests {
             description: Option<String>,
             #[parse(extract = [Unbox])]
             source_box: i32,
-            target_box: Box<i32>,
-            #[parse(extract = [Unbox])]
             keep_box: Box<i32>,
             #[parse(oneof, extract = [Unwrap])]
             oneof: ParsedOneof,
@@ -451,7 +448,6 @@ mod tests {
         #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
         struct ParsedNested {
             name: String,
-            #[parse(extract = [Unwrap])]
             description: Option<String>,
         }
 
@@ -473,7 +469,6 @@ mod tests {
                     default_value: Some(1),
                     nested: Some(NestedItem::default()),
                     source_box: Box::new(1),
-                    target_box: 1,
                     keep_box: Box::new(1),
                     oneof: Some(Oneof {
                         kind: Some(OneofKind::Value(1)),
@@ -505,7 +500,6 @@ mod tests {
                     name: "abc".into(),
                     description: Some("abc".into()),
                     source_box: 1,
-                    target_box: Box::new(1),
                     keep_box: Box::new(1),
                     oneof: ParsedOneof::Value(1),
                 }
@@ -535,7 +529,6 @@ mod tests {
                     description: Some("description".into()),
                 }),
                 source_box: Box::new(42),
-                target_box: 42,
                 keep_box: Box::new(42),
                 oneof: Some(Oneof {
                     kind: Some(OneofKind::Value(42)),
@@ -557,7 +550,6 @@ mod tests {
                 name: "name".into(),
                 description: Some("description".into()),
                 source_box: 42,
-                target_box: Box::new(42),
                 keep_box: Box::new(42),
                 oneof: ParsedOneof::Value(42),
             }
@@ -578,7 +570,6 @@ mod tests {
                 name: "name".into(),
                 description: Some("description".into()),
                 source_box: 42,
-                target_box: Box::new(42),
                 keep_box: Box::new(42),
                 oneof: ParsedOneof::Value(1),
             }),
@@ -595,7 +586,6 @@ mod tests {
                     description: Some("description".into()),
                 }),
                 source_box: Box::new(42),
-                target_box: 42,
                 keep_box: Box::new(42),
                 oneof: Some(Oneof {
                     kind: Some(OneofKind::Value(1)),
@@ -1154,7 +1144,7 @@ mod tests {
         #[derive(Debug, PartialEq, Parse)]
         #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            #[parse(wrapper, extract = [Unwrap])]
+            #[parse(wrapper)]
             value_f32: Option<f32>,
             #[parse(wrapper)]
             integer_16: i16,
@@ -1273,6 +1263,87 @@ mod tests {
             value: i32,
         }
 
+        #[derive(Debug, Clone, PartialEq, Default)]
+        struct NestedItem {
+            item: Option<Item>,
+        }
+
+        #[derive(Debug, Clone, PartialEq)]
+        struct Container {
+            item: Item,
+            option_item: Option<Item>,
+            nested_item: Option<NestedItem>,
+        }
+
+        impl Default for Container {
+            fn default() -> Self {
+                Self {
+                    item: Item::String("item".into()),
+                    option_item: Some(Item::String("option_item".into())),
+                    nested_item: Some(NestedItem {
+                        item: Some(Item::String("nested_item".into())),
+                    }),
+                }
+            }
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(bomboni_crate = bomboni, source = Container, write)]
+        struct ParsedContainer {
+            #[parse(oneof)]
+            item: ParsedItem,
+            #[parse(oneof, extract = [Unwrap])]
+            option_item: ParsedItem,
+            #[parse(source = "nested_item?.item?", oneof)]
+            nested_item: ParsedItem,
+        }
+
+        assert_eq!(
+            ParsedContainer::parse(Container {
+                item: Item::Data(Data { value: 42 }),
+                option_item: Some(Item::DataValue(Data { value: 42 })),
+                nested_item: Some(NestedItem {
+                    item: Some(Item::Data(Data { value: 42 })),
+                }),
+            })
+            .unwrap(),
+            ParsedContainer {
+                item: ParsedItem::Data(ParsedData { value: 42 }),
+                option_item: ParsedItem::DataValue(42),
+                nested_item: ParsedItem::Data(ParsedData { value: 42 }),
+            }
+        );
+        assert_eq!(
+            Container::from(ParsedContainer {
+                item: ParsedItem::Data(ParsedData { value: 42 }),
+                option_item: ParsedItem::DataValue(42),
+                nested_item: ParsedItem::Data(ParsedData { value: 42 }),
+            }),
+            Container {
+                item: Item::Data(Data { value: 42 }),
+                option_item: Some(Item::DataValue(Data { value: 42 })),
+                nested_item: Some(NestedItem {
+                    item: Some(Item::Data(Data { value: 42 })),
+                }),
+            }
+        );
+
+        assert!(matches!(
+            ParsedContainer::parse(Container {
+                nested_item: None,
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error,
+                path,
+                ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("nested_item".into())
+        ));
+
         assert_eq!(
             ParsedItem::parse(Item::String("abc".into())).unwrap(),
             ParsedItem::String("abc".into())
@@ -1347,7 +1418,6 @@ mod tests {
             #[parse(extract = [Unbox])]
             Inner(Box<ParsedValue>),
             Nested(ParsedNestedValue),
-            #[parse(extract = [Unwrap])]
             OptionalNested(Option<ParsedNestedValue>),
             #[parse(extract = [UnwrapOrDefault])]
             DefaultNested(ParsedNestedValue),
@@ -2031,6 +2101,7 @@ mod tests {
         struct Item {
             value: i32,
             id: Option<String>,
+            nested: Vec<i32>,
         }
 
         #[derive(Debug, PartialEq, Parse)]
@@ -2038,29 +2109,53 @@ mod tests {
         struct ParsedItem {
             #[parse(try_from = i32)]
             value: u64,
-            #[parse(convert = id_convert, extract = [Unwrap])]
+            #[parse(convert = id_convert)]
             id: Option<Id>,
+            #[parse(convert { parse = parse_nested, write = write_nested })]
+            nested: ParsedNestedItem,
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct ParsedNestedItem {
+            values: Vec<i32>,
+        }
+
+        #[allow(clippy::unnecessary_wraps)]
+        pub fn parse_nested(item: Vec<i32>) -> RequestResult<ParsedNestedItem> {
+            Ok(ParsedNestedItem { values: item })
+        }
+
+        pub fn write_nested(item: ParsedNestedItem) -> Vec<i32> {
+            item.values
         }
 
         assert_eq!(
             ParsedItem::parse(Item {
                 value: 42,
                 id: Some("2a".into()),
+                nested: vec![1, 2, 3],
             })
             .unwrap(),
             ParsedItem {
                 value: 42,
                 id: Some(Id::new(42)),
+                nested: ParsedNestedItem {
+                    values: vec![1, 2, 3],
+                },
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
                 value: 42,
                 id: Some(Id::new(42)),
+                nested: ParsedNestedItem {
+                    values: vec![1, 2, 3],
+                },
             }),
             Item {
                 value: 42,
                 id: Some("2a".into()),
+                nested: vec![1, 2, 3],
             }
         );
     }

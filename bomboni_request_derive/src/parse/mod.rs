@@ -29,7 +29,7 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
     Ok(quote! {
         #[doc(hidden)]
-        #[allow(unused_imports, non_upper_case_globals, unused_attributes, unused_qualifications)]
+        #[allow(unused_imports, unused_must_use, non_upper_case_globals, unused_attributes, unused_qualifications)]
         const _ : () = {
             #result
         };
