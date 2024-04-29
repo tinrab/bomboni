@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{quote, ToTokens};
 
 use crate::parse::{
     oneof::utility::{get_variant_extract, get_variant_source_ident},
-    options::{FieldExtractStep, ParseDerive, ParseOptions, ParseTaggedUnion, ParseVariant},
-    write_utility::expand_field_write_type,
+    options::{ParseDerive, ParseOptions, ParseTaggedUnion, ParseVariant},
+    write_utility::{expand_field_inject, expand_write_field_type},
 };
 
 pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
@@ -138,59 +138,7 @@ fn expand_write_tagged_union(
 
 fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
     let target_ident = &variant.ident;
-
     let extract = get_variant_extract(variant)?;
-    let mut inject_impl = if matches!(
-        extract.steps.last(),
-        Some(
-            FieldExtractStep::Unwrap
-                | FieldExtractStep::UnwrapOr(_)
-                | FieldExtractStep::UnwrapOrDefault
-                | FieldExtractStep::Unbox
-        )
-    ) || extract.steps.is_empty()
-    {
-        quote!(*source)
-    } else {
-        quote!(source)
-    };
-    let mut set_impl = quote!();
-    for step in &extract.steps {
-        match step {
-            FieldExtractStep::Field(field_name) => {
-                let field_ident = format_ident!("{}", field_name);
-                inject_impl.extend(quote! {
-                    .#field_ident
-                });
-            }
-            FieldExtractStep::Unwrap
-            | FieldExtractStep::UnwrapOr(_)
-            | FieldExtractStep::UnwrapOrDefault => {
-                set_impl.extend(quote! {
-                    let source_field = Some(source_field);
-                });
-            }
-            FieldExtractStep::Unbox => {
-                set_impl.extend(quote! {
-                    let source_field = Box::new(source_field);
-                });
-            }
-            FieldExtractStep::StringFilterEmpty => {
-                set_impl.extend(quote! {
-                    let source_field = source_field
-                        .filter(|s| !s.is_empty())
-                        .unwrap_or_default();
-                });
-            }
-            FieldExtractStep::EnumerationFilterUnspecified => {
-                set_impl.extend(quote! {
-                    let source_field = source_field
-                        .filter(|s| *s != 0)
-                        .unwrap_or(0);
-                });
-            }
-        }
-    }
 
     if let Some(ParseDerive {
         write,
@@ -208,6 +156,7 @@ fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             })?;
 
         if variant.options.source.is_some() || variant.options.extract.is_some() {
+            let inject_impl = expand_field_inject(&extract, &variant.options, None);
             let source_value = if *target_borrow {
                 quote!(&target)
             } else {
@@ -216,8 +165,7 @@ fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
 
             return Ok(quote! {
                 let source_field = #write_impl(#source_value);
-                #set_impl
-                #inject_impl = source_field;
+                #inject_impl
             });
         }
 
@@ -232,12 +180,11 @@ fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
     }
 
     let field_type_info = variant.type_info.as_ref().unwrap();
-    let write_inner_impl = expand_field_write_type(&variant.options, field_type_info);
+    let inject_impl = expand_field_inject(&extract, &variant.options, Some(field_type_info));
+    let write_field_impl = expand_write_field_type(&variant.options, field_type_info, inject_impl);
 
     Ok(quote! {
         let source_field = target;
-        #write_inner_impl
-        #set_impl
-        #inject_impl = source_field;
+        #write_field_impl
     })
 }

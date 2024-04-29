@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use crate::parse::{
     message::utility::{get_field_clone_set, get_field_extract, get_query_field_token_type},
     options::{FieldExtractStep, ParseDerive, ParseField, ParseOptions, ParseQuery, ParseResource},
-    parse_utility::{expand_field_extract, expand_field_parse_type, make_field_error_path},
+    parse_utility::{expand_field_extract, expand_parse_field_type, make_field_error_path},
 };
 
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<TokenStream> {
@@ -176,8 +176,8 @@ fn expand_parse_field(
             .unwrap();
 
         if field.options.source.is_some() || field.options.extract.is_some() {
-            let (extract_impl, field_path) =
-                expand_field_extract(&extract, field_clone_set, None, *source_borrow);
+            let (extract_impl, _get_impl, field_path) =
+                expand_field_extract(&extract, field_clone_set, None, None, *source_borrow);
             let field_error_path = make_field_error_path(&field_path, None);
 
             return Ok(quote! {
@@ -213,17 +213,23 @@ fn expand_parse_field(
         ));
     }
 
-    let (extract_impl, field_path) = expand_field_extract(&extract, field_clone_set, None, false);
+    let field_type_info = field.type_info.as_ref().unwrap();
+    let (extract_impl, get_impl, field_path) = expand_field_extract(
+        &extract,
+        field_clone_set,
+        Some(field_type_info),
+        None,
+        false,
+    );
 
     let field_error_path = make_field_error_path(&field_path, None);
-    let field_type_info = field.type_info.as_ref().unwrap();
-    let parse_inner_impl =
-        expand_field_parse_type(&field.options, field_type_info, field_error_path);
+    let parse_field_impl =
+        expand_parse_field_type(&field.options, field_type_info, field_error_path, get_impl);
 
     Ok(quote! {
         #target_ident: {
             #extract_impl
-            #parse_inner_impl
+            #parse_field_impl
             target
         },
     })

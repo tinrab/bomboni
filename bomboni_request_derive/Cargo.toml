@@ -21,5 +21,3 @@ proc-macro2 = { version = "1.0.81", features = ["proc-macro"] }
 syn = "2.0.60"
 quote = "1.0.36"
 darling = "0.20.8"
-
-prettyplease = "*"

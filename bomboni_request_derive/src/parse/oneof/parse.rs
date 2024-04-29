@@ -7,7 +7,7 @@ use crate::parse::{
     oneof::utility::get_variant_extract,
     oneof::utility::get_variant_source_ident,
     options::{ParseDerive, ParseOptions, ParseTaggedUnion, ParseVariant},
-    parse_utility::{expand_field_extract, expand_field_parse_type, make_field_error_path},
+    parse_utility::{expand_field_extract, expand_parse_field_type, make_field_error_path},
 };
 
 pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
@@ -162,9 +162,10 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             .unwrap();
 
         if variant.options.source.is_some() || variant.options.extract.is_some() {
-            let (extract_impl, field_path) = expand_field_extract(
+            let (extract_impl, _get_impl, field_path) = expand_field_extract(
                 &extract,
                 &BTreeSet::new(),
+                None,
                 Some(&field_error_path_wrapper),
                 *source_borrow,
             );
@@ -197,21 +198,25 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
         });
     }
 
-    let (extract_impl, field_path) = expand_field_extract(
+    let field_type_info = variant.type_info.as_ref().unwrap();
+    let (extract_impl, get_impl, field_path) = expand_field_extract(
         &extract,
         &BTreeSet::new(),
+        Some(field_type_info),
         Some(&field_error_path_wrapper),
         false,
     );
-
     let field_error_path = make_field_error_path(&field_path, Some(&field_error_path_wrapper));
-    let field_type_info = variant.type_info.as_ref().unwrap();
-    let parse_inner_impl =
-        expand_field_parse_type(&variant.options, field_type_info, field_error_path);
+    let parse_field_impl = expand_parse_field_type(
+        &variant.options,
+        field_type_info,
+        field_error_path,
+        get_impl,
+    );
 
     Ok(quote! {
         #extract_impl
-        #parse_inner_impl
+        #parse_field_impl
         target
     })
 }

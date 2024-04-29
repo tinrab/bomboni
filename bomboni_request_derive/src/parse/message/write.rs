@@ -1,11 +1,11 @@
 use bomboni_core::syn::type_is_phantom;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{quote, ToTokens};
 
 use crate::parse::{
     message::utility::get_field_extract,
-    options::{FieldExtractStep, ParseDerive, ParseField, ParseOptions, ParseQuery, ParseResource},
-    write_utility::expand_field_write_type,
+    options::{ParseDerive, ParseField, ParseOptions, ParseQuery, ParseResource},
+    write_utility::{expand_field_inject, expand_write_field_type},
 };
 
 pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<TokenStream> {
@@ -56,70 +56,6 @@ fn expand_write_field(field: &ParseField) -> syn::Result<TokenStream> {
     let target_ident = field.ident.as_ref().unwrap();
     let extract = get_field_extract(field)?;
 
-    let mut first_field = true;
-    let dereference_item = matches!(
-        extract.steps.last(),
-        Some(
-            FieldExtractStep::Unwrap
-                | FieldExtractStep::UnwrapOr(_)
-                | FieldExtractStep::UnwrapOrDefault
-        )
-    ) && !field.oneof;
-    let mut inject_impl = quote!();
-    let mut set_impl = quote!();
-    for step in &extract.steps {
-        match step {
-            FieldExtractStep::Field(field_name) => {
-                let field_ident = format_ident!("{}", field_name);
-                if first_field {
-                    first_field = false;
-                    if dereference_item {
-                        inject_impl.extend(quote!(*));
-                    }
-                    inject_impl.extend(quote! {
-                        source.#field_ident
-                    });
-                } else {
-                    inject_impl.extend(quote! {
-                        .#field_ident
-                    });
-                }
-            }
-            FieldExtractStep::Unwrap
-            | FieldExtractStep::UnwrapOr(_)
-            | FieldExtractStep::UnwrapOrDefault => {
-                if field.oneof {
-                    set_impl.extend(quote! {
-                        let source_field = Some(source_field);
-                    });
-                } else {
-                    inject_impl.extend(quote! {
-                        .get_or_insert_with(|| Default::default())
-                    });
-                }
-            }
-            FieldExtractStep::Unbox => {
-                set_impl.extend(quote! {
-                    let source_field = Box::new(source_field);
-                });
-            }
-            FieldExtractStep::StringFilterEmpty => {
-                set_impl.extend(quote! {
-                    let source_field = source_field
-                        .filter(|s| !s.is_empty())
-                        .unwrap_or_default();
-                });
-            }
-            FieldExtractStep::EnumerationFilterUnspecified => {
-                set_impl.extend(quote! {
-                    let source_field = source_field
-                        .filter(|s| *s != 0)
-                        .unwrap_or(0);
-                });
-            }
-        }
-    }
-
     if let Some(ParseDerive {
         write,
         module,
@@ -136,33 +72,32 @@ fn expand_write_field(field: &ParseField) -> syn::Result<TokenStream> {
             })?;
 
         if field.options.source.is_some() || field.options.extract.is_some() {
+            let inject_impl = expand_field_inject(&extract, &field.options, None);
             let source_value = if *target_borrow {
                 quote!(&target.#target_ident)
             } else {
                 quote!(target.#target_ident)
             };
 
-            return Ok(quote! {
+            return Ok(quote! {{
                 let source_field = #write_impl(#source_value);
-                #set_impl
-                #inject_impl = source_field;
-            });
+                #inject_impl
+            }});
         }
 
-        return Ok(quote! {
+        return Ok(quote! {{
             #write_impl(&target, &mut source);
-        });
+        }});
     }
 
     let field_type_info = field.type_info.as_ref().unwrap();
-    let write_inner_impl = expand_field_write_type(&field.options, field_type_info);
+    let inject_impl = expand_field_inject(&extract, &field.options, Some(field_type_info));
+    let write_field_impl = expand_write_field_type(&field.options, field_type_info, inject_impl);
 
-    Ok(quote! {
+    Ok(quote! {{
         let source_field = target.#target_ident;
-        #write_inner_impl
-        #set_impl
-        #inject_impl = source_field;
-    })
+        #write_field_impl
+    }})
 }
 
 fn expand_write_resource(options: &ParseResource, field: &ParseField) -> TokenStream {

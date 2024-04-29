@@ -12,15 +12,37 @@ use super::options::ParseConvert;
 pub fn expand_field_extract(
     extract: &FieldExtract,
     field_clone_set: &BTreeSet<String>,
+    field_type_info: Option<&FieldTypeInfo>,
     field_path_wrapper: Option<&TokenStream>,
     borrow: bool,
-) -> (TokenStream, String) {
-    let mut field_path = String::new();
+) -> (TokenStream, TokenStream, String) {
     let mut extract_impl = quote!();
-    let mut extracted_source: bool = false;
+    let mut get_impl = quote!();
+    let mut field_path = String::new();
 
-    // In case of enums, the first "field" is the enum variant
-    if !matches!(extract.steps.first(), Some(FieldExtractStep::Field(_))) {
+    let mut source_steps = extract.steps.iter().enumerate().peekable();
+    if let Some((_, FieldExtractStep::Field(field_name))) = source_steps.peek() {
+        source_steps.next();
+
+        field_path = field_name.clone();
+        let source_ident = if borrow {
+            quote! { &source }
+        } else {
+            quote! { source }
+        };
+        let field_ident = format_ident!("{field_name}");
+
+        if field_clone_set.contains(&field_path) {
+            extract_impl.extend(quote! {
+                // TODO: Avoid cloning in some cases
+                let target = #source_ident.#field_ident.clone();
+            });
+        } else {
+            extract_impl.extend(quote! {
+                let target = #source_ident.#field_ident;
+            });
+        }
+    } else {
         extract_impl.extend(if borrow {
             quote! {
                 let target = &source;
@@ -30,10 +52,32 @@ pub fn expand_field_extract(
                 let target = source;
             }
         });
-        extracted_source = true;
     }
 
-    for step in &extract.steps {
+    let last_unwrap_step = extract
+        .steps
+        .iter()
+        .rposition(|step| matches!(step, FieldExtractStep::Unwrap));
+    let mut target_option = if field_type_info
+        .and_then(|field_type_info| field_type_info.container_ident.as_deref())
+        == Some("Option")
+    {
+        Some(())
+    } else {
+        None
+    };
+
+    for (i, step) in source_steps {
+        let block_impl = if let Some(last_unwrap_step) = last_unwrap_step {
+            if last_unwrap_step < i {
+                &mut get_impl
+            } else {
+                &mut extract_impl
+            }
+        } else {
+            &mut extract_impl
+        };
+
         match step {
             FieldExtractStep::Field(field_name) => {
                 field_path = if field_path.is_empty() {
@@ -41,58 +85,49 @@ pub fn expand_field_extract(
                 } else {
                     format!("{field_path}.{field_name}")
                 };
-
-                let source_ident = if extracted_source {
-                    quote! { target }
-                } else {
-                    extracted_source = true;
-                    if borrow {
-                        quote! { &source }
-                    } else {
-                        quote! { source }
-                    }
-                };
                 let field_ident = format_ident!("{field_name}");
 
                 if field_clone_set.contains(&field_path) {
-                    extract_impl.extend(quote! {
+                    block_impl.extend(quote! {
                         // TODO: Avoid cloning in some cases
-                        let target = #source_ident.#field_ident.clone();
+                        let target = target.#field_ident.clone();
                     });
                 } else {
-                    extract_impl.extend(quote! {
-                        let target = #source_ident.#field_ident;
+                    block_impl.extend(quote! {
+                        let target = target.#field_ident;
                     });
                 }
             }
             FieldExtractStep::Unwrap => {
-                let error_path = make_field_error_path(&field_path, field_path_wrapper);
-                extract_impl.extend(quote! {
-                    let target = target.ok_or_else(|| {
-                        RequestError::path(
-                            #error_path,
-                            CommonError::RequiredFieldMissing,
-                        )
-                    })?;
-                });
+                if !(last_unwrap_step == Some(i) && target_option.take().is_some()) {
+                    let error_path = make_field_error_path(&field_path, field_path_wrapper);
+                    block_impl.extend(quote! {
+                        let target = target.ok_or_else(|| {
+                            RequestError::path(
+                                #error_path,
+                                CommonError::RequiredFieldMissing,
+                            )
+                        })?;
+                    });
+                }
             }
             FieldExtractStep::UnwrapOr(expr) => {
-                extract_impl.extend(quote! {
+                block_impl.extend(quote! {
                     let target = target.unwrap_or_else(|| #expr);
                 });
             }
             FieldExtractStep::UnwrapOrDefault => {
-                extract_impl.extend(quote! {
+                block_impl.extend(quote! {
                     let target = target.unwrap_or_default();
                 });
             }
             FieldExtractStep::Unbox => {
-                extract_impl.extend(quote! {
+                block_impl.extend(quote! {
                     let target = *target;
                 });
             }
             FieldExtractStep::StringFilterEmpty => {
-                extract_impl.extend(quote! {
+                block_impl.extend(quote! {
                     let target = if target.is_empty() {
                         None
                     } else {
@@ -101,7 +136,7 @@ pub fn expand_field_extract(
                 });
             }
             FieldExtractStep::EnumerationFilterUnspecified => {
-                extract_impl.extend(quote! {
+                block_impl.extend(quote! {
                     let target = if target == 0 {
                         None
                     } else {
@@ -112,7 +147,7 @@ pub fn expand_field_extract(
         }
     }
 
-    (extract_impl, field_path)
+    (extract_impl, get_impl, field_path)
 }
 
 pub fn make_field_error_path(field_path: &str, before: Option<&TokenStream>) -> TokenStream {
@@ -152,10 +187,11 @@ pub fn parse_field_source_extract(source: &str) -> Option<FieldExtract> {
     }
 }
 
-pub fn expand_field_parse_type(
+pub fn expand_parse_field_type(
     field_options: &ParseFieldOptions,
     field_type_info: &FieldTypeInfo,
     field_error_path: TokenStream,
+    get_impl: TokenStream,
 ) -> TokenStream {
     let mut parse_impl = quote!();
 
@@ -264,6 +300,7 @@ pub fn expand_field_parse_type(
             "Option" => {
                 return quote! {
                     let target = if let Some(target) = target {
+                        #get_impl
                         #parse_impl
                         Some(target)
                     } else {
@@ -274,6 +311,7 @@ pub fn expand_field_parse_type(
             "Box" => {
                 return quote! {
                     let target = {
+                        #get_impl
                         #parse_impl
                         Box::new(target)
                     };
@@ -281,6 +319,7 @@ pub fn expand_field_parse_type(
             }
             "Vec" => {
                 return quote! {
+                    #get_impl
                     let mut v = Vec::new();
                     for (i, target) in target.into_iter().enumerate() {
                         v.push({
@@ -308,9 +347,12 @@ pub fn expand_field_parse_type(
                     }
                 };
                 return if parse_kv_impl.is_empty() {
-                    quote!()
+                    quote! {
+                        #get_impl
+                    }
                 } else {
                     quote! {
+                        #get_impl
                         let mut m = #container_ident::new();
                         for (key, target) in target.into_iter() {
                             #parse_kv_impl
@@ -324,5 +366,8 @@ pub fn expand_field_parse_type(
         }
     }
 
-    parse_impl
+    quote! {
+        #get_impl
+        #parse_impl
+    }
 }

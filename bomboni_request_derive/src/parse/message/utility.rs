@@ -28,11 +28,14 @@ pub fn get_field_extract(field: &ParseField) -> syn::Result<FieldExtract> {
         if field.options.extract.is_none()
             && field.options.source.is_none()
             && field.options.derive.is_none()
+            && !field.options.oneof
             && !field.options.enumeration
-            && !field.oneof
+            && matches!(
+                field_type_info.container_ident.as_deref(),
+                None | Some("Option")
+            )
             && field_type_info.primitive_message
             && field_type_info.primitive_ident.is_some()
-            && field_type_info.container_ident.is_none()
             && field_type_info.generic_param.is_none()
         {
             steps.insert(1, FieldExtractStep::Unwrap);

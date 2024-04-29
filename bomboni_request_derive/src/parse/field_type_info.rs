@@ -157,6 +157,7 @@ mod tests {
             keep_primitive: false,
             extract: None,
             wrapper: false,
+            oneof: false,
             enumeration: false,
             regex: None,
             try_from: None,

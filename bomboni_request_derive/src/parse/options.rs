@@ -69,10 +69,6 @@ pub struct ParseField {
     #[darling(flatten)]
     pub options: ParseFieldOptions,
 
-    /// Parses oneof value.
-    /// Special purpose parse for oneof fields.
-    #[darling(default)]
-    pub oneof: bool,
     /// Parse resource fields into this field.
     /// Special purpose parse for resource fields into a `ParsedResource` field.
     pub resource: Option<ParseResource>,
@@ -142,6 +138,10 @@ pub struct ParseFieldOptions {
     ///
     #[darling(default)]
     pub wrapper: bool,
+    /// Parses oneof value.
+    /// Special purpose parse for oneof fields.
+    #[darling(default)]
+    pub oneof: bool,
     /// Parses enum value from `i32`.
     /// Special purpose parse for enum fields with `i32` values.
     #[darling(default)]
@@ -236,7 +236,95 @@ impl ParseOptions {
         options.data = match &options.data {
             Data::Struct(data) => {
                 let mut fields = Vec::new();
+                let mut contains_query = false;
+
                 for mut field in data.fields.iter().cloned() {
+                    if field.list_query.is_some() || field.search_query.is_some() {
+                        if contains_query {
+                            return Err(syn::Error::new_spanned(
+                                &field.ident,
+                                "can only have one list or search query field",
+                            ));
+                        }
+                        contains_query = true;
+                    }
+                    if field.list_query.is_some() && field.search_query.is_some() {
+                        return Err(syn::Error::new_spanned(
+                            &field.ident,
+                            "list and search query cannot be used together",
+                        ));
+                    }
+                    if (field.list_query.is_some() || field.search_query.is_some())
+                        && (field.options.keep
+                            || field.options.keep_primitive
+                            || field.options.derive.is_some()
+                            || field.options.oneof
+                            || field.options.enumeration
+                            || field.resource.is_some())
+                    {
+                        return Err(syn::Error::new_spanned(
+                            &field.ident,
+                            "query fields cannot be used with these options",
+                        ));
+                    }
+
+                    if field.options.extract.is_some() && field.options.source.is_some() {
+                        return Err(syn::Error::new_spanned(
+                            &field.ident,
+                            "`extract` and `source` cannot be used together",
+                        ));
+                    }
+
+                    if (field.options.oneof || field.options.enumeration)
+                        && (field.options.keep
+                            || field.options.keep_primitive
+                            || field.options.try_from.is_some()
+                            || field.options.derive.is_some()
+                            || field.options.convert.is_some()
+                            || field.resource.is_some()
+                            || field.list_query.is_some()
+                            || field.search_query.is_some())
+                    {
+                        return Err(syn::Error::new_spanned(
+                            &field.ident,
+                            "`oneof` and `enumeration` cannot be used with these options",
+                        ));
+                    }
+
+                    if field.options.wrapper
+                        && (field.options.keep
+                            || field.options.keep_primitive
+                            || field.options.derive.is_some()
+                            || field.options.oneof
+                            || field.options.enumeration
+                            || field.options.try_from.is_some()
+                            || field.resource.is_some()
+                            || field.list_query.is_some()
+                            || field.search_query.is_some())
+                    {
+                        return Err(syn::Error::new_spanned(
+                            &field.ident,
+                            "`wrapper` cannot be used with these options`",
+                        ));
+                    }
+
+                    if field.options.try_from.is_some()
+                        && (field.options.keep
+                            || field.options.keep_primitive
+                            || field.options.derive.is_some()
+                            || field.options.oneof
+                            || field.options.enumeration
+                            || field.options.convert.is_some()
+                            || field.resource.is_some()
+                            || field.list_query.is_some()
+                            || field.search_query.is_some())
+                    {
+                        return Err(syn::Error::new_spanned(
+                            &field.ident,
+                            "`try_from` cannot be used with these options",
+                        ));
+                    }
+
                     if field.options.source_field {
                         field.options.source = Some(field.ident.as_ref().unwrap().to_string());
                     }
@@ -258,11 +346,45 @@ impl ParseOptions {
                         ..field
                     });
                 }
+
                 Data::Struct(Fields::new(Style::Struct, fields))
             }
             Data::Enum(data) => {
                 let mut variants = Vec::new();
                 for mut variant in data.iter().cloned() {
+                    if variant.options.extract.is_some() && variant.options.source.is_some() {
+                        return Err(syn::Error::new_spanned(
+                            &variant.ident,
+                            "`extract` and `source` cannot be used together",
+                        ));
+                    }
+
+                    if variant.options.wrapper
+                        && (variant.options.keep
+                            || variant.options.keep_primitive
+                            || variant.options.try_from.is_some()
+                            || variant.options.derive.is_some()
+                            || variant.options.enumeration)
+                    {
+                        return Err(syn::Error::new_spanned(
+                            &variant.ident,
+                            "`wrapper` cannot be used with these options`",
+                        ));
+                    }
+
+                    if variant.options.try_from.is_some()
+                        && (variant.options.keep
+                            || variant.options.keep_primitive
+                            || variant.options.derive.is_some()
+                            || variant.options.enumeration
+                            || variant.options.convert.is_some())
+                    {
+                        return Err(syn::Error::new_spanned(
+                            &variant.ident,
+                            "`try_from` cannot be used with these options",
+                        ));
+                    }
+
                     if variant.options.source_field {
                         variant.options.source = Some(variant.ident.to_string());
                     }

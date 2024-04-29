@@ -114,6 +114,7 @@ mod tests {
             enum_value: i32,
             oneof: Option<OneofKind>,
             kept_nested: Option<NestedItem>,
+            optional_box: Option<Box<i32>>,
         }
 
         #[derive(Parse, Debug, PartialEq)]
@@ -121,12 +122,11 @@ mod tests {
         struct ParsedItem {
             #[parse(source = "string")]
             s: String,
-            #[parse(source = "optional_string")]
+            #[parse(source = "optional_string?")]
             opt_s: Option<String>,
             required_string: String,
             #[parse(extract = [Unwrap])]
             required_string_optional: String,
-            #[parse(extract = [Unwrap])]
             nested: ParsedNestedItem,
             optional_nested: Option<ParsedNestedItem>,
             #[parse(extract = [UnwrapOr(NestedItem::default())])]
@@ -139,6 +139,8 @@ mod tests {
             oneof: ParsedOneofKind,
             #[parse(keep_primitive)]
             kept_nested: Option<NestedItem>,
+            #[parse(extract = [Unwrap, Unbox])]
+            optional_box: Option<i32>,
             #[parse(skip)]
             extra: i32,
         }
@@ -157,6 +159,7 @@ mod tests {
                     enum_value: 1,
                     oneof: Some(OneofKind::String("oneof".into())),
                     kept_nested: Some(NestedItem {}),
+                    optional_box: Some(Box::new(1)),
                 }
             }
         }
@@ -175,6 +178,7 @@ mod tests {
                     enum_value: DataTypeEnum::String,
                     oneof: ParsedOneofKind::String("oneof".into()),
                     kept_nested: Some(NestedItem {}),
+                    optional_box: Some(1),
                     extra: 0,
                 }
             }
@@ -319,6 +323,7 @@ mod tests {
                 enum_value: 1,
                 oneof: Some(OneofKind::String("abc".into())),
                 kept_nested: Some(NestedItem {}),
+                optional_box: Some(Box::new(42)),
             })
             .unwrap(),
             ParsedItem {
@@ -333,6 +338,7 @@ mod tests {
                 enum_value: DataTypeEnum::String,
                 oneof: ParsedOneofKind::String("abc".into()),
                 kept_nested: Some(NestedItem {}),
+                optional_box: Some(42),
                 extra: 0,
             }
         );
@@ -349,6 +355,7 @@ mod tests {
                 enum_value: DataTypeEnum::Boolean,
                 oneof: ParsedOneofKind::String("abc".into()),
                 kept_nested: Some(NestedItem {}),
+                optional_box: Some(42),
                 extra: 0,
             }),
             Item {
@@ -363,6 +370,7 @@ mod tests {
                 enum_value: 2,
                 oneof: Some(OneofKind::String("abc".into())),
                 kept_nested: Some(NestedItem {}),
+                optional_box: Some(Box::new(42)),
             }
         );
     }
@@ -372,9 +380,13 @@ mod tests {
         #[derive(Debug, PartialEq)]
         struct Item {
             value: i32,
+            required_value: Option<i32>,
             optional_value: Option<i32>,
-            nested: Option<NestedItem>,
+            inner_optional_value: Option<Box<Option<Box<i32>>>>,
+            required_boxed_value: Option<Box<i32>>,
+            optional_boxed_value: Option<Box<i32>>,
             default_value: Option<i32>,
+            nested: Option<NestedItem>,
             source_box: Box<i32>,
             target_box: i32,
             keep_box: Box<i32>,
@@ -409,15 +421,23 @@ mod tests {
         #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
             value: i32,
-            #[parse(extract = [Unwrap])]
-            optional_value: i32,
+            #[parse(try_from = i32, extract = [Unwrap])]
+            required_value: i64,
+            #[parse(try_from = i32, extract = [Unwrap])]
+            optional_value: Option<i64>,
+            #[parse(try_from = i32, extract = [Unwrap, Unbox, Unwrap, Unbox])]
+            inner_optional_value: Option<i64>,
+            #[parse(try_from = i32, extract = [Unwrap, Unbox])]
+            required_boxed_value: Box<i64>,
+            #[parse(try_from = i32, extract = [Unwrap, Unbox])]
+            optional_boxed_value: Option<i64>,
+            #[parse(extract = [UnwrapOr(42i32)])]
+            default_value: i32,
             nested: ParsedNested,
             #[parse(source = "nested?.name")]
             name: String,
-            #[parse(source = "nested?.description")]
+            #[parse(source = "nested?.description?")]
             description: Option<String>,
-            #[parse(extract = [UnwrapOr(42i32)])]
-            default_value: i32,
             #[parse(extract = [Unbox])]
             source_box: i32,
             target_box: Box<i32>,
@@ -431,6 +451,7 @@ mod tests {
         #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
         struct ParsedNested {
             name: String,
+            #[parse(extract = [Unwrap])]
             description: Option<String>,
         }
 
@@ -444,9 +465,13 @@ mod tests {
             fn default() -> Self {
                 Self {
                     value: 1,
+                    required_value: Some(1),
                     optional_value: Some(1),
-                    nested: Some(NestedItem::default()),
+                    inner_optional_value: Some(Box::new(Some(Box::new(1)))),
+                    required_boxed_value: Some(Box::new(1)),
+                    optional_boxed_value: Some(Box::new(1)),
                     default_value: Some(1),
+                    nested: Some(NestedItem::default()),
                     source_box: Box::new(1),
                     target_box: 1,
                     keep_box: Box::new(1),
@@ -470,11 +495,15 @@ mod tests {
             fn default() -> Self {
                 Self {
                     value: 1,
-                    optional_value: 1,
+                    required_value: 1,
+                    optional_value: Some(1),
+                    inner_optional_value: Some(1),
+                    required_boxed_value: Box::new(1),
+                    optional_boxed_value: Some(1),
+                    default_value: 1,
                     nested: ParsedNested::default(),
                     name: "abc".into(),
                     description: Some("abc".into()),
-                    default_value: 1,
                     source_box: 1,
                     target_box: Box::new(1),
                     keep_box: Box::new(1),
@@ -495,47 +524,59 @@ mod tests {
         assert_eq!(
             ParsedItem::parse(Item {
                 value: 42,
+                required_value: Some(42),
                 optional_value: Some(42),
+                inner_optional_value: Some(Box::new(Some(Box::new(42)))),
+                required_boxed_value: Some(Box::new(42)),
+                optional_boxed_value: Some(Box::new(42)),
+                default_value: Some(42),
                 nested: Some(NestedItem {
                     name: "name".into(),
                     description: Some("description".into()),
                 }),
-                default_value: Some(42),
                 source_box: Box::new(42),
                 target_box: 42,
                 keep_box: Box::new(42),
                 oneof: Some(Oneof {
-                    kind: Some(OneofKind::Value(1)),
+                    kind: Some(OneofKind::Value(42)),
                 }),
             })
             .unwrap(),
             ParsedItem {
                 value: 42,
-                optional_value: 42,
+                optional_value: Some(42),
+                required_value: 42,
+                inner_optional_value: Some(42),
+                required_boxed_value: Box::new(42),
+                optional_boxed_value: Some(42),
+                default_value: 42,
                 nested: ParsedNested {
                     name: "name".into(),
                     description: Some("description".into()),
                 },
                 name: "name".into(),
                 description: Some("description".into()),
-                default_value: 42,
                 source_box: 42,
                 target_box: Box::new(42),
                 keep_box: Box::new(42),
-                oneof: ParsedOneof::Value(1),
+                oneof: ParsedOneof::Value(42),
             }
         );
         assert_eq!(
             Item::from(ParsedItem {
                 value: 42,
-                optional_value: 42,
+                optional_value: Some(42),
+                inner_optional_value: Some(42),
+                required_value: 42,
+                required_boxed_value: Box::new(42),
+                optional_boxed_value: Some(42),
+                default_value: 42,
                 nested: ParsedNested {
                     name: "name".into(),
                     description: Some("description".into()),
                 },
                 name: "name".into(),
                 description: Some("description".into()),
-                default_value: 42,
                 source_box: 42,
                 target_box: Box::new(42),
                 keep_box: Box::new(42),
@@ -544,11 +585,15 @@ mod tests {
             Item {
                 value: 42,
                 optional_value: Some(42),
+                inner_optional_value: Some(Box::new(Some(Box::new(42)))),
+                required_value: Some(42),
+                required_boxed_value: Some(Box::new(42)),
+                optional_boxed_value: Some(Box::new(42)),
+                default_value: Some(42),
                 nested: Some(NestedItem {
                     name: "name".into(),
                     description: Some("description".into()),
                 }),
-                default_value: Some(42),
                 source_box: Box::new(42),
                 target_box: 42,
                 keep_box: Box::new(42),
@@ -560,6 +605,28 @@ mod tests {
 
         assert_eq!(
             ParsedItem::parse(Item {
+                optional_value: None,
+                ..Default::default()
+            })
+            .unwrap(),
+            ParsedItem {
+                optional_value: None,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            ParsedItem::parse(Item {
+                optional_boxed_value: None,
+                ..Default::default()
+            })
+            .unwrap(),
+            ParsedItem {
+                optional_boxed_value: None,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            ParsedItem::parse(Item {
                 default_value: None,
                 ..Default::default()
             })
@@ -569,6 +636,31 @@ mod tests {
                 ..Default::default()
             }
         );
+
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                required_value: None,
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError { error, path, .. })
+            if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("required_value".into())
+        ));
+        assert!(matches!(
+            ParsedItem::parse(Item {
+                required_boxed_value: None,
+                ..Default::default()
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError { error, path, .. })
+            if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("required_boxed_value".into())
+        ));
     }
 
     #[test]
@@ -1062,7 +1154,7 @@ mod tests {
         #[derive(Debug, PartialEq, Parse)]
         #[parse(bomboni_crate = bomboni, source = Item, write)]
         struct ParsedItem {
-            #[parse(wrapper)]
+            #[parse(wrapper, extract = [Unwrap])]
             value_f32: Option<f32>,
             #[parse(wrapper)]
             integer_16: i16,
@@ -1255,6 +1347,7 @@ mod tests {
             #[parse(extract = [Unbox])]
             Inner(Box<ParsedValue>),
             Nested(ParsedNestedValue),
+            #[parse(extract = [Unwrap])]
             OptionalNested(Option<ParsedNestedValue>),
             #[parse(extract = [UnwrapOrDefault])]
             DefaultNested(ParsedNestedValue),
@@ -1376,7 +1469,7 @@ mod tests {
         struct ParsedItem {
             #[parse(keep, source = "value")]
             x: i32,
-            #[parse(keep)]
+            #[parse(keep_primitive)]
             item: Option<NestedItem>,
             #[parse(keep_primitive, extract = [Unwrap])]
             item_primitive: NestedItem,
@@ -1945,7 +2038,7 @@ mod tests {
         struct ParsedItem {
             #[parse(try_from = i32)]
             value: u64,
-            #[parse(convert = id_convert)]
+            #[parse(convert = id_convert, extract = [Unwrap])]
             id: Option<Id>,
         }
 

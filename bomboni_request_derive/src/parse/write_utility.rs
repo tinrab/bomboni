@@ -1,13 +1,91 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::parse::{field_type_info::FieldTypeInfo, options::ParseFieldOptions};
+use crate::parse::{
+    field_type_info::FieldTypeInfo,
+    options::{FieldExtract, FieldExtractStep, ParseConvert, ParseFieldOptions},
+};
 
-use super::options::ParseConvert;
+pub fn expand_field_inject(
+    extract: &FieldExtract,
+    field_options: &ParseFieldOptions,
+    field_type_info: Option<&FieldTypeInfo>,
+) -> TokenStream {
+    let mut inject_impl = quote!();
+    let mut set_impl = quote!();
 
-pub fn expand_field_write_type(
+    let last_unwrap_step = extract
+        .steps
+        .iter()
+        .rposition(|step| matches!(step, FieldExtractStep::Unwrap));
+    let mut target_option = if field_type_info
+        .and_then(|field_type_info| field_type_info.container_ident.as_deref())
+        == Some("Option")
+    {
+        Some(())
+    } else {
+        None
+    };
+
+    let mut dereference_source = false;
+
+    for (i, step) in extract.steps.iter().enumerate() {
+        match step {
+            FieldExtractStep::Field(field_name) => {
+                let field_ident = format_ident!("{}", field_name);
+                set_impl.extend(quote! {
+                    .#field_ident
+                });
+                dereference_source = false;
+            }
+            FieldExtractStep::Unwrap => {
+                if field_options.oneof
+                    || last_unwrap_step == Some(i) && target_option.take().is_some()
+                {
+                    inject_impl = quote! {
+                        let source_field = Some(source_field);
+                        #inject_impl
+                    };
+                } else {
+                    set_impl.extend(quote! {
+                        .get_or_insert_with(|| Default::default())
+                    });
+                    dereference_source = true;
+                }
+            }
+            FieldExtractStep::UnwrapOr(_) | FieldExtractStep::UnwrapOrDefault => {
+                inject_impl = quote! {
+                    let source_field = Some(source_field);
+                    #inject_impl
+                };
+            }
+            FieldExtractStep::Unbox => {
+                inject_impl = quote! {
+                    let source_field = Box::new(source_field);
+                    #inject_impl
+                };
+            }
+            FieldExtractStep::StringFilterEmpty
+            | FieldExtractStep::EnumerationFilterUnspecified => {}
+        }
+    }
+
+    if dereference_source || !matches!(extract.steps.first(), Some(FieldExtractStep::Field(_))) {
+        set_impl = quote!(*source #set_impl);
+    } else {
+        set_impl = quote!(source #set_impl);
+    }
+
+    quote! {
+        #inject_impl
+        #set_impl = source_field;
+    }
+}
+
+pub fn expand_write_field_type(
     field_options: &ParseFieldOptions,
     field_type_info: &FieldTypeInfo,
+    inject_impl: TokenStream,
 ) -> TokenStream {
     let mut write_impl = quote!();
 
@@ -72,18 +150,17 @@ pub fn expand_field_write_type(
         match container_ident.as_str() {
             "Option" => {
                 return quote! {
-                    let source_field = if let Some(source_field) = source_field {
+                    if let Some(source_field) = source_field {
                         #write_impl
-                        Some(source_field)
-                    } else {
-                        None
-                    };
+                        #inject_impl
+                    }
                 };
             }
             "Box" => {
                 return quote! {
                     let source_field = *source_field;
                     #write_impl
+                    #inject_impl
                 };
             }
             "Vec" => {
@@ -94,6 +171,7 @@ pub fn expand_field_write_type(
                         v.push(source_field);
                     }
                     let source_field = v;
+                    #inject_impl
                 };
             }
             "HashMap" | "BTreeMap" => {
@@ -103,7 +181,9 @@ pub fn expand_field_write_type(
                     quote! { BTreeMap }
                 };
                 return if write_impl.is_empty() {
-                    quote!()
+                    quote! {
+                        #inject_impl
+                    }
                 } else {
                     quote! {
                         let mut m = #container_ident::new();
@@ -112,6 +192,7 @@ pub fn expand_field_write_type(
                             m.insert(key, source_field);
                         }
                         let source_field = m;
+                        #inject_impl
                     }
                 };
             }
@@ -119,5 +200,8 @@ pub fn expand_field_write_type(
         }
     }
 
-    write_impl
+    quote! {
+        #write_impl
+        #inject_impl
+    }
 }
