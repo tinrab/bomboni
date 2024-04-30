@@ -5,11 +5,12 @@ use std::{
     fmt::{self, Display, Formatter},
     num::ParseIntError,
     str::FromStr,
-    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 #[cfg(feature = "serde")]
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::date_time::UtcDateTime;
 
 pub mod generator;
 #[cfg(feature = "mysql")]
@@ -43,8 +44,8 @@ impl Id {
 
     /// Encodes the Id from parts.
     #[must_use]
-    pub fn from_parts(time: SystemTime, worker: u16, sequence: u16) -> Self {
-        let timestamp = u128::from(time.duration_since(UNIX_EPOCH).unwrap().as_secs());
+    pub fn from_parts(time: UtcDateTime, worker: u16, sequence: u16) -> Self {
+        let timestamp = time.unix_timestamp() as u128;
         let worker = u128::from(worker);
         let sequence = u128::from(sequence);
 
@@ -66,10 +67,9 @@ impl Id {
     /// Basic usage:
     ///
     /// ```
-    /// # use std::time::{SystemTime, Duration};
-    /// use bomboni_common::id::Id;
+    /// use bomboni_common::{id::Id, date_time::UtcDateTime};
     ///
-    /// let time = SystemTime::UNIX_EPOCH + Duration::from_secs(1337);
+    /// let time = UtcDateTime::from_timestamp(1337, 0).unwrap();
     /// let id = Id::from_parts(time, 42, 1);
     /// let (timestamp, worker, sequence) = id.decode();
     /// assert_eq!(timestamp, time);
@@ -77,9 +77,10 @@ impl Id {
     /// assert_eq!(sequence, 1);
     /// ```
     #[must_use]
-    pub fn decode(self) -> (SystemTime, u16, u16) {
-        let timestamp = SystemTime::UNIX_EPOCH
-            + Duration::from_secs((self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as u64);
+    pub fn decode(self) -> (UtcDateTime, u16, u16) {
+        let timestamp =
+            UtcDateTime::from_timestamp((self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as i64, 0)
+                .unwrap();
         let worker = ((self.0 >> SEQUENCE_BITS) & ((1 << WORKER_BITS) - 1)) as u16;
         let sequence = (self.0 & ((1 << SEQUENCE_BITS) - 1)) as u16;
         (timestamp, worker, sequence)
@@ -144,32 +145,23 @@ impl<'de> Deserialize<'de> for Id {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use super::*;
 
     #[test]
     fn it_works() {
-        assert_eq!(
-            Id::from_parts(SystemTime::UNIX_EPOCH + Duration::from_secs(10), 1, 1),
-            Id(0b1010_0000_0000_0000_0001_0000_0000_0000_0001)
-        );
-        let max_time = SystemTime::UNIX_EPOCH + Duration::from_secs(Duration::MAX.as_secs() / 2);
-        let id = Id::from_parts(max_time, 1, 1);
-        assert_eq!(
-            id,
-            Id(0b111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_0000_0000_0000_0001_0000_0000_0000_0001)
-        );
+        let ts = UtcDateTime::from_timestamp(10, 0).unwrap();
+        let id = Id::from_parts(ts, 1, 1);
+        assert_eq!(id, Id(0b1010_0000_0000_0000_0001_0000_0000_0000_0001));
         let (timestamp, worker, sequence) = id.decode();
-        assert_eq!(timestamp, max_time);
+        assert_eq!(timestamp, ts);
         assert_eq!(worker, 1);
         assert_eq!(sequence, 1);
     }
 
-    #[test]
     #[cfg(feature = "serde")]
+    #[test]
     fn serialize() {
-        let id = Id::from_parts(SystemTime::UNIX_EPOCH + Duration::from_secs(2 << 20), 1, 1);
-        assert_eq!(serde_json::to_string(&id).unwrap(), r#""20000000010001""#);
+        let id = Id::from_parts(UtcDateTime::from_timestamp(3, 0).unwrap(), 5, 7);
+        assert_eq!(serde_json::to_string(&id).unwrap(), r#""300050007""#);
     }
 }

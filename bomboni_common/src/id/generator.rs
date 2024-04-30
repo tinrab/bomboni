@@ -1,11 +1,24 @@
-use std::{
-    thread,
-    time::{Duration, SystemTime},
-};
+use std::thread;
+use std::time::Duration;
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm"
+))]
+use wasm_bindgen::prelude::*;
 
+use crate::date_time::UtcDateTime;
 use crate::id::Id;
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(
+    all(
+        target_family = "wasm",
+        not(any(target_os = "emscripten", target_os = "wasi")),
+        feature = "wasm"
+    ),
+    wasm_bindgen(js_name = IdGenerator)
+)]
 pub struct Generator {
     worker: u16,
     next: u16,
@@ -37,7 +50,7 @@ impl Generator {
     /// assert_ne!(g.generate(), g.generate());
     /// ```
     pub fn generate(&mut self) -> Id {
-        let id = Id::from_parts(SystemTime::now(), self.worker, self.next);
+        let id = Id::from_parts(UtcDateTime::now(), self.worker, self.next);
 
         self.next += 1;
         if self.next == u16::MAX {
@@ -53,7 +66,7 @@ impl Generator {
     /// The same as [`generate`] but async.
     #[cfg(feature = "tokio")]
     pub async fn generate_async(&mut self) -> Id {
-        let id = Id::from_parts(SystemTime::now(), self.worker, self.next);
+        let id = Id::from_parts(UtcDateTime::now(), self.worker, self.next);
 
         self.next += 1;
         if self.next == u16::MAX {
@@ -86,7 +99,7 @@ impl Generator {
         }
 
         let mut ids = Vec::with_capacity(count);
-        let mut now = SystemTime::now();
+        let mut now = UtcDateTime::now();
 
         for _ in 0..count {
             let id = Id::from_parts(now, self.worker, self.next);
@@ -96,7 +109,7 @@ impl Generator {
             if self.next == u16::MAX {
                 self.next = 0;
                 thread::sleep(SLEEP_DURATION);
-                now = SystemTime::now();
+                now = UtcDateTime::now();
             }
         }
 
@@ -113,7 +126,7 @@ impl Generator {
         }
 
         let mut ids = Vec::with_capacity(count);
-        let mut now = SystemTime::now();
+        let mut now = UtcDateTime::now();
 
         for _ in 0..count {
             let id = Id::from_parts(now, self.worker, self.next);
@@ -123,11 +136,29 @@ impl Generator {
             if self.next == u16::MAX {
                 self.next = 0;
                 tokio::time::sleep(SLEEP_DURATION).await;
-                now = SystemTime::now();
+                now = UtcDateTime::now();
             }
         }
 
         ids
+    }
+}
+
+#[cfg(all(
+    target_family = "wasm",
+    not(any(target_os = "emscripten", target_os = "wasi")),
+    feature = "wasm",
+))]
+#[wasm_bindgen(js_class = IdGenerator)]
+impl Generator {
+    #[wasm_bindgen(constructor)]
+    pub fn wasm_new(worker: u16) -> Self {
+        Self { next: 0, worker }
+    }
+
+    #[wasm_bindgen(js_name = generate)]
+    pub fn wasm_generate(&mut self) -> Id {
+        self.generate()
     }
 }
 
