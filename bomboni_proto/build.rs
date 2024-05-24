@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
             println!("cargo:rerun-if-changed={proto_path}");
         }
 
-        let mut config = prost_build::Config::new();
+        let mut config = Config::new();
         config
             .file_descriptor_set_path(&fd_path)
             .compile_well_known_types()
@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         println!("cargo:rerun-if-changed={}", proto_path.display());
     }
 
-    let mut config = prost_build::Config::new();
+    let mut config = Config::new();
     config
         .file_descriptor_set_path(&fd_path)
         .compile_well_known_types()

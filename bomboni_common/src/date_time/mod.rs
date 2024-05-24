@@ -4,9 +4,11 @@ use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use time::convert::{Nanosecond, Second};
+pub use time::Month;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-pub use time::Month;
+#[cfg(feature = "postgres")]
+mod postgres;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(

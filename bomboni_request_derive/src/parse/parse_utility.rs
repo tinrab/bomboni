@@ -24,7 +24,7 @@ pub fn expand_field_extract(
     if let Some((_, FieldExtractStep::Field(field_name))) = source_steps.peek() {
         source_steps.next();
 
-        field_path = field_name.clone();
+        field_path.clone_from(field_name);
         let source_ident = if borrow {
             quote! { &source }
         } else {

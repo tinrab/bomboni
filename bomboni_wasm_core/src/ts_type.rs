@@ -91,7 +91,7 @@ impl TsType {
             Type::BareFn(TypeBareFn { inputs, output, .. }) => {
                 let params = inputs.iter().map(|arg| Self::from_type(&arg.ty)).collect();
 
-                let alias_type = if let syn::ReturnType::Type(_, ty) = output {
+                let alias_type = if let ReturnType::Type(_, ty) = output {
                     Self::from_type(ty)
                 } else {
                     Self::VOID
@@ -228,7 +228,7 @@ impl TsType {
             "Box" | "Cow" | "Rc" | "Arc" | "Cell" | "RefCell" if args.len() == 1 => {
                 Self::from_type(args[0])
             }
-            "Vec" | "VecDeque" | "LinkedList" if args.len() == 1 => {
+            "Vec" | "VecDeque" | "LinkedList" | "HashSet" | "BTreeSet" if args.len() == 1 => {
                 let element = Self::from_type(args[0]);
                 Self::Array(Box::new(element))
             }
@@ -243,10 +243,6 @@ impl TsType {
                 .to_string();
 
                 Self::Reference { name, type_params }
-            }
-            "HashSet" | "BTreeSet" if args.len() == 1 => {
-                let element = Self::from_type(args[0]);
-                Self::Array(Box::new(element))
             }
             "ByteBuf" => {
                 if cfg!(feature = "js") {

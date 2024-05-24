@@ -16,9 +16,9 @@ path = "src/lib.rs"
 [dependencies]
 bomboni_core = { path = "../bomboni_core", version = "0.1.55" }
 
-prost = "0.12.4"
-prost-types = "0.12.4"
-proc-macro2 = "1.0.81"
-syn = { version = "2.0.60", features = ["full"] }
+prost = "0.12.6"
+prost-types = "0.12.6"
+proc-macro2 = "1.0.83"
+syn = { version = "2.0.66", features = ["full"] }
 quote = "1.0.36"
-prettyplease = "0.2.19"
+prettyplease = "0.2.20"

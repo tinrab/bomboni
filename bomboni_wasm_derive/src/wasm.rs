@@ -210,6 +210,7 @@ fn derive_serde_wasm(options: &WasmOptions) -> TokenStream {
     let usage = expand_usage(options);
     quote! {
         #[automatically_derived]
+        #[allow(empty_docs)]
         const _: () = {
             #usage
             #impls

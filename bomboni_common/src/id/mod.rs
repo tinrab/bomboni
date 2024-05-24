@@ -13,8 +13,8 @@ use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
 use crate::date_time::UtcDateTime;
 
 pub mod generator;
-#[cfg(feature = "mysql")]
-mod mysql;
+#[cfg(feature = "postgres")]
+mod postgres;
 
 const TIMESTAMP_BITS: i64 = 64;
 const WORKER_BITS: i64 = 16;

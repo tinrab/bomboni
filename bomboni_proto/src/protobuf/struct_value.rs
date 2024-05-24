@@ -249,7 +249,7 @@ const _: () = {
         fn try_from(value: JsValue) -> Result<Self, Self::Error> {
             let obj: Object = value.unchecked_into();
             let mut fields = BTreeMap::new();
-            for k in js_sys::Object::keys(&obj).iter() {
+            for k in Object::keys(&obj).iter() {
                 let v = js_sys::Reflect::get(&obj, &k).unwrap();
                 fields.insert(
                     k.as_string()
@@ -272,7 +272,7 @@ const _: () = {
                 ValueKind::StringValue(s) => JsValue::from_str(&s),
                 ValueKind::BoolValue(b) => JsValue::from_bool(b),
                 ValueKind::StructValue(Struct { fields }) => {
-                    let obj = js_sys::Object::new();
+                    let obj = Object::new();
                     for (k, v) in fields {
                         js_sys::Reflect::set(&obj, &k.into(), &v.into()).unwrap();
                     }

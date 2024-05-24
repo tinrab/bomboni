@@ -146,7 +146,7 @@ pub struct ParseFieldOptions {
     /// Special purpose parse for enum fields with `i32` values.
     #[darling(default)]
     pub enumeration: bool,
-    /// Check string against RegEx.
+    /// Check string against Regex.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,
 
