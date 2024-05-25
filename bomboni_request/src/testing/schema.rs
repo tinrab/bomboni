@@ -1,8 +1,5 @@
-use std::collections::BTreeMap;
-
 use crate::schema::{
-    FieldMemberSchema, FunctionSchema, MemberSchema, ResourceMemberSchema, Schema, SchemaMapped,
-    ValueType,
+    FieldMemberSchema, MemberSchema, ResourceMemberSchema, Schema, SchemaMapped, ValueType,
 };
 use crate::value::Value;
 use bomboni_common::btree_map_into;
@@ -47,12 +44,6 @@ impl RequestItem {
                     },
                 }),
             },
-            functions: btree_map_into! {
-                "regex" => FunctionSchema {
-                    argument_value_types: vec![ValueType::String, ValueType::String],
-                    return_value_type: ValueType::Boolean,
-                }
-            },
         }
     }
 }
@@ -76,7 +67,6 @@ impl UserItem {
                 "displayName" => FieldMemberSchema::new_ordered(ValueType::String),
                 "age" => FieldMemberSchema::new_ordered(ValueType::Integer),
             ),
-            functions: BTreeMap::default(),
         }
     }
 }
@@ -88,6 +78,20 @@ impl SchemaMapped for UserItem {
             "displayName" => self.display_name.clone().into(),
             "age" => self.age.into(),
             _ => unimplemented!("SchemaMapped: User::{}", name),
+        }
+    }
+}
+
+impl TaskItem {
+    pub fn get_schema() -> Schema {
+        Schema {
+            members: btree_map_into!(
+                "id" => FieldMemberSchema::new_ordered(ValueType::String),
+                "userId" => FieldMemberSchema::new_ordered(ValueType::String),
+                "content" => FieldMemberSchema::new(ValueType::String),
+                "deleted" => FieldMemberSchema::new(ValueType::Boolean),
+                "tags" => FieldMemberSchema::new_repeated(ValueType::String),
+            ),
         }
     }
 }

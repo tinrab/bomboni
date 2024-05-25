@@ -2,12 +2,13 @@ use crate::{
     filter::Filter,
     ordering::Ordering,
     query::error::{QueryError, QueryResult},
-    schema::Schema,
+    schema::{FunctionSchemaMap, Schema},
 };
 
 pub fn parse_query_filter(
     filter: Option<&str>,
     schema: &Schema,
+    schema_functions: Option<&FunctionSchemaMap>,
     max_filter_length: Option<usize>,
 ) -> QueryResult<Filter> {
     // Empty string is considered as None, because an optional string can be "", from protobuf's side.
@@ -16,7 +17,10 @@ pub fn parse_query_filter(
             return Err(QueryError::FilterTooLong);
         }
         let filter = Filter::parse(filter)?;
-        if !filter.is_valid(schema) {
+        if filter
+            .get_result_value_type(schema, schema_functions)
+            .is_none()
+        {
             return Err(QueryError::FilterSchemaMismatch);
         }
         Ok(filter)

@@ -107,8 +107,8 @@ impl Debug for RsaPageTokenBuilder {
     }
 }
 
-#[cfg(test)]
 #[cfg(feature = "testing")]
+#[cfg(test)]
 mod tests {
     use std::sync::OnceLock;
 

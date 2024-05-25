@@ -8,7 +8,6 @@ use crate::value::Value;
 #[derive(Debug, Clone)]
 pub struct Schema {
     pub members: BTreeMap<String, MemberSchema>,
-    pub functions: BTreeMap<String, FunctionSchema>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +33,8 @@ pub struct FunctionSchema {
     pub argument_value_types: Vec<ValueType>,
     pub return_value_type: ValueType,
 }
+
+pub type FunctionSchemaMap = BTreeMap<String, FunctionSchema>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
@@ -125,8 +126,8 @@ impl Display for ValueType {
     }
 }
 
-#[cfg(test)]
 #[cfg(feature = "testing")]
+#[cfg(test)]
 mod tests {
     use crate::testing::schema::RequestItem;
 

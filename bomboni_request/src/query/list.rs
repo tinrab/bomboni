@@ -16,7 +16,7 @@ use crate::{
         },
         utility::{parse_query_filter, parse_query_ordering},
     },
-    schema::{Schema, SchemaMapped},
+    schema::{FunctionSchemaMap, Schema, SchemaMapped},
 };
 
 /// Represents a list query.
@@ -47,6 +47,7 @@ pub struct ListQueryConfig {
 #[derive(Debug, Clone)]
 pub struct ListQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
+    schema_functions: FunctionSchemaMap,
     options: ListQueryConfig,
     page_token_builder: P,
 }
@@ -75,9 +76,15 @@ impl Default for ListQueryConfig {
 }
 
 impl<P: PageTokenBuilder> ListQueryBuilder<P> {
-    pub fn new(schema: Schema, options: ListQueryConfig, page_token_builder: P) -> Self {
+    pub fn new(
+        schema: Schema,
+        schema_functions: FunctionSchemaMap,
+        options: ListQueryConfig,
+        page_token_builder: P,
+    ) -> Self {
         Self {
             schema,
+            schema_functions,
             options,
             page_token_builder,
         }
@@ -90,7 +97,12 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
         filter: Option<&str>,
         ordering: Option<&str>,
     ) -> QueryResult<ListQuery<P::PageToken>> {
-        let filter = parse_query_filter(filter, &self.schema, self.options.max_filter_length)?;
+        let filter = parse_query_filter(
+            filter,
+            &self.schema,
+            Some(&self.schema_functions),
+            self.options.max_filter_length,
+        )?;
         let mut ordering =
             parse_query_ordering(ordering, &self.schema, self.options.max_ordering_length)?;
 
@@ -155,8 +167,8 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
     }
 }
 
-#[cfg(test)]
 #[cfg(feature = "testing")]
+#[cfg(test)]
 mod tests {
     use crate::{
         filter::error::FilterError, ordering::OrderingDirection,
@@ -269,6 +281,7 @@ mod tests {
     fn get_query_builder() -> ListQueryBuilder<PlainPageTokenBuilder> {
         ListQueryBuilder::<PlainPageTokenBuilder>::new(
             UserItem::get_schema(),
+            FunctionSchemaMap::new(),
             ListQueryConfig {
                 max_page_size: Some(20),
                 default_page_size: 10,

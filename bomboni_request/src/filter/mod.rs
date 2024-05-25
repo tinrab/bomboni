@@ -14,8 +14,8 @@ use pest::Parser;
 
 use self::error::FilterResult;
 
-use super::schema::{MemberSchema, Schema, SchemaMapped, ValueType};
-use super::value::Value;
+use crate::schema::{FunctionSchemaMap, MemberSchema, Schema, SchemaMapped, ValueType};
+use crate::value::Value;
 
 pub mod error;
 
@@ -369,14 +369,18 @@ impl Filter {
         }
     }
 
-    pub fn get_result_value_type(&self, schema: &Schema) -> Option<ValueType> {
+    pub fn get_result_value_type(
+        &self,
+        schema: &Schema,
+        schema_functions: Option<&FunctionSchemaMap>,
+    ) -> Option<ValueType> {
         match self {
             Self::Conjunction(_)
             | Self::Disjunction(_)
             | Self::Negate(_)
             | Self::Restriction(_, _, _) => Some(ValueType::Boolean),
-            Self::Function(name, _) => Some(schema.functions.get(name)?.return_value_type),
-            Self::Composite(composite) => composite.get_result_value_type(schema),
+            Self::Function(name, _) => Some(schema_functions?.get(name)?.return_value_type),
+            Self::Composite(composite) => composite.get_result_value_type(schema, schema_functions),
             Self::Name(name) => schema.get_member(name).and_then(|member| {
                 if let MemberSchema::Field(field) = member {
                     Some(field.value_type)
@@ -386,11 +390,6 @@ impl Filter {
             }),
             Self::Value(value) => value.value_type(),
         }
-    }
-
-    pub fn is_valid(&self, schema: &Schema) -> bool {
-        // TODO: verify if this is fine
-        self.get_result_value_type(schema).is_some()
     }
 }
 
@@ -452,8 +451,8 @@ impl Display for FilterComparator {
     }
 }
 
-#[cfg(test)]
 #[cfg(feature = "testing")]
+#[cfg(test)]
 mod tests {
     use crate::testing::schema::{RequestItem, TaskItem, UserItem};
 
@@ -470,7 +469,10 @@ mod tests {
                 assert!(!check!($filter));
             };
             ($filter:expr) => {
-                Filter::parse($filter).unwrap().is_valid(&schema)
+                Filter::parse($filter)
+                    .unwrap()
+                    .get_result_value_type(&schema, None)
+                    .is_some()
             };
         }
 

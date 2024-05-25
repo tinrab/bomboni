@@ -47,13 +47,14 @@ pub struct ParsedResource {
     pub revision_create_time: Option<UtcDateTime>,
 }
 
-#[cfg(test)]
 #[cfg(feature = "testing")]
+#[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, HashMap};
     use std::fmt::Debug;
     use std::marker::PhantomData;
 
+    use crate::schema::FunctionSchemaMap;
     use crate::{
         error::{CommonError, PathError, PathErrorStep, RequestError, RequestResult},
         filter::Filter,
@@ -1703,6 +1704,7 @@ mod tests {
             SINGLETON.get_or_init(|| {
                 ListQueryBuilder::<PlainPageTokenBuilder>::new(
                     UserItem::get_schema(),
+                    FunctionSchemaMap::new(),
                     ListQueryConfig {
                         max_page_size: Some(20),
                         default_page_size: 10,
@@ -1724,6 +1726,7 @@ mod tests {
             SINGLETON.get_or_init(|| {
                 SearchQueryBuilder::<PlainPageTokenBuilder>::new(
                     UserItem::get_schema(),
+                    FunctionSchemaMap::new(),
                     SearchQueryConfig {
                         max_query_length: Some(50),
                         max_page_size: Some(20),
@@ -1864,6 +1867,7 @@ mod tests {
                 },
                 &ListQueryBuilder::<CustomPageTokenBuilder>::new(
                     UserItem::get_schema(),
+                    FunctionSchemaMap::new(),
                     ListQueryConfig {
                         max_page_size: Some(20),
                         default_page_size: 10,

@@ -13,6 +13,7 @@ pub mod ordering;
 pub mod parse;
 pub mod query;
 pub mod schema;
+pub mod sql;
 pub mod value;
 
 #[cfg(feature = "testing")]

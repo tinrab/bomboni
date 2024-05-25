@@ -14,7 +14,7 @@ use crate::{
         },
         utility::{parse_query_filter, parse_query_ordering},
     },
-    schema::{Schema, SchemaMapped},
+    schema::{FunctionSchemaMap, Schema, SchemaMapped},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,6 +42,7 @@ pub struct SearchQueryConfig {
 #[derive(Debug, Clone)]
 pub struct SearchQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
+    schema_functions: FunctionSchemaMap,
     options: SearchQueryConfig,
     page_token_builder: P,
 }
@@ -73,9 +74,15 @@ impl Default for SearchQueryConfig {
 }
 
 impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
-    pub fn new(schema: Schema, options: SearchQueryConfig, page_token_builder: P) -> Self {
+    pub fn new(
+        schema: Schema,
+        schema_functions: FunctionSchemaMap,
+        options: SearchQueryConfig,
+        page_token_builder: P,
+    ) -> Self {
         Self {
             schema,
+            schema_functions,
             options,
             page_token_builder,
         }
@@ -93,7 +100,12 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
             return Err(QueryError::QueryTooLong);
         }
 
-        let filter = parse_query_filter(filter, &self.schema, self.options.max_filter_length)?;
+        let filter = parse_query_filter(
+            filter,
+            &self.schema,
+            Some(&self.schema_functions),
+            self.options.max_filter_length,
+        )?;
         let mut ordering =
             parse_query_ordering(ordering, &self.schema, self.options.max_ordering_length)?;
 
@@ -236,6 +248,7 @@ mod tests {
     fn get_query_builder() -> SearchQueryBuilder<PlainPageTokenBuilder> {
         SearchQueryBuilder::<PlainPageTokenBuilder>::new(
             UserItem::get_schema(),
+            FunctionSchemaMap::new(),
             SearchQueryConfig {
                 max_page_size: Some(20),
                 default_page_size: 10,

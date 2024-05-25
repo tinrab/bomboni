@@ -34,33 +34,44 @@ impl Ordering {
 
     pub fn parse(source: &str) -> OrderingResult<Self> {
         let mut terms = Vec::new();
-        let mut term_names = BTreeSet::new();
+        let mut term_names = BTreeSet::<&str>::new();
+
         for parts in source
             .split(',')
             .map(|part| part.split_whitespace().collect::<Vec<_>>())
             .filter(|parts| !parts.is_empty())
         {
-            let mut direction = OrderingDirection::Ascending;
-            let mut name = String::new();
-            let parts_len = parts.len();
-            for (i, part) in parts.into_iter().enumerate() {
-                if i < parts_len - 1 {
-                    name.push_str(part);
-                } else if part == "asc" {
-                    direction = OrderingDirection::Ascending;
-                } else if part == "desc" {
-                    direction = OrderingDirection::Descending;
-                } else {
-                    name.push_str(part);
+            if parts.len() > 2 {
+                return Err(OrderingError::InvalidTermFormat(parts.join(" ")));
+            }
+            match parts.as_slice() {
+                [name, dir] => {
+                    if !term_names.insert(*name) {
+                        return Err(OrderingError::DuplicateField((*name).into()));
+                    }
+                    let direction = match *dir {
+                        "asc" => OrderingDirection::Ascending,
+                        "desc" => OrderingDirection::Descending,
+                        _ => return Err(OrderingError::InvalidDirection((*dir).into())),
+                    };
+                    terms.push(OrderingTerm {
+                        name: (*name).into(),
+                        direction,
+                    });
                 }
+                [name] => {
+                    if !term_names.insert(name) {
+                        return Err(OrderingError::DuplicateField((*name).into()));
+                    }
+                    terms.push(OrderingTerm {
+                        name: (*name).into(),
+                        direction: OrderingDirection::Ascending,
+                    });
+                }
+                _ => return Err(OrderingError::InvalidTermFormat(parts.join(" "))),
             }
-
-            if !term_names.insert(name.clone()) {
-                return Err(OrderingError::DuplicateField(name.clone()));
-            }
-
-            terms.push(OrderingTerm { name, direction });
         }
+
         Ok(Self(terms))
     }
 
@@ -145,8 +156,8 @@ impl Display for OrderingDirection {
     }
 }
 
-#[cfg(test)]
 #[cfg(feature = "testing")]
+#[cfg(test)]
 mod tests {
     use crate::ordering::OrderingDirection::{Ascending, Descending};
     use crate::testing::schema::UserItem;
@@ -154,10 +165,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn basic() {
-        let ordering = Ordering::parse(" , user.displayName, task .userId desc").unwrap();
+    fn it_works() {
         assert_eq!(
-            ordering,
+            Ordering::parse(" , user.displayName, task.userId desc").unwrap(),
             Ordering(vec![
                 OrderingTerm {
                     name: "user.displayName".into(),
@@ -169,6 +179,15 @@ mod tests {
                 },
             ])
         );
+
+        assert!(matches!(
+            Ordering::parse("user.displayName, user.displayName").unwrap_err(),
+            OrderingError::DuplicateField(_)
+        ));
+        assert!(matches!(
+            Ordering::parse("user.id ABC").unwrap_err(),
+            OrderingError::InvalidDirection(_)
+        ));
     }
 
     #[test]
