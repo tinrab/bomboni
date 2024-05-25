@@ -9,17 +9,17 @@ use crate::{
 use super::{SqlDialect, SqlRenameMap};
 
 pub struct SqlOrderingBuilder<'a> {
-    schema: &'a Schema,
     dialect: SqlDialect,
+    schema: &'a Schema,
     rename_map: Option<&'a SqlRenameMap>,
     result: String,
 }
 
 impl<'a> SqlOrderingBuilder<'a> {
-    pub fn new(schema: &'a Schema, dialect: SqlDialect) -> Self {
+    pub fn new(dialect: SqlDialect, schema: &'a Schema) -> Self {
         Self {
-            schema,
             dialect,
+            schema,
             rename_map: None,
             result: String::new(),
         }
@@ -94,7 +94,7 @@ mod tests {
         let schema = RequestItem::get_schema();
 
         assert_eq!(
-            SqlOrderingBuilder::new(&schema, SqlDialect::Postgres)
+            SqlOrderingBuilder::new(SqlDialect::Postgres, &schema)
                 .build(&Ordering::parse("user.age desc, user.displayName").unwrap())
                 .unwrap(),
             r#""user"."age" DESC, "user"."displayName" ASC"#

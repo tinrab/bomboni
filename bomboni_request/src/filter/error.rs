@@ -1,7 +1,10 @@
 use pest::error::InputLocation;
 use thiserror::Error;
 
-use crate::{filter::Rule, schema::ValueType};
+use crate::{
+    filter::{FilterComparator, Rule},
+    schema::ValueType,
+};
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum FilterError {
@@ -15,6 +18,8 @@ pub enum FilterError {
     UnknownMember(String),
     #[error("unknown function `{0}`")]
     UnknownFunction(String),
+    #[error("invalid number of arguments for function `{name}`, expected {expected}")]
+    FunctionInvalidArgumentCount { name: String, expected: usize },
     #[error("invalid result value type of filter")]
     InvalidResultValueType,
     #[error("expected filter type `{expected}`, but got `{actual}`")]
@@ -24,6 +29,8 @@ pub enum FilterError {
     },
     #[error("incomparable value type `{0}`")]
     IncomparableType(ValueType),
+    #[error("unsuitable comparator `{0}`")]
+    UnsuitableComparator(FilterComparator),
 }
 
 pub type FilterResult<T> = Result<T, FilterError>;

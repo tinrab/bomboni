@@ -14,6 +14,7 @@ use pest::Parser;
 
 use self::error::FilterResult;
 
+use crate::filter::error::FilterError;
 use crate::schema::{FunctionSchemaMap, MemberSchema, Schema, SchemaMapped, ValueType};
 use crate::value::Value;
 
@@ -152,8 +153,8 @@ impl Filter {
             Self::Restriction(comparable, _, arg) => {
                 1usize + comparable.as_ref().len() + arg.as_ref().len()
             }
-            Self::Function(tree, args) => {
-                1usize + tree.len() + args.iter().map(Filter::len).sum::<usize>()
+            Self::Function(tree, arguments) => {
+                1usize + tree.len() + arguments.iter().map(Filter::len).sum::<usize>()
             }
             Self::Composite(composite) => 1usize + composite.as_ref().len(),
             _ => 1usize,
@@ -373,23 +374,118 @@ impl Filter {
         &self,
         schema: &Schema,
         schema_functions: Option<&FunctionSchemaMap>,
-    ) -> Option<ValueType> {
+    ) -> FilterResult<ValueType> {
         match self {
             Self::Conjunction(_)
             | Self::Disjunction(_)
             | Self::Negate(_)
-            | Self::Restriction(_, _, _) => Some(ValueType::Boolean),
-            Self::Function(name, _) => Some(schema_functions?.get(name)?.return_value_type),
+            | Self::Restriction(_, _, _) => Ok(ValueType::Boolean),
+            Self::Function(name, _) => Ok(schema_functions
+                .and_then(|schema_functions| schema_functions.get(name))
+                .ok_or_else(|| FilterError::UnknownFunction(name.clone()))?
+                .return_value_type),
             Self::Composite(composite) => composite.get_result_value_type(schema, schema_functions),
-            Self::Name(name) => schema.get_member(name).and_then(|member| {
-                if let MemberSchema::Field(field) = member {
-                    Some(field.value_type)
+            Self::Name(name) => {
+                let member_schema = schema
+                    .get_member(name)
+                    .ok_or_else(|| FilterError::UnknownMember(name.clone()))?;
+                if let MemberSchema::Field(field) = member_schema {
+                    Ok(field.value_type)
                 } else {
-                    None
+                    Err(FilterError::InvalidResultValueType)
                 }
-            }),
-            Self::Value(value) => value.value_type(),
+            }
+            Self::Value(value) => value
+                .value_type()
+                .ok_or(FilterError::InvalidResultValueType),
         }
+    }
+
+    pub fn validate(
+        &self,
+        schema: &Schema,
+        schema_functions: Option<&FunctionSchemaMap>,
+    ) -> FilterResult<()> {
+        match self {
+            Self::Conjunction(parts) | Self::Disjunction(parts) => {
+                for part in parts {
+                    part.validate(schema, schema_functions)?;
+                    let part_value_type = part.get_result_value_type(schema, schema_functions)?;
+                    if part_value_type != ValueType::Boolean {
+                        return Err(FilterError::InvalidType {
+                            actual: part_value_type,
+                            expected: ValueType::Boolean,
+                        });
+                    }
+                }
+            }
+            Self::Negate(tree) => {
+                let result_value_type = tree.get_result_value_type(schema, schema_functions)?;
+                if result_value_type != ValueType::Boolean {
+                    return Err(FilterError::InvalidType {
+                        actual: result_value_type,
+                        expected: ValueType::Boolean,
+                    });
+                }
+            }
+            Self::Restriction(comparable, comparator, argument) => {
+                comparable.validate(schema, schema_functions)?;
+                let comparable_type = comparable.get_result_value_type(schema, schema_functions)?;
+                argument.validate(schema, schema_functions)?;
+                let argument_type = argument.get_result_value_type(schema, schema_functions)?;
+
+                if comparator == &FilterComparator::Has {
+                    return Err(FilterError::UnsuitableComparator(*comparator));
+                    //     if !matches!(**argument, Filter::Conjunction(_) | Filter::Disjunction(_)) {
+                    //         if comparable_type != argument_type && argument_type != ValueType::Any {
+                    //             return Err(FilterError::InvalidType {
+                    //                 actual: argument_type,
+                    //                 expected: comparable_type,
+                    //             });
+                    //         }
+                    //     }
+                }
+
+                if comparable_type != argument_type {
+                    return Err(FilterError::InvalidType {
+                        actual: argument_type,
+                        expected: comparable_type,
+                    });
+                }
+            }
+            Self::Function(name, arguments) => {
+                let function = schema_functions
+                    .and_then(|schema_functions| schema_functions.get(name))
+                    .ok_or_else(|| FilterError::UnknownFunction(name.clone()))?;
+                if function.argument_value_types.len() != arguments.len() {
+                    return Err(FilterError::FunctionInvalidArgumentCount {
+                        name: name.clone(),
+                        expected: function.argument_value_types.len(),
+                    });
+                }
+                for (argument, argument_schema) in
+                    arguments.iter().zip(&function.argument_value_types)
+                {
+                    argument.validate(schema, schema_functions)?;
+                    let argument_value_type =
+                        argument.get_result_value_type(schema, schema_functions)?;
+                    if argument_value_type != *argument_schema {
+                        return Err(FilterError::InvalidType {
+                            actual: argument_value_type,
+                            expected: *argument_schema,
+                        });
+                    }
+                }
+            }
+            Self::Composite(composite) => composite.validate(schema, schema_functions)?,
+            Self::Name(name) => {
+                if schema.get_member(name).is_none() {
+                    return Err(FilterError::UnknownMember(name.clone()));
+                }
+            }
+            Self::Value(_) => {}
+        }
+        Ok(())
     }
 }
 
@@ -418,12 +514,12 @@ impl Display for Filter {
                     write!(f, "{comparable} {comparator} {arg}")
                 }
             },
-            Self::Function(name, args) => {
+            Self::Function(name, arguments) => {
                 write!(
                     f,
                     "{}({})",
                     name,
-                    args.iter().map(ToString::to_string).join(", ")
+                    arguments.iter().map(ToString::to_string).join(", ")
                 )
             }
             Self::Composite(composite) => {
@@ -462,26 +558,35 @@ mod tests {
     fn validate_schema() {
         let schema = UserItem::get_schema();
         macro_rules! check {
-            (@valid $filter:expr) => {
-                assert!(check!($filter));
+            (@ok $filter:expr) => {
+                match check!($filter) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        panic!("Expected Ok, got Err: {:#?}", err);
+                    }
+                }
             };
-            (@invalid $filter:expr) => {
-                assert!(!check!($filter));
+            (@error $filter:expr) => {
+                match check!($filter) {
+                    Ok(_) => {
+                        panic!("Expected Err, got Ok");
+                    }
+                    Err(_) => {}
+                }
             };
             ($filter:expr) => {
-                Filter::parse($filter)
-                    .unwrap()
-                    .get_result_value_type(&schema, None)
-                    .is_some()
+                Filter::parse($filter).unwrap().validate(&schema, None)
             };
         }
 
-        check!(@valid "42");
-        check!(@valid "false");
+        check!(@ok "42");
+        check!(@ok "false");
+        check!(@ok r#"id="42""#);
 
-        check!(@invalid "a");
-        check!(@invalid "a.b");
-        check!(@invalid "f()");
+        check!(@error "a");
+        check!(@error "a.b");
+        check!(@error "f()");
+        check!(@error "id=42");
     }
 
     #[test]

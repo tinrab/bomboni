@@ -101,17 +101,16 @@ impl Ordering {
         Some(cmp::Ordering::Equal)
     }
 
-    pub fn is_valid(&self, schema: &Schema) -> bool {
+    pub fn validate(&self, schema: &Schema) -> OrderingResult<()> {
         for term in self.iter() {
-            if let Some(field) = schema.get_field(&term.name) {
-                if !field.ordered {
-                    return false;
-                }
-            } else {
-                return false;
+            let field_schema = schema
+                .get_field(&term.name)
+                .ok_or_else(|| OrderingError::UnknownMember(term.name.clone()))?;
+            if !field_schema.ordered {
+                return Err(OrderingError::UnorderedField(term.name.clone()));
             }
         }
-        true
+        Ok(())
     }
 }
 

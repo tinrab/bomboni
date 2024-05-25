@@ -3,9 +3,11 @@ use std::collections::BTreeMap;
 
 pub use filter::SqlFilterBuilder;
 pub use ordering::SqlOrderingBuilder;
+pub use query::{QuerySqlBuilder, QuerySqlStatement};
 
 mod filter;
 mod ordering;
+mod query;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SqlDialect {

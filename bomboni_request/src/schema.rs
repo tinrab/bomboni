@@ -26,6 +26,7 @@ pub struct FieldMemberSchema {
     pub value_type: ValueType,
     pub repeated: bool,
     pub ordered: bool,
+    pub allow_has_operator: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +45,7 @@ pub enum ValueType {
     String,
     Timestamp,
     Any,
+    // ResourceName,
 }
 
 pub trait SchemaMapped {
@@ -88,6 +90,7 @@ impl FieldMemberSchema {
             value_type,
             repeated: false,
             ordered: false,
+            allow_has_operator: true,
         }
     }
 
@@ -96,6 +99,7 @@ impl FieldMemberSchema {
             value_type,
             repeated: false,
             ordered: true,
+            allow_has_operator: true,
         }
     }
 
@@ -104,6 +108,7 @@ impl FieldMemberSchema {
             value_type,
             repeated: true,
             ordered: false,
+            allow_has_operator: true,
         }
     }
 }

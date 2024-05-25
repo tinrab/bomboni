@@ -175,8 +175,10 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
 #[cfg(feature = "testing")]
 mod tests {
     use crate::{
-        filter::error::FilterError, ordering::OrderingDirection,
-        query::page_token::plain::PlainPageTokenBuilder, testing::schema::UserItem,
+        filter::error::FilterError,
+        ordering::{error::OrderingError, OrderingDirection},
+        query::page_token::plain::PlainPageTokenBuilder,
+        testing::schema::UserItem,
     };
 
     use super::*;
@@ -232,7 +234,7 @@ mod tests {
         );
         assert_eq!(
             q.build("abc", None, None, Some("lol"), None).unwrap_err(),
-            QueryError::FilterSchemaMismatch
+            QueryError::FilterError(FilterError::UnknownMember("lol".into()))
         );
         assert_eq!(
             q.build("abc", None, None, None, Some(&("a".repeat(100))))
@@ -241,7 +243,7 @@ mod tests {
         );
         assert_eq!(
             q.build("abc", None, None, None, Some("lol")).unwrap_err(),
-            QueryError::OrderingSchemaMismatch
+            QueryError::OrderingError(OrderingError::UnknownMember("lol".into()))
         );
     }
 

@@ -9,25 +9,25 @@ use crate::{
 };
 
 pub struct SqlFilterBuilder<'a> {
-    schema: &'a Schema,
     dialect: SqlDialect,
+    schema: &'a Schema,
     schema_functions: Option<&'a FunctionSchemaMap>,
     rename_map: Option<&'a SqlRenameMap>,
     argument_offset: usize,
-    check_result_boolean: bool,
+    case_insensitive_like: bool,
     arguments: Vec<Value>,
     result: String,
 }
 
 impl<'a> SqlFilterBuilder<'a> {
-    pub fn new(schema: &'a Schema, dialect: SqlDialect) -> Self {
+    pub fn new(dialect: SqlDialect, schema: &'a Schema) -> Self {
         Self {
-            schema,
             dialect,
+            schema,
             schema_functions: None,
             rename_map: None,
             argument_offset: 0,
-            check_result_boolean: false,
+            case_insensitive_like: false,
             arguments: Vec::new(),
             result: String::new(),
         }
@@ -48,21 +48,12 @@ impl<'a> SqlFilterBuilder<'a> {
         self
     }
 
-    pub fn check_result_boolean(&mut self) -> &mut Self {
-        self.check_result_boolean = true;
+    pub fn case_insensitive_like(&mut self) -> &mut Self {
+        self.case_insensitive_like = true;
         self
     }
 
     pub fn build(&mut self, filter: &Filter) -> FilterResult<(String, Vec<Value>)> {
-        if self.check_result_boolean
-            && !matches!(
-                filter.get_result_value_type(self.schema, self.schema_functions),
-                Some(ValueType::Boolean)
-            )
-        {
-            return Err(FilterError::InvalidResultValueType);
-        }
-
         self.build_tree(filter)?;
 
         let result = self.result.clone();
@@ -77,9 +68,8 @@ impl<'a> SqlFilterBuilder<'a> {
         match tree {
             Filter::Conjunction(parts) => {
                 for (i, part) in parts.iter().enumerate() {
-                    let part_type = part
-                        .get_result_value_type(self.schema, self.schema_functions)
-                        .ok_or(FilterError::InvalidResultValueType)?;
+                    let part_type =
+                        part.get_result_value_type(self.schema, self.schema_functions)?;
                     if part_type != ValueType::Boolean {
                         return Err(FilterError::InvalidType {
                             actual: part_type,
@@ -95,9 +85,8 @@ impl<'a> SqlFilterBuilder<'a> {
             }
             Filter::Disjunction(parts) => {
                 for (i, part) in parts.iter().enumerate() {
-                    let part_type = part
-                        .get_result_value_type(self.schema, self.schema_functions)
-                        .ok_or(FilterError::InvalidResultValueType)?;
+                    let part_type =
+                        part.get_result_value_type(self.schema, self.schema_functions)?;
                     if part_type != ValueType::Boolean {
                         return Err(FilterError::InvalidType {
                             actual: part_type,
@@ -143,9 +132,7 @@ impl<'a> SqlFilterBuilder<'a> {
     }
 
     fn build_negate(&mut self, tree: &Filter) -> FilterResult<()> {
-        let tree_type = tree
-            .get_result_value_type(self.schema, self.schema_functions)
-            .ok_or(FilterError::InvalidResultValueType)?;
+        let tree_type = tree.get_result_value_type(self.schema, self.schema_functions)?;
         if tree_type != ValueType::Boolean {
             return Err(FilterError::InvalidType {
                 actual: tree_type,
@@ -164,116 +151,127 @@ impl<'a> SqlFilterBuilder<'a> {
         &mut self,
         comparable: &Filter,
         comparator: FilterComparator,
-        arg: &Filter,
+        argument: &Filter,
     ) -> FilterResult<()> {
-        let comparable_type = comparable
-            .get_result_value_type(self.schema, self.schema_functions)
-            .ok_or(FilterError::InvalidResultValueType)?;
-        let arg_type = arg
-            .get_result_value_type(self.schema, self.schema_functions)
-            .ok_or(FilterError::InvalidResultValueType)?;
+        let comparable_type =
+            comparable.get_result_value_type(self.schema, self.schema_functions)?;
+        let argument_type = argument.get_result_value_type(self.schema, self.schema_functions)?;
 
-        let mut composite = arg;
-        if let Filter::Composite(comp) = composite {
-            composite = comp;
-        }
+        // let mut composite = argument;
+        // if let Filter::Composite(comp) = composite {
+        //     composite = comp;
+        // }
 
         if comparator == FilterComparator::Has {
-            match composite {
-                Filter::Conjunction(parts) => {
-                    self.result.push('(');
-                    for (i, part) in parts.iter().enumerate() {
-                        self.build_restriction(comparable, FilterComparator::Equal, part)?;
-                        if i < parts.len() - 1 {
-                            self.result.push_str(" AND ");
-                        }
-                    }
-                    self.result.push(')');
-                }
-                Filter::Disjunction(parts) => {
-                    self.build_tree(comparable)?;
-                    self.result.push_str(" = ANY(");
+            // TODO: decide how to generate SQL
+            return Err(FilterError::UnsuitableComparator(comparator));
+            //     match composite {
+            //         Filter::Conjunction(parts) => {
+            //             self.result.push('(');
+            //             for (i, part) in parts.iter().enumerate() {
+            //                 self.build_restriction(comparable, FilterComparator::Equal, part)?;
+            //                 if i < parts.len() - 1 {
+            //                     self.result.push_str(" AND ");
+            //                 }
+            //             }
+            //             self.result.push(')');
+            //         }
+            //         Filter::Disjunction(parts) => {
+            //             self.build_tree(comparable)?;
+            //             self.result.push_str(" = ANY(");
 
-                    let mut values: Vec<Value> = Vec::new();
-                    for part in parts {
-                        if let Filter::Value(value) = part {
-                            let value_type =
-                                value.value_type().ok_or(FilterError::ExpectedValue)?;
-                            if let Some(first_value) = values.first() {
-                                if let Some(first_value_type) = first_value.value_type() {
-                                    if first_value_type != value_type {
-                                        return Err(FilterError::InvalidType {
-                                            actual: value_type,
-                                            expected: first_value_type,
-                                        });
-                                    }
-                                } else {
-                                    return Err(FilterError::InvalidResultValueType);
-                                }
-                            }
-                            values.push(value.clone());
-                        } else {
-                            return Err(FilterError::ExpectedValue);
-                        }
-                    }
-                    self.build_argument(Value::Repeated(values));
+            //             let mut values: Vec<Value> = Vec::new();
+            //             for part in parts {
+            //                 if let Filter::Value(value) = part {
+            //                     let value_type =
+            //                         value.value_type().ok_or(FilterError::ExpectedValue)?;
+            //                     if let Some(first_value) = values.first() {
+            //                         if let Some(first_value_type) = first_value.value_type() {
+            //                             if first_value_type != value_type {
+            //                                 return Err(FilterError::InvalidType {
+            //                                     actual: value_type,
+            //                                     expected: first_value_type,
+            //                                 });
+            //                             }
+            //                         } else {
+            //                             return Err(FilterError::InvalidResultValueType);
+            //                         }
+            //                     }
+            //                     values.push(value.clone());
+            //                 } else {
+            //                     return Err(FilterError::ExpectedValue);
+            //                 }
+            //             }
+            //             self.build_argument(Value::Repeated(values));
 
-                    self.result.push(')');
-                }
-                _ => {
-                    if comparable_type != arg_type && arg_type != ValueType::Any {
-                        return Err(FilterError::InvalidType {
-                            actual: arg_type,
-                            expected: comparable_type,
-                        });
-                    }
+            //             self.result.push(')');
+            //         }
+            //         _ => {
+            //             if comparable_type != argument_type && argument_type != ValueType::Any {
+            //                 return Err(FilterError::InvalidType {
+            //                     actual: argument_type,
+            //                     expected: comparable_type,
+            //                 });
+            //             }
 
-                    self.build_tree(comparable)?;
+            //             if self.case_insensitive_like && matches!(&argument_type, ValueType::String) {
+            //                 self.result.push_str("LOWER(");
+            //                 self.build_tree(comparable)?;
+            //                 self.result.push(')');
+            //             } else {
+            //                 self.build_tree(comparable)?;
+            //             }
 
-                    match arg_type {
-                        ValueType::Integer
-                        | ValueType::Float
-                        | ValueType::Boolean
-                        | ValueType::Timestamp => {
-                            self.result.push_str(" = ");
-                            self.build_tree(composite)?;
-                        }
-                        ValueType::String => {
-                            self.result.push_str(" LIKE ");
-                            if let Filter::Value(value) = composite {
-                                self.result.push_str(&format!(
-                                    "${}",
-                                    self.arguments.len() + 1 + self.argument_offset
-                                ));
-                                match value {
-                                    Value::Integer(_) | Value::Float(_) | Value::Boolean(_) => {
-                                        self.arguments.push(format!("%{value}%").into());
-                                    }
-                                    Value::String(value) => {
-                                        self.arguments.push(format!("%{value}%").into());
-                                    }
-                                    Value::Timestamp(value) => {
-                                        self.arguments.push(format!("%{value}%").into());
-                                    }
-                                    _ => unreachable!(),
-                                }
-                            } else {
-                                unreachable!()
-                            }
-                        }
-                        ValueType::Any => {
-                            self.result.push_str(" IS NOT NULL");
-                        }
-                    }
-                }
-            }
+            //             match argument_type {
+            //                 ValueType::Integer
+            //                 | ValueType::Float
+            //                 | ValueType::Boolean
+            //                 | ValueType::Timestamp => {
+            //                     self.result.push_str(" = ");
+            //                     self.build_tree(composite)?;
+            //                 }
+            //                 ValueType::String => {
+            //                     self.result.push_str(" LIKE ");
+            //                     if self.case_insensitive_like {
+            //                         self.result.push_str("LOWER(");
+            //                     }
+            //                     if let Filter::Value(value) = composite {
+            //                         self.result.push_str(&format!(
+            //                             "${}",
+            //                             self.arguments.len() + 1 + self.argument_offset
+            //                         ));
+            //                         match value {
+            //                             Value::Integer(_) | Value::Float(_) | Value::Boolean(_) => {
+            //                                 self.arguments.push(format!("%{value}%").into());
+            //                             }
+            //                             Value::String(value) => {
+            //                                 self.arguments.push(format!("%{value}%").into());
+            //                             }
+            //                             Value::Timestamp(value) => {
+            //                                 self.arguments.push(format!("%{value}%").into());
+            //                             }
+            //                             _ => unreachable!(),
+            //                         }
+            //                     } else {
+            //                         unreachable!()
+            //                     }
+            //                     if self.case_insensitive_like {
+            //                         self.result.push(')');
+            //                     }
+            //                 }
+            //                 ValueType::Any => {
+            //                     self.result.push_str(" IS NOT NULL");
+            //                 }
+            //             }
+            //         }
+            //     }
 
-            return Ok(());
+            //     return Ok(());
         }
 
-        if comparable_type != arg_type {
+        if comparable_type != argument_type {
             return Err(FilterError::InvalidType {
-                actual: arg_type,
+                actual: argument_type,
                 expected: comparable_type,
             });
         }
@@ -281,26 +279,26 @@ impl<'a> SqlFilterBuilder<'a> {
         self.build_tree(comparable)?;
         match comparator {
             FilterComparator::Less => {
-                if arg_type == ValueType::Boolean {
-                    return Err(FilterError::IncomparableType(arg_type));
+                if argument_type == ValueType::Boolean {
+                    return Err(FilterError::IncomparableType(argument_type));
                 }
                 self.result.push_str(" < ");
             }
             FilterComparator::LessOrEqual => {
-                if arg_type == ValueType::Boolean {
-                    return Err(FilterError::IncomparableType(arg_type));
+                if argument_type == ValueType::Boolean {
+                    return Err(FilterError::IncomparableType(argument_type));
                 }
                 self.result.push_str(" <= ");
             }
             FilterComparator::Greater => {
-                if arg_type == ValueType::Boolean {
-                    return Err(FilterError::IncomparableType(arg_type));
+                if argument_type == ValueType::Boolean {
+                    return Err(FilterError::IncomparableType(argument_type));
                 }
                 self.result.push_str(" > ");
             }
             FilterComparator::GreaterOrEqual => {
-                if arg_type == ValueType::Boolean {
-                    return Err(FilterError::IncomparableType(arg_type));
+                if argument_type == ValueType::Boolean {
+                    return Err(FilterError::IncomparableType(argument_type));
                 }
                 self.result.push_str(" >= ");
             }
@@ -312,12 +310,12 @@ impl<'a> SqlFilterBuilder<'a> {
             }
             FilterComparator::Has => unreachable!(),
         }
-        self.build_tree(arg)?;
+        self.build_tree(argument)?;
 
         Ok(())
     }
 
-    fn build_function(&mut self, name: &str, args: &[Filter]) -> FilterResult<()> {
+    fn build_function(&mut self, name: &str, arguments: &[Filter]) -> FilterResult<()> {
         let function = self
             .schema_functions
             .as_ref()
@@ -331,11 +329,9 @@ impl<'a> SqlFilterBuilder<'a> {
         }
 
         self.result.push('(');
-        for (i, arg) in args.iter().enumerate() {
+        for (i, arg) in arguments.iter().enumerate() {
             let expected_type = function.argument_value_types[i];
-            let arg_type = arg
-                .get_result_value_type(self.schema, self.schema_functions)
-                .ok_or(FilterError::InvalidResultValueType)?;
+            let arg_type = arg.get_result_value_type(self.schema, self.schema_functions)?;
             if arg_type != expected_type {
                 return Err(FilterError::InvalidType {
                     actual: arg_type,
@@ -344,7 +340,7 @@ impl<'a> SqlFilterBuilder<'a> {
             }
 
             self.build_tree(arg)?;
-            if i < args.len() - 1 {
+            if i < arguments.len() - 1 {
                 self.result.push_str(", ");
             }
         }
@@ -395,7 +391,7 @@ mod tests {
     fn it_works() {
         let schema = RequestItem::get_schema();
 
-        let (sql, args) = SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
+        let (sql, args) = SqlFilterBuilder::new(SqlDialect::Postgres,&schema)
             .set_rename_map(&SqlRenameMap {
                 members: btree_map_into! {
                     "user" => "u",
@@ -405,7 +401,7 @@ mod tests {
             })
             .build(
                 &Filter::parse(
-                    r#"NOT task.deleted AND task.userId:"2" OR user.age >= 30 OR task.deleted = true"#,
+                    r#"NOT task.deleted AND task.userId="2" OR user.age >= 30 OR task.deleted = true"#,
                 )
                 .unwrap(),
             )
@@ -413,13 +409,13 @@ mod tests {
 
         assert_eq!(
             sql,
-            r#"NOT ("task"."deleted") AND "task"."user_id" LIKE $1 OR "u"."age" >= $2 OR "task"."deleted" = $3"#
+            r#"NOT ("task"."deleted") AND "task"."user_id" = $1 OR "u"."age" >= $2 OR "task"."deleted" = $3"#
         );
-        assert_eq!(args[0], "%2%".into());
+        assert_eq!(args[0], "2".into());
         assert_eq!(args[1], 30.into());
         assert_eq!(args[2], true.into());
 
-        let (sql, args) = SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
+        let (sql, args) = SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
             .set_schema_functions(&btree_map_into! {
                 "regex" => FunctionSchema {
                     argument_value_types: vec![ValueType::String, ValueType::String],
@@ -437,22 +433,17 @@ mod tests {
         assert_eq!(sql, r#"REGEX("user"."displayName", $1)"#);
         assert_eq!(args[0], Value::String("a".into()));
 
-        assert!(SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
+        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
             .build(&Filter::parse("logs").unwrap())
             .is_err());
-        assert!(SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
+        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
             .build(&Filter::parse("user.logs").unwrap())
             .is_err());
-        assert!(SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
+        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
             .build(&Filter::parse("user.id = 42").unwrap())
             .is_err());
-        assert!(SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
+        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
             .build(&Filter::parse("task.deleted < false").unwrap())
-            .is_err());
-
-        assert!(SqlFilterBuilder::new(&schema, SqlDialect::Postgres)
-            .check_result_boolean()
-            .build(&Filter::parse("user.id").unwrap())
             .is_err());
     }
 }

@@ -10,6 +10,8 @@ pub enum OrderingError {
     DuplicateField(String),
     #[error("invalid ordering direction `{0}`")]
     InvalidDirection(String),
+    #[error("unordered field `{0}`")]
+    UnorderedField(String),
 }
 
 pub type OrderingResult<T> = Result<T, OrderingError>;

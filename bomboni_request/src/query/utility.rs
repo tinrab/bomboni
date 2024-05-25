@@ -17,12 +17,7 @@ pub fn parse_query_filter(
             return Err(QueryError::FilterTooLong);
         }
         let filter = Filter::parse(filter)?;
-        if filter
-            .get_result_value_type(schema, schema_functions)
-            .is_none()
-        {
-            return Err(QueryError::FilterSchemaMismatch);
-        }
+        filter.validate(schema, schema_functions)?;
         Ok(filter)
     } else {
         Ok(Filter::default())
@@ -39,9 +34,7 @@ pub fn parse_query_ordering(
             return Err(QueryError::OrderingTooLong);
         }
         let ordering = Ordering::parse(ordering)?;
-        if !ordering.is_valid(schema) {
-            return Err(QueryError::OrderingSchemaMismatch);
-        }
+        ordering.validate(schema)?;
         Ok(ordering)
     } else {
         Ok(Ordering::default())

@@ -63,7 +63,12 @@ impl UserItem {
     pub fn get_schema() -> Schema {
         Schema {
             members: btree_map_into!(
-                "id" => FieldMemberSchema::new_ordered(ValueType::String),
+                "id" => FieldMemberSchema {
+                    value_type: ValueType::String,
+                    repeated: false,
+                    ordered: true,
+                    allow_has_operator: false,
+                },
                 "displayName" => FieldMemberSchema::new_ordered(ValueType::String),
                 "age" => FieldMemberSchema::new_ordered(ValueType::Integer),
             ),

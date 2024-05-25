@@ -22,6 +22,12 @@ pub struct FilterPageToken {
     pub filter: Filter,
 }
 
+impl FilterPageToken {
+    pub fn new(filter: Filter) -> Self {
+        Self { filter }
+    }
+}
+
 pub trait PageTokenBuilder {
     type PageToken: Clone + ToString;
 
