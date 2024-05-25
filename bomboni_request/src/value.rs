@@ -193,6 +193,57 @@ impl From<Vec<Self>> for Value {
     }
 }
 
+#[cfg(feature = "postgres")]
+const _: () = {
+    use bytes::BytesMut;
+    use postgres_types::{to_sql_checked, IsNull, ToSql, Type};
+
+    impl ToSql for Value {
+        fn to_sql(
+            &self,
+            ty: &Type,
+            out: &mut BytesMut,
+        ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>>
+        where
+            Self: Sized,
+        {
+            match self {
+                Self::Integer(value) => value.to_sql(ty, out),
+                Self::Float(value) => value.to_sql(ty, out),
+                Self::Boolean(value) => value.to_sql(ty, out),
+                Self::String(value) => value.to_sql(ty, out),
+                Self::Timestamp(value) => value.to_sql(ty, out),
+                Self::Repeated(values) => values.to_sql(ty, out),
+                Self::Any => Ok(IsNull::No),
+            }
+        }
+
+        fn accepts(ty: &Type) -> bool {
+            matches!(
+                ty,
+                &Type::INT8
+                    | &Type::FLOAT8
+                    | &Type::BOOL
+                    | &Type::VARCHAR
+                    | &Type::TEXT
+                    | &Type::TIMESTAMPTZ
+            )
+        }
+
+        to_sql_checked!();
+    }
+
+    impl<'a> FromIterator<&'a Value> for Vec<&'a (dyn ToSql + Sync)> {
+        fn from_iter<T: IntoIterator<Item = &'a Value>>(iter: T) -> Self {
+            let mut elements: Vec<&(dyn ToSql + Sync)> = Vec::new();
+            for e in iter {
+                elements.push(e);
+            }
+            elements
+        }
+    }
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -48,7 +48,7 @@ wasm = [
 ]
 js = ["bomboni_common/js", "bomboni_proto/js", "bomboni_wasm/js"]
 fs = ["dep:bomboni_fs"]
-postgres = ["bomboni_common/postgres"]
+postgres = ["bomboni_common/postgres", "bomboni_request/postgres"]
 
 [dependencies]
 bomboni_common = { path = "bomboni_common", version = "0.1.55" }
