@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_proto"
-version = "0.1.55"
+version = "0.1.56"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with Protobuf/gRPC. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -30,7 +30,7 @@ js = ["bomboni_common/js"]
 [dependencies]
 bomboni_common = { path = "../bomboni_common", features = [
   "serde",
-], version = "0.1.55" }
+], version = "0.1.56" }
 
 thiserror = "1.0.61"
 time = { version = "0.3.36", features = ["serde", "formatting", "parsing"] }
@@ -44,7 +44,7 @@ http = { version = "1.1.0", optional = true }
 chrono = { version = "0.4.38", optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.55", optional = true }
+bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.56", optional = true }
 
 wasm-bindgen = { version = "0.2.92", optional = true }
 js-sys = { version = "0.3.69", optional = true }
@@ -54,5 +54,5 @@ serde-wasm-bindgen = { version = "0.6.5", optional = true }
 serde_json = "1.0.117"
 
 [build-dependencies]
-bomboni_prost = { path = "../bomboni_prost", version = "0.1.55" }
+bomboni_prost = { path = "../bomboni_prost", version = "0.1.56" }
 prost-build = "0.12.6"

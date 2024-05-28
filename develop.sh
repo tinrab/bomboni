@@ -71,8 +71,8 @@ function publish() {
 		cargo publish -p bomboni_core --allow-dirty
 		cargo publish -p bomboni_wasm_core --allow-dirty
 		cargo publish -p bomboni_wasm_derive --allow-dirty
-		cargo publish -p bomboni_common --allow-dirty
 		cargo publish -p bomboni_wasm --allow-dirty
+		cargo publish -p bomboni_common --allow-dirty
 		cargo publish -p bomboni_prost --allow-dirty
 		cargo publish -p bomboni_proto --allow-dirty
 		cargo publish -p bomboni_request_derive --allow-dirty
