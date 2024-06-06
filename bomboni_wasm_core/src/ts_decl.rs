@@ -499,7 +499,8 @@ impl<'a> TsDeclParser<'a> {
                     extends
                         .into_iter()
                         .map(|ty| match ty {
-                            TsType::Option(ty) => TsType::Union(vec![*ty, TsType::nullish()]),
+                            // TsType::Option(ty) => TsType::Union(vec![*ty, TsType::nullish()]),
+                            TsType::Option(ty) => TsType::Partial(Box::new(*ty)),
                             _ => ty,
                         })
                         .collect(),

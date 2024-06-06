@@ -29,6 +29,7 @@ pub enum TsType {
     Intersection(Vec<Self>),
     Union(Vec<Self>),
     Override(String),
+    Partial(Box<Self>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,7 +164,6 @@ impl TsType {
             Self::Tuple(elements) => {
                 elements.iter().for_each(|t| t.visit(f));
             }
-            Self::Option(t) => t.visit(f),
             Self::Reference { type_params, .. } => {
                 type_params.iter().for_each(|t| t.visit(f));
             }
@@ -179,6 +179,7 @@ impl TsType {
             Self::Intersection(types) | Self::Union(types) => {
                 types.iter().for_each(|t| t.visit(f));
             }
+            Self::Option(t) | Self::Partial(t) => t.visit(f),
         }
     }
 
@@ -404,6 +405,7 @@ impl TsType {
                     .map(|ty| ty.change_reference(rename_map))
                     .collect(),
             ),
+            Self::Partial(t) => Self::Partial(Box::new(t.change_reference(rename_map))),
             _ => self,
         }
     }
@@ -545,6 +547,9 @@ impl Display for TsType {
             }
             Self::Override(src) => {
                 write!(f, "{src}")
+            }
+            Self::Partial(t) => {
+                write!(f, "Partial<{t}>")
             }
         }
     }
