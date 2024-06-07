@@ -228,14 +228,16 @@ pub fn expand_parse_field_type(
                 .map_err(|err: RequestError| err.wrap_path(#field_error_path) #inner_wrap_err)?;
         });
     } else if field_options.enumeration {
-        parse_impl = quote! {
-            if target == 0 {
-                return Err(RequestError::path(
-                    #field_error_path,
-                    CommonError::RequiredFieldMissing,
-                ) #inner_wrap_err);
-            }
-        };
+        if !field_options.unspecified {
+            parse_impl = quote! {
+                if target == 0 {
+                    return Err(RequestError::path(
+                        #field_error_path,
+                        CommonError::RequiredFieldMissing,
+                    ) #inner_wrap_err);
+                }
+            };
+        }
         if !field_options.keep_primitive {
             parse_impl.extend(quote! {
                 let target = target.try_into()
@@ -260,14 +262,16 @@ pub fn expand_parse_field_type(
         }
 
         if primitive_ident == "String" {
-            parse_impl.extend(quote! {
-                if target.is_empty() {
-                    return Err(RequestError::path(
-                        #field_error_path,
-                        CommonError::RequiredFieldMissing,
-                    ) #inner_wrap_err);
-                }
-            });
+            if !field_options.unspecified {
+                parse_impl.extend(quote! {
+                    if target.is_empty() {
+                        return Err(RequestError::path(
+                            #field_error_path,
+                            CommonError::RequiredFieldMissing,
+                        ) #inner_wrap_err);
+                    }
+                });
+            }
             if let Some(regex) = field_options.regex.as_ref() {
                 parse_impl.extend(quote! {
                     if !re.is_match(&target) {

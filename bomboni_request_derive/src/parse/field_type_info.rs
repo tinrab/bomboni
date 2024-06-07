@@ -155,6 +155,7 @@ mod tests {
             skip: false,
             keep: false,
             keep_primitive: false,
+            unspecified: false,
             extract: None,
             wrapper: false,
             oneof: false,

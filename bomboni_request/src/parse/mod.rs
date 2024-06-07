@@ -661,6 +661,7 @@ mod tests {
             required: String,
             possibly_empty: String,
             regex_validated: String,
+            wrapped: StringValue,
         }
 
         #[derive(Parse, Debug, PartialEq)]
@@ -671,6 +672,8 @@ mod tests {
             possibly_empty: Option<String>,
             #[parse(regex = "^[a-z]+$")]
             regex_validated: String,
+            #[parse(wrapper, unspecified)]
+            wrapped: String,
         }
 
         impl Default for Item {
@@ -679,6 +682,9 @@ mod tests {
                     required: "required".into(),
                     possibly_empty: "possibly_empty".into(),
                     regex_validated: "regex".into(),
+                    wrapped: StringValue {
+                        value: "wrapped".into(),
+                    },
                 }
             }
         }
@@ -689,6 +695,7 @@ mod tests {
                 required: "required".into(),
                 possibly_empty: Some("possibly_empty".into()),
                 regex_validated: "regex".into(),
+                wrapped: "wrapped".into(),
             }
         );
 

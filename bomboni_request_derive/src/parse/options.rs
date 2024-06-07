@@ -120,6 +120,10 @@ pub struct ParseFieldOptions {
     /// Only surrounding container will be extracted and parsed.
     #[darling(default)]
     pub keep_primitive: bool,
+    /// Allow unspecified enum values and empty strings.
+    /// The field will not be treated as required.
+    #[darling(default)]
+    pub unspecified: bool,
     /// Extraction plan for the field.
     #[darling(default)]
     pub extract: Option<FieldExtract>,
