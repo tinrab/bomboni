@@ -48,7 +48,6 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
 
         let context = Context {
             config: &config,
-            descriptor: &descriptor,
             package_name: package_name.clone(),
             path: Vec::default(),
         };

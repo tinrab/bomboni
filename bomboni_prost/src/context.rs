@@ -1,11 +1,10 @@
 use crate::config::CompileConfig;
 use bomboni_core::string::{str_to_case, Case};
-use prost_types::{DescriptorProto, FileDescriptorSet, OneofDescriptorProto};
+use prost_types::{DescriptorProto, OneofDescriptorProto};
 use syn::{parse_quote, ExprPath, PathSegment};
 
 pub struct Context<'a> {
     pub config: &'a CompileConfig,
-    pub descriptor: &'a FileDescriptorSet,
     pub package_name: String,
     pub path: Vec<String>,
 }

@@ -68,7 +68,6 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         .btree_map(["."]);
 
     build_serde(&mut config);
-    build_copy_derive(&mut config);
     if std::env::var("CARGO_CFG_TARGET_FAMILY") == Ok("wasm".into()) && cfg!(feature = "wasm") {
         build_wasm(&mut config);
     }
@@ -129,15 +128,6 @@ fn build_serde(config: &mut Config) {
         ".google.rpc.Status.details",
         r#"#[serde(with = "crate::rpc::status::details_serde")]"#,
     );
-}
-
-fn build_copy_derive(config: &mut Config) {
-    for message_name in ["Timestamp", "Empty", "Duration"] {
-        config.message_attribute(
-            format!(".google.protobuf.{message_name}"),
-            r"#[derive(Copy)]",
-        );
-    }
 }
 
 fn build_wasm(config: &mut Config) {

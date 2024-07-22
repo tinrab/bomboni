@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_wasm"
-version = "0.1.56"
+version = "0.1.57"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with WASM. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -18,14 +18,14 @@ derive = ["dep:bomboni_wasm_derive"]
 js = ["bomboni_wasm_core/js"]
 
 [dependencies]
-bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.56" }
-bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.56", optional = true }
+bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.57" }
+bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.57", optional = true }
 
-serde = "1.0.202"
+serde = "1.0.204"
 wasm-bindgen = "0.2.92"
 js-sys = "0.3.69"
 serde-wasm-bindgen = "0.6.5"
 
 [dev-dependencies]
-serde = { version = "1.0.202", features = ["derive"] }
-serde_json = "1.0.117"
+serde = { version = "1.0.204", features = ["derive"] }
+serde_json = "1.0.120"
