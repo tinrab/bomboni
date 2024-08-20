@@ -22,6 +22,7 @@ function lint() {
 		unused_extern_crates
 		unused_import_braces
 		unused_qualifications
+		clippy::clone_on_ref_ptr
 		clippy::all
 		clippy::correctness
 		clippy::suspicious

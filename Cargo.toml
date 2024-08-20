@@ -27,6 +27,7 @@ members = [
   "bomboni_wasm",
   "bomboni_wasm_core",
   "bomboni_wasm_derive",
+  "wasm_sample",
 ]
 
 [features]

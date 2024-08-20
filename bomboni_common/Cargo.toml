@@ -35,7 +35,7 @@ thiserror = "1.0.63"
 regex = "1.10.5"
 time = { version = "0.3.36", features = ["formatting", "parsing"] }
 
-tokio = { version = "1.38.1", features = ["time", "sync"], optional = true }
+tokio = { version = "1.39.1", features = ["time", "sync"], optional = true }
 serde = { version = "1.0.204", features = ["derive"], optional = true }
 chrono = { version = "0.4.38", optional = true }
 postgres-types = { version = "0.2.7", features = [
@@ -49,4 +49,4 @@ js-sys = { version = "0.3.69", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.120"
-tokio = { version = "1.38.1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.39.1", features = ["rt-multi-thread", "macros"] }

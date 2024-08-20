@@ -28,9 +28,6 @@ pub struct Generator {
 /// Used to avoid collisions.
 const SLEEP_DURATION: Duration = Duration::from_secs(1);
 
-#[cfg(feature = "tokio")]
-pub type GeneratorArc = std::sync::Arc<tokio::sync::Mutex<Generator>>;
-
 impl Generator {
     #[must_use]
     pub const fn new(worker: u16) -> Self {
