@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_common"
-version = "0.1.57"
+version = "0.1.58"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Common things for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -15,7 +15,7 @@ path = "src/lib.rs"
 
 [features]
 serde = ["dep:serde"]
-tokio = ["dep:tokio"]
+tokio = ["dep:tokio", "dep:parking_lot"]
 chrono = ["dep:chrono"]
 wasm = [
   "dep:bomboni_wasm",
@@ -27,7 +27,7 @@ js = []
 postgres = ["dep:postgres-types", "dep:bytes"]
 
 [dependencies]
-bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.57", features = [
+bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.58", features = [
   "derive",
 ], optional = true }
 
@@ -36,6 +36,7 @@ regex = "1.10.5"
 time = { version = "0.3.36", features = ["formatting", "parsing"] }
 
 tokio = { version = "1.39.1", features = ["time", "sync"], optional = true }
+parking_lot = { version = "0.12.3", optional = true }
 serde = { version = "1.0.204", features = ["derive"], optional = true }
 chrono = { version = "0.4.38", optional = true }
 postgres-types = { version = "0.2.7", features = [

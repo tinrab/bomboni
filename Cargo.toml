@@ -1,6 +1,6 @@
 [package]
 name = "bomboni"
-version = "0.1.57"
+version = "0.1.58"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utility Library for Rust"
 repository = "https://github.com/tinrab/bomboni"
@@ -27,7 +27,6 @@ members = [
   "bomboni_wasm",
   "bomboni_wasm_core",
   "bomboni_wasm_derive",
-  "wasm_sample",
 ]
 
 [features]
@@ -52,11 +51,11 @@ fs = ["dep:bomboni_fs"]
 postgres = ["bomboni_common/postgres", "bomboni_request/postgres"]
 
 [dependencies]
-bomboni_common = { path = "bomboni_common", version = "0.1.57" }
+bomboni_common = { path = "bomboni_common", version = "0.1.58" }
 
-bomboni_prost = { path = "bomboni_prost", version = "0.1.57", default-features = false, optional = true }
-bomboni_proto = { path = "bomboni_proto", version = "0.1.57", default-features = false, optional = true }
-bomboni_request = { path = "bomboni_request", version = "0.1.57", default-features = false, optional = true }
-bomboni_template = { path = "bomboni_template", version = "0.1.57", default-features = false, optional = true }
-bomboni_wasm = { path = "bomboni_wasm", version = "0.1.57", default-features = false, optional = true }
-bomboni_fs = { path = "bomboni_fs", version = "0.1.57", default-features = false, optional = true }
+bomboni_prost = { path = "bomboni_prost", version = "0.1.58", default-features = false, optional = true }
+bomboni_proto = { path = "bomboni_proto", version = "0.1.58", default-features = false, optional = true }
+bomboni_request = { path = "bomboni_request", version = "0.1.58", default-features = false, optional = true }
+bomboni_template = { path = "bomboni_template", version = "0.1.58", default-features = false, optional = true }
+bomboni_wasm = { path = "bomboni_wasm", version = "0.1.58", default-features = false, optional = true }
+bomboni_fs = { path = "bomboni_fs", version = "0.1.58", default-features = false, optional = true }

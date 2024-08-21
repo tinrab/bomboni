@@ -784,15 +784,19 @@ mod tests {
 
         #[derive(Debug, PartialEq)]
         enum OneofKind {
-            Pos((i32, i32)),
-            Float(Option<FloatValue>),
+            Derived(String),
+            BorrowedDerived(String),
+            Extracted(Option<String>),
+            BorrowedExtracted(Option<String>),
         }
 
         impl OneofKind {
             pub fn get_variant_name(&self) -> &'static str {
                 match self {
-                    Self::Pos(_) => "pos",
-                    Self::Float(_) => "float",
+                    Self::Derived(_) => "derived",
+                    Self::BorrowedDerived(_) => "borrowed_derived",
+                    Self::Extracted(_) => "extracted",
+                    Self::BorrowedExtracted(_) => "borrowed_extracted",
                 }
             }
         }
@@ -848,30 +852,83 @@ mod tests {
         #[derive(Debug, PartialEq, Parse)]
         #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
         enum ParsedOneof {
-            #[parse(derive { parse = pos_oneof_parse, write = pos_oneof_write })]
-            Pos(String),
-            #[parse(extract = [UnwrapOrDefault], derive { parse = float_parse, write = float_write })]
-            Float(f64),
+            #[parse(derive { parse = derived_oneof_parse, write = derived_oneof_write })]
+            Derived(i32),
+            #[parse(derive { parse = borrowed_derived_oneof_parse, write = borrowed_derived_oneof_write, source_borrow, target_borrow })]
+            BorrowedDerived(i32),
+            #[parse(extract = [Unwrap], derive { parse = extracted_oneof_parse, write = extracted_oneof_write })]
+            Extracted(i32),
+            #[parse(extract = [Unwrap], derive { parse = borrowed_extracted_parse, write = borrowed_extracted_write, source_borrow, target_borrow })]
+            BorrowedExtracted(i32),
         }
 
         #[allow(clippy::unnecessary_wraps)]
-        fn pos_oneof_parse(item: (i32, i32)) -> RequestResult<String> {
-            Ok(format!("{}, {}", item.0, item.1))
+        fn derived_oneof_parse(value: String) -> RequestResult<i32> {
+            Ok(value
+                .parse()
+                .map_err(|_| CommonError::InvalidNumericValue)?)
         }
 
-        fn pos_oneof_write(target: String) -> (i32, i32) {
-            let parts: Vec<&str> = target.split(", ").collect();
-            (parts[0].parse().unwrap(), parts[1].parse().unwrap())
+        fn derived_oneof_write(value: i32) -> String {
+            value.to_string()
+        }
+
+        fn borrowed_derived_oneof_parse(oneof: &OneofKind) -> Option<RequestResult<ParsedOneof>> {
+            match oneof {
+                OneofKind::BorrowedDerived(value) => {
+                    Some(Ok(ParsedOneof::BorrowedDerived(match value.parse() {
+                        Ok(value) => value,
+                        Err(_) => return Some(Err(CommonError::InvalidNumericValue.into())),
+                    })))
+                }
+                _ => None,
+            }
+        }
+
+        fn borrowed_derived_oneof_write(oneof: &ParsedOneof) -> Option<Oneof> {
+            match oneof {
+                ParsedOneof::BorrowedDerived(value) => Some(Oneof {
+                    kind: Some(OneofKind::BorrowedDerived(value.to_string())),
+                }),
+                _ => None,
+            }
         }
 
         #[allow(clippy::unnecessary_wraps)]
-        fn float_parse(value: FloatValue) -> RequestResult<f64> {
-            Ok(f64::from(value.value))
+        fn extracted_oneof_parse(value: String) -> RequestResult<i32> {
+            Ok(value
+                .parse()
+                .map_err(|_| CommonError::InvalidNumericValue)?)
         }
 
-        fn float_write(value: f64) -> FloatValue {
-            FloatValue {
-                value: value as f32,
+        #[allow(clippy::unnecessary_wraps)]
+        fn extracted_oneof_write(value: i32) -> Option<String> {
+            Some(value.to_string())
+        }
+
+        fn borrowed_extracted_parse(source: &OneofKind) -> Option<RequestResult<ParsedOneof>> {
+            match source {
+                OneofKind::BorrowedExtracted(value) => {
+                    match value
+                        .as_ref()
+                        .ok_or(CommonError::RequiredFieldMissing)
+                        .and_then(|value| {
+                            value.parse().map_err(|_| CommonError::InvalidNumericValue)
+                        }) {
+                        Ok(value) => Some(Ok(ParsedOneof::BorrowedExtracted(value))),
+                        Err(err) => Some(Err(err.into())),
+                    }
+                }
+                _ => None,
+            }
+        }
+
+        fn borrowed_extracted_write(oneof: &ParsedOneof) -> Option<Oneof> {
+            match oneof {
+                ParsedOneof::BorrowedExtracted(value) => Some(Oneof {
+                    kind: Some(OneofKind::BorrowedExtracted(Some(value.to_string()))),
+                }),
+                _ => None,
             }
         }
 
@@ -922,30 +979,101 @@ mod tests {
 
         assert_eq!(
             ParsedOneof::parse(Oneof {
-                kind: Some(OneofKind::Pos((1, 2))),
+                kind: Some(OneofKind::Derived("42".into())),
             })
             .unwrap(),
-            ParsedOneof::Pos("1, 2".into())
+            ParsedOneof::Derived(42i32)
         );
         assert_eq!(
-            Oneof::from(ParsedOneof::Pos("1, 2".into())),
+            Oneof::from(ParsedOneof::Derived(42i32)),
             Oneof {
-                kind: Some(OneofKind::Pos((1, 2))),
+                kind: Some(OneofKind::Derived("42".into())),
             }
         );
+        assert!(matches!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::Derived("f".into())),
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error,
+                path,
+                ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::InvalidNumericValue
+            ) && path[0] == PathErrorStep::Field("derived".into())
+        ));
+
         assert_eq!(
             ParsedOneof::parse(Oneof {
-                kind: Some(OneofKind::Float(Some(FloatValue { value: 1.0 }))),
+                kind: Some(OneofKind::BorrowedDerived("42".into())),
             })
             .unwrap(),
-            ParsedOneof::Float(1.0)
+            ParsedOneof::BorrowedDerived(42i32)
         );
         assert_eq!(
-            Oneof::from(ParsedOneof::Float(1.0)),
+            Oneof::from(ParsedOneof::BorrowedDerived(42i32)),
             Oneof {
-                kind: Some(OneofKind::Float(Some(FloatValue { value: 1.0 }))),
+                kind: Some(OneofKind::BorrowedDerived("42".into())),
             }
         );
+
+        assert_eq!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::Extracted(Some("42".into()))),
+            })
+            .unwrap(),
+            ParsedOneof::Extracted(42i32)
+        );
+        assert_eq!(
+            Oneof::from(ParsedOneof::Extracted(42i32)),
+            Oneof {
+                kind: Some(OneofKind::Extracted(Some("42".into()))),
+            }
+        );
+        assert!(matches!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::Extracted(None)),
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error,
+                path,
+                ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("extracted".into())
+        ));
+
+        assert_eq!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::BorrowedExtracted(Some("42".into()))),
+            })
+            .unwrap(),
+            ParsedOneof::BorrowedExtracted(42i32)
+        );
+        assert_eq!(
+            Oneof::from(ParsedOneof::BorrowedExtracted(42i32)),
+            Oneof {
+                kind: Some(OneofKind::BorrowedExtracted(Some("42".into()))),
+            }
+        );
+        assert!(matches!(
+            ParsedOneof::parse(Oneof {
+                kind: Some(OneofKind::BorrowedExtracted(None)),
+            })
+            .unwrap_err(),
+            RequestError::Path(PathError {
+                error,
+                path,
+                ..
+            }) if matches!(
+                error.as_any().downcast_ref::<CommonError>().unwrap(),
+                CommonError::RequiredFieldMissing
+            ) && path[0] == PathErrorStep::Field("borrowed_extracted".into())
+        ));
     }
 
     #[test]
@@ -1260,8 +1388,8 @@ mod tests {
             #[parse(extract = [Field("value")])]
             DataValue(i32),
             Null(()),
-            #[parse(source_unit)]
             Empty,
+            #[parse(source_unit)]
             Dropped,
         }
 

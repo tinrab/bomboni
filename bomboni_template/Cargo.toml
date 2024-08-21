@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_template"
-version = "0.1.57"
+version = "0.1.58"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working Handlebars templates. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -18,8 +18,8 @@ default = ["testing"]
 testing = []
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.57" }
-bomboni_proto = { version = "0.1.57", path = "../bomboni_proto" }
+bomboni_common = { path = "../bomboni_common", version = "0.1.58" }
+bomboni_proto = { version = "0.1.58", path = "../bomboni_proto" }
 
 thiserror = "1.0.63"
 handlebars = "6.0.0"

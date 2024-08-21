@@ -1,11 +1,17 @@
 use std::thread;
 use std::time::Duration;
+
 #[cfg(all(
     target_family = "wasm",
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm"
 ))]
 use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "tokio")]
+use parking_lot::Mutex;
+#[cfg(feature = "tokio")]
+use std::{ops::Deref, sync::Arc};
 
 use crate::date_time::UtcDateTime;
 use crate::id::Id;
@@ -19,16 +25,20 @@ use crate::id::Id;
     ),
     wasm_bindgen(js_name = IdGenerator)
 )]
-pub struct Generator {
+pub struct IdGenerator {
     worker: u16,
     next: u16,
 }
+
+#[cfg(feature = "tokio")]
+#[derive(Debug, Clone)]
+pub struct IdGeneratorArc(Arc<Mutex<IdGenerator>>);
 
 /// Duration to sleep after overflowing the sequence number.
 /// Used to avoid collisions.
 const SLEEP_DURATION: Duration = Duration::from_secs(1);
 
-impl Generator {
+impl IdGenerator {
     #[must_use]
     pub const fn new(worker: u16) -> Self {
         Self { next: 0, worker }
@@ -41,9 +51,9 @@ impl Generator {
     /// Basic usage:
     ///
     /// ```
-    /// use bomboni_common::id::generator::Generator;
+    /// use bomboni_common::id::generator::IdGenerator;
     ///
-    /// let mut g = Generator::new(1);
+    /// let mut g = IdGenerator::new(1);
     /// assert_ne!(g.generate(), g.generate());
     /// ```
     pub fn generate(&mut self) -> Id {
@@ -83,9 +93,9 @@ impl Generator {
     ///
     /// ```
     /// # use std::collections::HashSet;
-    /// use bomboni_common::id::generator::Generator;
+    /// use bomboni_common::id::generator::IdGenerator;
     ///
-    /// let mut g = Generator::new(1);
+    /// let mut g = IdGenerator::new(1);
     /// let ids = g.generate_multiple(3);
     /// let id_set: HashSet<_> = ids.iter().collect();
     /// assert_eq!(id_set.len(), ids.len());
@@ -147,7 +157,7 @@ impl Generator {
     feature = "wasm",
 ))]
 #[wasm_bindgen(js_class = IdGenerator)]
-impl Generator {
+impl IdGenerator {
     #[wasm_bindgen(constructor)]
     pub fn wasm_new(worker: u16) -> Self {
         Self { next: 0, worker }
@@ -159,13 +169,30 @@ impl Generator {
     }
 }
 
+#[cfg(feature = "tokio")]
+const _: () = {
+    impl IdGeneratorArc {
+        pub fn new(worker: u16) -> Self {
+            Self(Arc::new(Mutex::new(IdGenerator::new(worker))))
+        }
+    }
+
+    impl Deref for IdGeneratorArc {
+        type Target = Mutex<IdGenerator>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn it_works() {
-        let mut id_generator = Generator::new(42);
+        let mut id_generator = IdGenerator::new(42);
         let id = id_generator.generate();
         let (_timestamp, worker, sequence) = id.decode();
         assert_eq!(worker, 42);
@@ -179,7 +206,7 @@ mod tests {
         use std::collections::HashSet;
         const N: usize = 10;
 
-        let mut g = Generator::new(1);
+        let mut g = IdGenerator::new(1);
 
         let mut ids = HashSet::new();
         ids.extend(g.generate_multiple_async(N / 2).await);

@@ -39,8 +39,14 @@ fn derive_serde_wasm(options: &WasmOptions) -> TokenStream {
     let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
     let ts_decl = TsDeclParser::new(options).parse();
-    let ts_decl_literal = ts_decl.to_string();
     let ts_decl_name = ts_decl.name();
+
+    let ts_decl_literal = if let Some(override_type) = options.override_type.as_ref() {
+        let type_name = options.name();
+        format!("export type {type_name} = {override_type};")
+    } else {
+        ts_decl.to_string()
+    };
 
     let mut impls = quote! {
         #[wasm_bindgen]

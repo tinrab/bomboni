@@ -84,22 +84,6 @@ fn expand_write_variants(
         let target_variant_ident = &variant.ident;
         let source_variant_ident = get_variant_source_ident(variant)?;
 
-        if let Some(ParseDerive { target_borrow, .. }) = variant.options.derive.as_ref() {
-            let write_variant = expand_write_variant(variant)?;
-            if *target_borrow {
-                write_derived_borrowed.extend(write_variant);
-            } else {
-                write_variants.extend(quote! {
-                    #ident::#target_variant_ident(target) => {
-                        #source::#source_variant_ident(
-                            #write_variant
-                        )
-                    }
-                });
-            }
-            continue;
-        }
-
         if variant.fields.is_empty() {
             write_variants.extend(if variant.source_unit {
                 quote! {
@@ -113,6 +97,14 @@ fn expand_write_variants(
                         #source::#source_variant_ident
                     }
                 }
+            });
+        } else if matches!(
+            variant.options.derive.as_ref(),
+            Some(ParseDerive { target_borrow, .. }) if *target_borrow,
+        ) {
+            let write_variant = expand_write_variant(variant)?;
+            write_derived_borrowed.extend(quote! {
+                #write_variant
             });
         } else {
             let write_variant = expand_write_variant(variant)?;
@@ -134,6 +126,8 @@ fn expand_write_variants(
 fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
     let target_ident = &variant.ident;
 
+    let extract = get_variant_extract(variant)?;
+
     if let Some(ParseDerive {
         write,
         module,
@@ -149,20 +143,6 @@ fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
                 syn::Error::new_spanned(target_ident, "missing derive write implementation")
             })?;
 
-        // if variant.options.source.is_some() || variant.options.extract.is_some() {
-        //     let inject_impl = expand_field_inject(&extract, &variant.options, None);
-        //     let source_value = if *target_borrow {
-        //         quote!(&target)
-        //     } else {
-        //         quote!(target)
-        //     };
-
-        //     return Ok(quote! {
-        //         let source_field = #write_impl(#source_value);
-        //         #inject_impl
-        //     });
-        // }
-
         return Ok(if *target_borrow {
             quote! {
                 if let Some(source) = #write_impl(&target) {
@@ -171,12 +151,12 @@ fn expand_write_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             }
         } else {
             quote! {
-                #write_impl(target)
+                *source = {
+                    #write_impl(target)
+                };
             }
         });
     }
-
-    let extract = get_variant_extract(variant)?;
 
     let field_type_info = variant.type_info.as_ref().unwrap();
     let inject_impl = expand_field_inject(&extract, &variant.options, Some(field_type_info));

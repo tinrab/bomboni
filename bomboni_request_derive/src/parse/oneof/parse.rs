@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Ident, Path};
+use syn::Path;
 
 use crate::parse::{
     oneof::utility::get_variant_extract,
@@ -12,11 +12,11 @@ use crate::parse::{
 };
 
 pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
-    Ok(if let Some(tagged_union) = options.tagged_union.as_ref() {
-        expand_tagged_union(options, variants, tagged_union)?
+    if let Some(tagged_union) = options.tagged_union.as_ref() {
+        expand_tagged_union(options, variants, tagged_union)
     } else {
-        expand_parse(options, variants)?
-    })
+        expand_parse(options, variants)
+    }
 }
 
 fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
@@ -141,6 +141,17 @@ fn expand_parse_variants(
 }
 
 fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
+    if variant.options.keep {
+        return Ok(quote! {
+            source.clone()
+        });
+    }
+
+    let extract = get_variant_extract(variant)?;
+    let field_error_path_wrapper = quote! {
+        PathErrorStep::Field(variant_name.into())
+    };
+
     if let Some(ParseDerive {
         parse,
         module,
@@ -154,24 +165,32 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
             .or_else(|| module.as_ref().map(|module| quote!(#module::parse)))
             .unwrap();
 
-        //     if variant.options.source.is_some() || variant.options.extract.is_some() {
-        //         let (extract_impl, _get_impl, field_path) = expand_field_extract(
-        //             &extract,
-        //             &BTreeSet::new(),
-        //             None,
-        //             Some(&field_error_path_wrapper),
-        //             *source_borrow,
-        //         );
-        //         let field_error_path =
-        //             make_field_error_path(&field_path, Some(&field_error_path_wrapper));
+        if variant.options.source.is_some() || variant.options.extract.is_some() {
+            let (extract_impl, _get_impl, field_path) = expand_field_extract(
+                &extract,
+                &BTreeSet::new(),
+                None,
+                Some(&field_error_path_wrapper),
+                *source_borrow,
+            );
+            let field_error_path =
+                make_field_error_path(&field_path, Some(&field_error_path_wrapper));
 
-        //         return Ok(quote! {
-        //             #extract_impl
-        //             let target = #parse_impl(target)
-        //                 .map_err(|err: RequestError| err.wrap_path(#field_error_path))?;
-        //             target
-        //         });
-        //     }
+            return Ok(if *source_borrow {
+                quote! {
+                    if let Some(result) = #parse_impl(&source) {
+                        return result.map_err(|err: RequestError| err.wrap_field(variant_name));
+                    }
+                }
+            } else {
+                quote! {
+                    #extract_impl
+                    let target = #parse_impl(target)
+                        .map_err(|err: RequestError| err.wrap_path(#field_error_path))?;
+                    target
+                }
+            });
+        }
 
         if *source_borrow {
             return Ok(quote! {
@@ -179,23 +198,12 @@ fn expand_parse_variant(variant: &ParseVariant) -> syn::Result<TokenStream> {
                     return result.map_err(|err: RequestError| err.wrap_field(variant_name));
                 }
             });
-        } else {
-            return Ok(quote! {
-                #parse_impl(source).map_err(|err: RequestError| err.wrap_field(variant_name))?
-            });
         }
-    }
 
-    if variant.options.keep {
         return Ok(quote! {
-            source.clone()
+            #parse_impl(source).map_err(|err: RequestError| err.wrap_field(variant_name))?
         });
     }
-
-    let extract = get_variant_extract(variant)?;
-    let field_error_path_wrapper = quote! {
-        PathErrorStep::Field(variant_name.into())
-    };
 
     let field_type_info = variant.type_info.as_ref().unwrap();
     let (extract_impl, get_impl, field_path) = expand_field_extract(
