@@ -130,7 +130,7 @@ impl Display for EnumTsDecl {
                 write!(
                     f,
                     "\n  {} = {},",
-                    str_to_case(&member.name, Case::Pascal),
+                    str_to_case(&member.name, Case::ScreamingSnake),
                     &member.alias_type
                 )?;
             }

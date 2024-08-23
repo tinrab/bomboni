@@ -69,7 +69,6 @@ function test() {
 
 function publish() {
 	if [[ "$2" =~ ^(--actually-do-it)$ ]]; then
-		echo "Publishing..."
 		cargo publish -p bomboni_core --allow-dirty
 		cargo publish -p bomboni_wasm_core --allow-dirty
 		cargo publish -p bomboni_wasm_derive --allow-dirty
