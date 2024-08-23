@@ -5,7 +5,7 @@
 //!
 //! [1]: https://github.com/madonoharu/tsify
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use bomboni_core::string::{str_to_case, Case};
 use bomboni_wasm_core::{
@@ -436,7 +436,8 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
     let ts_decl = TsDeclParser::new(options).parse();
     let ts_decl_name = ts_decl.name();
 
-    let mut variants = String::new();
+    // let mut variants = String::new();
+    let mut variants = BTreeMap::new();
     if let TsDecl::Enum(ts_enum) = &ts_decl {
         let mut unique_member_names = BTreeSet::new();
         for member in &ts_enum.members {
@@ -451,13 +452,26 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
                 ));
             }
 
-            variants.push_str(&format!("{member_name}: {member_type_value},\n"));
-            variants.push_str(&format!("{member_type_value}: \"{member_name}\",\n"));
+            variants.insert(member_name.clone(), member_type_value.clone());
+            variants.insert(member_type_value, format!("\"{member_name}\""));
         }
     }
 
     let usage = expand_usage(options);
-    let js_literal = format!("export const {ts_decl_name} = Object.freeze({{\n  {variants}}});");
+    let js_literal = format!(
+        "export const {} = Object.freeze({{\n  {}}});",
+        ts_decl_name,
+        variants
+            .into_iter()
+            .map(|(k, v)| { format!("{k}: {v}") })
+            .fold(String::new(), |acc, row| {
+                if acc.is_empty() {
+                    row.to_string()
+                } else {
+                    format!("{acc},\n{row}")
+                }
+            })
+    );
     let impls = derive_serde_wasm(options);
     Ok(quote! {
         #[automatically_derived]
