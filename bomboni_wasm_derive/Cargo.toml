@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_wasm_derive"
-version = "0.1.58"
+version = "0.1.59"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Internal WASM derive macros for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -15,8 +15,8 @@ path = "src/lib.rs"
 proc-macro = true
 
 [dependencies]
-bomboni_core = { path = "../bomboni_core", version = "0.1.58" }
-bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.58" }
+bomboni_core = { path = "../bomboni_core", version = "0.1.59" }
+bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.59" }
 
 proc-macro2 = { version = "1.0.86", features = ["proc-macro"] }
 syn = "2.0.72"
