@@ -32,10 +32,23 @@ impl<'de> Deserialize<'de> for Empty {
     feature = "wasm",
 ))]
 const _: () = {
-    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
 
-    #[wasm_bindgen(typescript_custom_section)]
-    const TS_APPEND_CONTENT: &'static str = r#"
-        export type Empty = {};
-    "#;
+    impl From<Empty> for JsValue {
+        fn from(_: Empty) -> Self {
+            if cfg!(feature = "js") {
+                JsValue::undefined()
+            } else {
+                JsValue::null()
+            }
+        }
+    }
+
+    impl TryFrom<JsValue> for Empty {
+        type Error = JsValue;
+
+        fn try_from(_: JsValue) -> Result<Self, Self::Error> {
+            Ok(Self {})
+        }
+    }
 };

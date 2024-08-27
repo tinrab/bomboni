@@ -213,6 +213,18 @@ fn build_wasm(config: &mut Config) {
 
     if cfg!(feature = "js") {
         config.message_attribute(
+            ".google.protobuf.Empty",
+            r#"
+                #[derive(bomboni_wasm::Wasm)]
+                #[wasm(
+                    bomboni_crate = crate::bomboni,
+                    wasm_abi,
+                    js_value,
+                    override_type = "undefined | null",
+                )]
+            "#,
+        );
+        config.message_attribute(
             ".google.protobuf.Timestamp",
             r#"
                 #[derive(bomboni_wasm::Wasm)]
@@ -225,6 +237,18 @@ fn build_wasm(config: &mut Config) {
             "#,
         );
     } else {
+        config.message_attribute(
+            ".google.protobuf.Empty",
+            r#"
+                #[derive(bomboni_wasm::Wasm)]
+                #[wasm(
+                    bomboni_crate = crate::bomboni,
+                    wasm_abi,
+                    js_value,
+                    override_type = "null",
+                )]
+            "#,
+        );
         config.message_attribute(
             ".google.protobuf.Timestamp",
             "

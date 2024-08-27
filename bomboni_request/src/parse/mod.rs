@@ -2271,7 +2271,7 @@ mod tests {
         assert_eq!(
             ParsedItem::parse(Item {
                 value: 42,
-                id: Some("2a".into()),
+                id: Some("0000000000000000000000000000002A".into()),
                 nested: vec![1, 2, 3],
             })
             .unwrap(),
@@ -2293,7 +2293,7 @@ mod tests {
             }),
             Item {
                 value: 42,
-                id: Some("2a".into()),
+                id: Some("0000000000000000000000000000002A".into()),
                 nested: vec![1, 2, 3],
             }
         );
