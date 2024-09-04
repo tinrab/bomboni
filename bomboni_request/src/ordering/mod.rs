@@ -8,6 +8,7 @@ use std::{
 use crate::{
     ordering::error::{OrderingError, OrderingResult},
     schema::{Schema, SchemaMapped},
+    string::String,
 };
 
 pub mod error;
@@ -42,7 +43,7 @@ impl Ordering {
             .filter(|parts| !parts.is_empty())
         {
             if parts.len() > 2 {
-                return Err(OrderingError::InvalidTermFormat(parts.join(" ")));
+                return Err(OrderingError::InvalidTermFormat(parts.join(" ").into()));
             }
             match parts.as_slice() {
                 [name, dir] => {
@@ -68,7 +69,7 @@ impl Ordering {
                         direction: OrderingDirection::Ascending,
                     });
                 }
-                _ => return Err(OrderingError::InvalidTermFormat(parts.join(" "))),
+                _ => return Err(OrderingError::InvalidTermFormat(parts.join(" ").into())),
             }
         }
 
@@ -130,13 +131,13 @@ impl DerefMut for Ordering {
 
 impl Display for Ordering {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(
-            &self
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", "),
-        )
+        for (i, term) in self.iter().enumerate() {
+            f.write_str(&term.to_string())?;
+            if i < self.len() - 1 {
+                f.write_str(", ")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -193,12 +194,12 @@ mod tests {
     fn evaluate() {
         let a = UserItem {
             id: "1".into(),
-            display_name: "a".to_string(),
+            display_name: "a".into(),
             age: 30,
         };
         let b = UserItem {
             id: "2".into(),
-            display_name: "b".to_string(),
+            display_name: "b".into(),
             age: 30,
         };
         assert_eq!(

@@ -1,4 +1,3 @@
-use crate::query::error::QueryError;
 use bomboni_proto::google::protobuf::Any;
 use bomboni_proto::google::rpc::bad_request::FieldViolation;
 use bomboni_proto::google::rpc::BadRequest;
@@ -8,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use thiserror::Error;
+
+use crate::{format_string, query::error::QueryError, string::String};
 
 #[derive(Error, Debug)]
 #[cfg_attr(
@@ -126,17 +127,17 @@ impl RequestError {
     #[must_use]
     pub fn bad_request<N, V, F, E>(name: N, violations: V) -> Self
     where
-        N: Display,
+        N: Into<String>,
         V: IntoIterator<Item = (F, E)>,
-        F: Display,
+        F: Into<String>,
         E: Into<GenericErrorBox>,
     {
         Self::BadRequest {
-            name: name.to_string(),
+            name: name.into(),
             violations: violations
                 .into_iter()
                 .map(|(field, error)| PathError {
-                    path: vec![PathErrorStep::Field(field.to_string())],
+                    path: vec![PathErrorStep::Field(field.into())],
                     error: error.into(),
                 })
                 .collect(),
@@ -163,21 +164,21 @@ impl RequestError {
     #[must_use]
     pub fn field<F, E>(field: F, error: E) -> Self
     where
-        F: Display,
+        F: Into<String>,
         E: Into<GenericErrorBox>,
     {
-        Self::path([PathErrorStep::Field(field.to_string())], error)
+        Self::path([PathErrorStep::Field(field.into())], error)
     }
 
     #[must_use]
     pub fn field_index<F, E>(field: F, index: usize, error: E) -> Self
     where
-        F: Display,
+        F: Into<String>,
         E: Into<GenericErrorBox>,
     {
         Self::path(
             [
-                PathErrorStep::Field(field.to_string()),
+                PathErrorStep::Field(field.into()),
                 PathErrorStep::Index(index),
             ],
             error,
@@ -187,14 +188,14 @@ impl RequestError {
     #[must_use]
     pub fn field_key<F, K, E>(field: F, key: K, error: E) -> Self
     where
-        F: Display,
-        K: Display,
+        F: Into<String>,
+        K: Into<String>,
         E: Into<GenericErrorBox>,
     {
         Self::path(
             [
-                PathErrorStep::Field(field.to_string()),
-                PathErrorStep::Key(key.to_string()),
+                PathErrorStep::Field(field.into()),
+                PathErrorStep::Key(key.into()),
             ],
             error,
         )
@@ -203,10 +204,10 @@ impl RequestError {
     #[must_use]
     pub fn field_parse<F, E>(field: F, error: E) -> Self
     where
-        F: Display,
+        F: Into<String>,
         E: Into<GenericErrorBox>,
     {
-        Self::path(PathError::parse_path(field.to_string()), error)
+        Self::path(PathError::parse_path(field.into()), error)
     }
 
     #[must_use]
@@ -220,10 +221,10 @@ impl RequestError {
     #[must_use]
     pub fn key<K, E>(key: K, error: E) -> Self
     where
-        K: Display,
+        K: Into<String>,
         E: Into<GenericErrorBox>,
     {
-        Self::path([PathErrorStep::Key(key.to_string())], error)
+        Self::path([PathErrorStep::Key(key.into())], error)
     }
 
     #[must_use]
@@ -268,8 +269,8 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_field<F: Display>(self, field: F) -> Self {
-        self.wrap_path([PathErrorStep::Field(field.to_string())])
+    pub fn wrap_field<F: Into<String>>(self, field: F) -> Self {
+        self.wrap_path([PathErrorStep::Field(field.into())])
     }
 
     #[must_use]
@@ -278,17 +279,17 @@ impl RequestError {
     }
 
     #[must_use]
-    pub fn wrap_key<K: Display>(self, key: K) -> Self {
-        self.wrap_path([PathErrorStep::Key(key.to_string())])
+    pub fn wrap_key<K: Into<String>>(self, key: K) -> Self {
+        self.wrap_path([PathErrorStep::Key(key.into())])
     }
 
     #[must_use]
     pub fn wrap_field_index<F>(self, field: F, index: usize) -> Self
     where
-        F: Display,
+        F: Into<String>,
     {
         self.wrap_path([
-            PathErrorStep::Field(field.to_string()),
+            PathErrorStep::Field(field.into()),
             PathErrorStep::Index(index),
         ])
     }
@@ -296,17 +297,17 @@ impl RequestError {
     #[must_use]
     pub fn wrap_field_key<F, K>(self, field: F, key: K) -> Self
     where
-        F: Display,
-        K: Display,
+        F: Into<String>,
+        K: Into<String>,
     {
         self.wrap_path([
-            PathErrorStep::Field(field.to_string()),
-            PathErrorStep::Key(key.to_string()),
+            PathErrorStep::Field(field.into()),
+            PathErrorStep::Key(key.into()),
         ])
     }
 
     #[must_use]
-    pub fn wrap_request<N: Display>(self, name: N) -> Self {
+    pub fn wrap_request<N: Into<String>>(self, name: N) -> Self {
         match self {
             Self::Path(error) => Self::bad_request(name, [(error.path_to_string(), error.error)]),
             Self::Generic(error) => {
@@ -341,7 +342,7 @@ impl RequestError {
                 field_violations: violations
                     .iter()
                     .map(|error| FieldViolation {
-                        field: error.path_to_string(),
+                        field: error.path_to_string().into(),
                         description: error.error.to_string(),
                     })
                     .collect(),
@@ -391,18 +392,18 @@ impl PathError {
     }
 
     pub fn path_to_string(&self) -> String {
-        let mut path = String::new();
+        let mut path = String::default();
         for (i, step) in self.path.iter().enumerate() {
             match step {
                 PathErrorStep::Field(field) => {
                     if i == 0 {
                         path.push_str(field);
                     } else {
-                        path.push_str(&format!(".{field}"));
+                        path.push_str(&format_string!(".{field}"));
                     }
                 }
-                PathErrorStep::Index(index) => path.push_str(&format!("[{index}]")),
-                PathErrorStep::Key(key) => path.push_str(&format!("{{{key}}}")),
+                PathErrorStep::Index(index) => path.push_str(&format_string!("[{index}]")),
+                PathErrorStep::Key(key) => path.push_str(&format_string!("{{{key}}}")),
             }
         }
         path
@@ -416,13 +417,13 @@ impl PathError {
             if let Some(index) = part.find('[') {
                 let field = &part[..index];
                 let index = part[index + 1..part.len() - 1].parse().unwrap();
-                steps.push(PathErrorStep::Field(field.to_string()));
+                steps.push(PathErrorStep::Field(field.into()));
                 steps.push(PathErrorStep::Index(index));
             } else if let Some(index) = part.find('{') {
                 let key = &part[index + 1..part.len() - 1];
-                steps.push(PathErrorStep::Key(key.to_string()));
+                steps.push(PathErrorStep::Key(key.into()));
             } else {
-                steps.push(PathErrorStep::Field(part.to_string()));
+                steps.push(PathErrorStep::Field(part.into()));
             }
         }
         steps
@@ -489,24 +490,24 @@ impl<T: 'static + GenericError + Send + Sync> From<T> for RequestError {
 }
 
 pub trait RequestErrorExt {
-    fn wrap<F: Display>(self, field: F) -> RequestError;
+    fn wrap<F: Into<String>>(self, field: F) -> RequestError;
 
     fn wrap_index(self, index: usize) -> RequestError;
 
-    fn wrap_key<K: Display>(self, key: K) -> RequestError;
+    fn wrap_key<K: Into<String>>(self, key: K) -> RequestError;
 
-    fn wrap_field_index<F: Display>(self, field: F, index: usize) -> RequestError;
+    fn wrap_field_index<F: Into<String>>(self, field: F, index: usize) -> RequestError;
 
-    fn wrap_field_key<F: Display, K: Display>(self, field: F, key: K) -> RequestError;
+    fn wrap_field_key<F: Into<String>, K: Into<String>>(self, field: F, key: K) -> RequestError;
 
-    fn wrap_request<N: Display>(self, name: N) -> RequestError;
+    fn wrap_request<N: Into<String>>(self, name: N) -> RequestError;
 }
 
 impl<T> RequestErrorExt for T
 where
     T: 'static + GenericError + Send + Sync,
 {
-    fn wrap<F: Display>(self, field: F) -> RequestError {
+    fn wrap<F: Into<String>>(self, field: F) -> RequestError {
         RequestError::generic(self).wrap_field(field)
     }
 
@@ -514,19 +515,19 @@ where
         RequestError::generic(self).wrap_index(index)
     }
 
-    fn wrap_key<K: Display>(self, key: K) -> RequestError {
+    fn wrap_key<K: Into<String>>(self, key: K) -> RequestError {
         RequestError::generic(self).wrap_key(key)
     }
 
-    fn wrap_field_index<F: Display>(self, field: F, index: usize) -> RequestError {
+    fn wrap_field_index<F: Into<String>>(self, field: F, index: usize) -> RequestError {
         RequestError::generic(self).wrap_field_index(field, index)
     }
 
-    fn wrap_field_key<F: Display, K: Display>(self, field: F, key: K) -> RequestError {
+    fn wrap_field_key<F: Into<String>, K: Into<String>>(self, field: F, key: K) -> RequestError {
         RequestError::generic(self).wrap_field_key(field, key)
     }
 
-    fn wrap_request<N: Display>(self, name: N) -> RequestError {
+    fn wrap_request<N: Into<String>>(self, name: N) -> RequestError {
         RequestError::generic(self).wrap_request(name)
     }
 }

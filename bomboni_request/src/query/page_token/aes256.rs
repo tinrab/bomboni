@@ -9,6 +9,7 @@ use crate::{
         },
     },
     schema::SchemaMapped,
+    string::String,
 };
 use aes_gcm::{
     aead::{Aead, OsRng},
@@ -95,9 +96,9 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         encrypted.splice(0..0, nonce);
 
         if self.url_safe {
-            Ok(Base64Url::encode_string(&encrypted))
+            Ok(Base64Url::encode_string(&encrypted).into())
         } else {
-            Ok(Base64::encode_string(&encrypted))
+            Ok(Base64::encode_string(&encrypted).into())
         }
     }
 }

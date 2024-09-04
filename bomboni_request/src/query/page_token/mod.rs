@@ -7,7 +7,7 @@
 
 use std::fmt::{self, Display, Formatter};
 
-use crate::{filter::Filter, ordering::Ordering, schema::SchemaMapped};
+use crate::{filter::Filter, ordering::Ordering, schema::SchemaMapped, string::String};
 
 use super::error::QueryResult;
 pub mod aes256;
@@ -29,7 +29,7 @@ impl FilterPageToken {
 }
 
 pub trait PageTokenBuilder {
-    type PageToken: Clone + ToString;
+    type PageToken: Clone;
 
     /// Parse a page token.
     /// [`QueryError::InvalidPageToken`] is returned if the page token is invalid for any reason.
@@ -60,3 +60,15 @@ impl Display for FilterPageToken {
         write!(f, "{}", self.filter)
     }
 }
+
+// impl From<FilterPageToken> for String {
+//     fn from(value: FilterPageToken) -> Self {
+//         format_string!("{}", value.filter)
+//     }
+// }
+
+// impl From<FilterPageToken> for CompactString {
+//     fn from(value: FilterPageToken) -> Self {
+//         format_compact!("{}", value.filter)
+//     }
+// }

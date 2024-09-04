@@ -207,7 +207,11 @@ pub fn expand_parse_field_type(
             quote!(.insert_path([PathErrorStep::Index(i)], 1))
         }
         Some("HashMap" | "BTreeMap") => {
-            quote!(.insert_path([PathErrorStep::Key(key.to_string())], 1))
+            if cfg!(feature = "compact-str") {
+                quote!(.insert_path([PathErrorStep::Key(key.to_compact_string())], 1))
+            } else {
+                quote!(.insert_path([PathErrorStep::Key(key.to_string())], 1))
+            }
         }
         _ => quote!(),
     };
@@ -262,6 +266,11 @@ pub fn expand_parse_field_type(
         }
 
         if primitive_ident == "String" {
+            if cfg!(feature = "compact-str") {
+                parse_impl.extend(quote! {
+                    let target = target.to_compact_string();
+                });
+            }
             if !field_options.unspecified {
                 parse_impl.extend(quote! {
                     if target.is_empty() {

@@ -58,12 +58,46 @@ function lint() {
 }
 
 function test() {
+	features=(
+		"derive"
+		"prost"
+		"proto"
+		"request"
+		"template"
+		"serde"
+		"chrono"
+		"tokio"
+		"tonic"
+		"js"
+		"fs"
+		"postgres"
+	)
+
+	if [[ "$2" =~ ^(--compact-str)$ ]]; then
+		features+=("compact-str")
+		echo "Testing with features: ${features[@]}"
+
+		cargo test --workspace --all-targets \
+			--features $(echo "${features[@]}" | sed -e 's/ /,/g') \
+			-- --nocapture
+		cargo test --workspace --doc \
+			--features $(echo "${features[@]}" | sed -e 's/ /,/g') \
+			-- --nocapture
+		return
+	fi
+
 	if [[ "$2" =~ ^(--no-default-features)$ ]]; then
 		cargo test --workspace --all-targets --no-default-features -- --nocapture
 		cargo test --workspace --doc --no-default-features -- --nocapture
 	else
-		cargo test --workspace --all-targets --all-features -- --nocapture
-		cargo test --workspace --doc --all-features -- --nocapture
+		echo "Testing with features: ${features[@]}"
+
+		cargo test  --release --workspace --all-targets \
+			--features $(echo "${features[@]}" | sed -e 's/ /,/g') \
+			-- --nocapture
+		cargo test --workspace --doc \
+			--features $(echo "${features[@]}" | sed -e 's/ /,/g') \
+			-- --nocapture
 	fi
 }
 

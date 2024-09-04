@@ -1,13 +1,13 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
+use std::num::{ParseFloatError, ParseIntError};
+use std::str::FromStr;
+
 use crate::google::protobuf::{
     BoolValue, BytesValue, DoubleValue, FloatValue, Int32Value, Int64Value, StringValue,
     UInt32Value, UInt64Value,
 };
 use crate::serde::helpers as serde_helpers;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use std::fmt::{Display, Formatter};
-use std::num::{ParseFloatError, ParseIntError};
-use std::str::FromStr;
 
 impl From<String> for StringValue {
     fn from(value: String) -> Self {
@@ -28,6 +28,25 @@ impl From<&str> for StringValue {
         }
     }
 }
+
+#[cfg(feature = "compact-str")]
+const _: () = {
+    use compact_str::CompactString;
+
+    impl From<CompactString> for StringValue {
+        fn from(value: CompactString) -> Self {
+            Self {
+                value: value.into(),
+            }
+        }
+    }
+
+    impl From<StringValue> for CompactString {
+        fn from(value: StringValue) -> Self {
+            value.value.into()
+        }
+    }
+};
 
 impl From<Vec<u8>> for BytesValue {
     fn from(value: Vec<u8>) -> Self {

@@ -1,11 +1,13 @@
 use crate::{
     filter::Filter,
+    format_string,
     ordering::Ordering,
     query::{
         error::{QueryError, QueryResult},
         page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
     },
     schema::SchemaMapped,
+    string::String,
 };
 use std::fmt::{self, Debug, Formatter};
 
@@ -41,7 +43,7 @@ impl PageTokenBuilder for PlainPageTokenBuilder {
         if page_filter.is_empty() {
             return Err(QueryError::PageTokenFailure);
         }
-        Ok(format!("{page_filter}"))
+        Ok(format_string!("{page_filter}"))
     }
 }
 

@@ -15,6 +15,7 @@ use crate::{
         utility::{parse_query_filter, parse_query_ordering},
     },
     schema::{FunctionSchemaMap, Schema, SchemaMapped},
+    string::String,
 };
 
 #[derive(Debug, Clone, PartialEq)]

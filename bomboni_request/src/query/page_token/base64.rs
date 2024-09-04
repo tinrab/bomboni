@@ -5,6 +5,7 @@ use crate::{
         error::{QueryError, QueryResult},
         page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
     },
+    string::String,
 };
 use base64ct::{Base64, Base64Url, Encoding};
 use std::fmt::{self, Debug, Formatter};
@@ -56,9 +57,9 @@ impl PageTokenBuilder for Base64PageTokenBuilder {
             return Err(QueryError::PageTokenFailure);
         }
         if self.url_safe {
-            Ok(Base64Url::encode_string(page_filter.to_string().as_bytes()))
+            Ok(Base64Url::encode_string(page_filter.to_string().as_bytes()).into())
         } else {
-            Ok(Base64::encode_string(page_filter.to_string().as_bytes()))
+            Ok(Base64::encode_string(page_filter.to_string().as_bytes()).into())
         }
     }
 }

@@ -5,6 +5,7 @@ use crate::{
         Filter, FilterComparator,
     },
     schema::{FunctionSchemaMap, Schema, ValueType},
+    string::String,
     value::Value,
 };
 
@@ -29,7 +30,7 @@ impl<'a> SqlFilterBuilder<'a> {
             argument_offset: 0,
             case_insensitive_like: false,
             arguments: Vec::new(),
-            result: String::new(),
+            result: String::default(),
         }
     }
 

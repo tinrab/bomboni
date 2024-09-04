@@ -17,12 +17,13 @@ use crate::{
         utility::{parse_query_filter, parse_query_ordering},
     },
     schema::{FunctionSchemaMap, Schema, SchemaMapped},
+    string::String,
 };
 
 /// Represents a list query.
 /// List queries list paged, filtered and ordered items.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ListQuery<T: Clone + ToString = FilterPageToken> {
+pub struct ListQuery<T: Clone = FilterPageToken> {
     pub page_size: i32,
     pub page_token: Option<T>,
     pub filter: Filter,

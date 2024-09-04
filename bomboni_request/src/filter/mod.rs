@@ -7,7 +7,6 @@
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
 
-use itertools::Itertools;
 use parser::{FilterParser, Rule};
 use pest::iterators::Pair;
 use pest::Parser;
@@ -16,6 +15,7 @@ use self::error::FilterResult;
 
 use crate::filter::error::FilterError;
 use crate::schema::{FunctionSchemaMap, MemberSchema, Schema, SchemaMapped, ValueType};
+use crate::string::String;
 use crate::value::Value;
 
 pub mod error;
@@ -61,20 +61,43 @@ impl Filter {
     fn parse_tree(pair: Pair<Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
             Rule::filter | Rule::expression => {
-                match pair
+                let mut pairs = pair
                     .into_inner()
                     .filter(|pair| pair.as_rule() != Rule::EOI)
-                    .map(Self::parse_tree)
-                    .exactly_one()
-                {
-                    Ok(inner_tree) => inner_tree,
-                    Err(inner_trees) => Ok(Self::Conjunction(inner_trees.try_collect()?)),
+                    .map(Self::parse_tree);
+                match pairs.next() {
+                    Some(first) => match pairs.next() {
+                        Some(second) => {
+                            let mut conj = vec![first?, second?];
+                            for pair in pairs {
+                                conj.push(pair?);
+                            }
+                            Ok(Self::Conjunction(conj))
+                        }
+                        None => first,
+                    },
+                    None => Ok(Self::Conjunction(Vec::new())),
                 }
             }
-            Rule::factor => match pair.into_inner().map(Self::parse_tree).exactly_one() {
-                Ok(inner_tree) => inner_tree,
-                Err(inner_trees) => Ok(Self::Disjunction(inner_trees.try_collect()?)),
-            },
+            Rule::factor => {
+                let mut pairs = pair
+                    .into_inner()
+                    .filter(|pair| pair.as_rule() != Rule::EOI)
+                    .map(Self::parse_tree);
+                match pairs.next() {
+                    Some(first) => match pairs.next() {
+                        Some(second) => {
+                            let mut disj = vec![first?, second?];
+                            for pair in pairs {
+                                disj.push(pair?);
+                            }
+                            Ok(Self::Disjunction(disj))
+                        }
+                        None => first,
+                    },
+                    None => Ok(Self::Disjunction(Vec::new())),
+                }
+            }
             Rule::term => {
                 let lexeme = pair.as_str().trim();
                 if lexeme.starts_with("NOT") || lexeme.starts_with('-') {
@@ -112,7 +135,7 @@ impl Filter {
             }
             Rule::comparable => Self::parse_tree(pair.into_inner().next().unwrap()),
             Rule::function => {
-                let mut name = String::new();
+                let mut name = String::default();
                 let mut arguments = Vec::new();
                 let mut argument_list = false;
                 for pair in pair.into_inner() {
@@ -130,11 +153,27 @@ impl Filter {
             Rule::composite => Ok(Self::Composite(Box::new(Self::parse_tree(
                 pair.into_inner().next().unwrap(),
             )?))),
-            Rule::name => Ok(Self::Name(
-                pair.into_inner()
-                    .map(|identifier| identifier.as_str())
-                    .join("."),
-            )),
+            Rule::name => Ok(Self::Name({
+                #[cfg(feature = "compact-str")]
+                {
+                    use compact_str::CompactStringExt;
+                    let pairs: Vec<_> = pair
+                        .into_inner()
+                        .map(|identifier| identifier.as_str())
+                        .collect();
+                    pairs.join_compact(".").into()
+                }
+                #[cfg(not(feature = "compact-str"))]
+                {
+                    pair.into_inner().fold(String::new(), |acc, s| {
+                        if acc.is_empty() {
+                            s.as_str().into()
+                        } else {
+                            acc + "." + s.as_str()
+                        }
+                    })
+                }
+            })),
             Rule::string | Rule::boolean | Rule::number | Rule::any => {
                 Ok(Self::Value(Value::parse(&pair)?))
             }
@@ -498,8 +537,24 @@ impl Default for Filter {
 impl Display for Filter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Conjunction(parts) => parts.iter().map(ToString::to_string).join(" AND ").fmt(f),
-            Self::Disjunction(parts) => parts.iter().map(ToString::to_string).join(" OR ").fmt(f),
+            Self::Conjunction(parts) => {
+                for (i, part) in parts.iter().enumerate() {
+                    part.fmt(f)?;
+                    if i != parts.len() - 1 {
+                        f.write_str(" AND ")?;
+                    }
+                }
+                Ok(())
+            }
+            Self::Disjunction(parts) => {
+                for (i, part) in parts.iter().enumerate() {
+                    part.fmt(f)?;
+                    if i != parts.len() - 1 {
+                        f.write_str(" OR ")?;
+                    }
+                }
+                Ok(())
+            }
             Self::Negate(tree) => {
                 f.write_str("NOT ")?;
                 tree.fmt(f)
@@ -515,12 +570,14 @@ impl Display for Filter {
                 }
             },
             Self::Function(name, arguments) => {
-                write!(
-                    f,
-                    "{}({})",
-                    name,
-                    arguments.iter().map(ToString::to_string).join(", ")
-                )
+                write!(f, "{}(", name)?;
+                for (i, argument) in arguments.iter().enumerate() {
+                    argument.fmt(f)?;
+                    if i < arguments.len() - 1 {
+                        f.write_str(", ")?;
+                    }
+                }
+                write!(f, ")")
             }
             Self::Composite(composite) => {
                 f.write_char('(')?;
@@ -532,6 +589,21 @@ impl Display for Filter {
         }
     }
 }
+
+// impl From<&Filter> for CompactString {
+//     fn from(value: &Filter) -> Self {
+//         // use compact_str::CompactStringExt;
+//         // let mut s = CompactString::new("");
+
+//         // CompactStringExt::join_compact(&self, separator)
+
+//         // match value {
+//         //     Filter::Conjunction(parts) => parts.iter().map(Into::into)
+//         //     _ => unreachable!(),
+//         // }
+//         todo!()
+//     }
+// }
 
 impl Display for FilterComparator {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

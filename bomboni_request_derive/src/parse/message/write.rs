@@ -160,11 +160,18 @@ fn expand_write_query(query: &ParseQuery, field: &ParseField, search: bool) -> T
             source.#source_ident = Some(target.#target_ident.page_size.try_into().unwrap());
         });
     }
+
+    let to_string_fn = if cfg!(feature = "compact-str") {
+        quote!(to_compact_string)
+    } else {
+        quote!(to_string)
+    };
+
     if query.page_token.write {
         let source_ident = &query.page_token.source;
         write_impl.extend(quote! {
-            source.#source_ident = target.#target_ident.page_token.map(|page_token| page_token.to_string());
-        });
+                source.#source_ident = target.#target_ident.page_token.map(|page_token| page_token.#to_string_fn());
+            });
     }
     if query.filter.write {
         let source_ident = &query.filter.source;
@@ -172,7 +179,7 @@ fn expand_write_query(query: &ParseQuery, field: &ParseField, search: bool) -> T
             source.#source_ident = if target.#target_ident.filter.is_empty() {
                 None
             } else {
-                Some(target.#target_ident.filter.to_string())
+                Some(target.#target_ident.filter.#to_string_fn())
             };
         });
     }
@@ -182,7 +189,7 @@ fn expand_write_query(query: &ParseQuery, field: &ParseField, search: bool) -> T
             source.#source_ident = if target.#target_ident.ordering.is_empty() {
                 None
             } else {
-                Some(target.#target_ident.ordering.to_string())
+                Some(target.#target_ident.ordering.#to_string_fn())
             };
         });
     }

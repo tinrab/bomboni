@@ -138,6 +138,27 @@ impl FromStr for Id {
     }
 }
 
+#[cfg(feature = "compact-str")]
+const _: () = {
+    use compact_str::{format_compact, CompactString};
+
+    impl From<Id> for CompactString {
+        fn from(id: Id) -> Self {
+            format_compact!("{:032X}", id.0)
+        }
+    }
+
+    impl TryFrom<CompactString> for Id {
+        type Error = ParseIdError;
+
+        fn try_from(value: CompactString) -> Result<Self, Self::Error> {
+            let value = u128::from_str_radix(&value.to_string(), 16)
+                .map_err(|_| ParseIdError::InvalidString)?;
+            Ok(Self::new(value))
+        }
+    }
+};
+
 macro_rules! impl_from {
     ( $( $source:ty ),* $(,)? ) => {
         $(impl From<$source> for Id {
@@ -193,7 +214,6 @@ impl<'de> Deserialize<'de> for Id {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -239,5 +259,16 @@ mod tests {
             serde_json::to_string(&id).unwrap(),
             r#""00000000000000000000000300050007""#
         );
+    }
+
+    #[cfg(feature = "compact-str")]
+    #[test]
+    fn compact_str_convert() {
+        use compact_str::CompactString;
+
+        let id = Id::new(424242);
+        let s = CompactString::from(id);
+        assert_eq!(s, "00000000000000000000000000067932");
+        assert_eq!(Id::try_from(s).unwrap(), id);
     }
 }

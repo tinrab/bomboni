@@ -1,4 +1,3 @@
-use crate::error::RequestResult;
 use bomboni_common::date_time::UtcDateTime;
 use bomboni_common::id::Id;
 #[cfg(all(
@@ -7,6 +6,8 @@ use bomboni_common::id::Id;
     feature = "wasm"
 ))]
 use wasm_bindgen::prelude::*;
+
+use crate::{error::RequestResult, string::String};
 
 pub mod helpers;
 
@@ -54,6 +55,7 @@ mod tests {
     use std::fmt::Debug;
     use std::marker::PhantomData;
 
+    use crate::format_string;
     use crate::schema::FunctionSchemaMap;
     use crate::{
         error::{CommonError, PathError, PathErrorStep, RequestError, RequestResult},
@@ -248,7 +250,7 @@ mod tests {
 
         assert_parse_field_err!(
             Item {
-                string: String::new(),
+                string: String::default(),
                 ..Default::default()
             },
             "string",
@@ -256,7 +258,7 @@ mod tests {
         );
         assert_parse_field_err!(
             Item {
-                required_string: String::new(),
+                required_string: String::default(),
                 ..Default::default()
             },
             "required_string",
@@ -272,7 +274,7 @@ mod tests {
         );
         assert_parse_field_err!(
             Item {
-                required_string_optional: Some(String::new()),
+                required_string_optional: Some(String::default()),
                 ..Default::default()
             },
             "required_string_optional",
@@ -701,7 +703,7 @@ mod tests {
 
         assert!(matches!(
             ParsedItem::parse(Item {
-                required: String::new(),
+                required: String::default(),
                 ..Default::default()
             })
             .unwrap_err(),
@@ -815,7 +817,7 @@ mod tests {
 
         #[allow(clippy::unnecessary_wraps)]
         fn pos_parse(item: &Item) -> RequestResult<String> {
-            Ok(format!("{}, {}", item.x, item.y))
+            Ok(format_string!("{}, {}", item.x, item.y))
         }
 
         fn pos_write(target: &ParsedItem, source: &mut Item) {
@@ -833,7 +835,7 @@ mod tests {
         }
 
         fn id_write(id: u64) -> String {
-            id.to_string()
+            format_string!("{}", id)
         }
 
         mod nullable_derive {
@@ -870,7 +872,7 @@ mod tests {
         }
 
         fn derived_oneof_write(value: i32) -> String {
-            value.to_string()
+            format_string!("{}", value)
         }
 
         fn borrowed_derived_oneof_parse(oneof: &OneofKind) -> Option<RequestResult<ParsedOneof>> {
@@ -888,7 +890,7 @@ mod tests {
         fn borrowed_derived_oneof_write(oneof: &ParsedOneof) -> Option<Oneof> {
             match oneof {
                 ParsedOneof::BorrowedDerived(value) => Some(Oneof {
-                    kind: Some(OneofKind::BorrowedDerived(value.to_string())),
+                    kind: Some(OneofKind::BorrowedDerived(format_string!("{}", value))),
                 }),
                 _ => None,
             }
@@ -903,7 +905,7 @@ mod tests {
 
         #[allow(clippy::unnecessary_wraps)]
         fn extracted_oneof_write(value: i32) -> Option<String> {
-            Some(value.to_string())
+            Some(format_string!("{}", value))
         }
 
         fn borrowed_extracted_parse(source: &OneofKind) -> Option<RequestResult<ParsedOneof>> {
@@ -926,7 +928,9 @@ mod tests {
         fn borrowed_extracted_write(oneof: &ParsedOneof) -> Option<Oneof> {
             match oneof {
                 ParsedOneof::BorrowedExtracted(value) => Some(Oneof {
-                    kind: Some(OneofKind::BorrowedExtracted(Some(value.to_string()))),
+                    kind: Some(OneofKind::BorrowedExtracted(Some(format_string!(
+                        "{}", value
+                    )))),
                 }),
                 _ => None,
             }
@@ -964,7 +968,7 @@ mod tests {
 
         assert!(matches!(
             ParsedItem::parse(Item {
-                name: String::new(),
+                name: String::default(),
                 ..Default::default()
             }).unwrap_err(),
             RequestError::Path(PathError {
@@ -1490,7 +1494,7 @@ mod tests {
         );
 
         assert!(matches!(
-            ParsedItem::parse(Item::String(String::new())).unwrap_err(),
+            ParsedItem::parse(Item::String(String::default())).unwrap_err(),
             RequestError::Path(PathError {
                 error,
                 path,
@@ -1774,14 +1778,14 @@ mod tests {
             ParsedItem::<i32, i32, String>::parse(Item { value: 42 }).unwrap(),
             ParsedItem::<i32, i32, String> {
                 value: 42,
-                skipped: String::new(),
+                skipped: String::default(),
                 _ts: PhantomData,
             }
         );
         assert_eq!(
             Item::from(ParsedItem::<i32, i32, String> {
                 value: 42,
-                skipped: String::new(),
+                skipped: String::default(),
                 _ts: PhantomData,
             }),
             Item { value: 42 }
@@ -1945,7 +1949,7 @@ mod tests {
                 },
             }),
             Item {
-                query: String::new(),
+                query: String::default(),
                 page_size: Some(20),
                 page_token: Some("true".into()),
                 filter: Some("true".into()),
@@ -1985,7 +1989,7 @@ mod tests {
                 },
             }),
             Item {
-                query: String::new(),
+                query: String::default(),
                 page_size: Some(20),
                 page_token: Some("true".into()),
                 filter: None,
@@ -2042,7 +2046,7 @@ mod tests {
                 },
             }),
             Item {
-                query: String::new(),
+                query: String::default(),
                 page_size: Some(20),
                 page_token: Some("42".into()),
                 filter: Some("true".into()),
@@ -2349,7 +2353,7 @@ mod tests {
     fn parse_maps() {
         derived_map!(
             pub parse1,
-            |item: i32| -> (i32, String) { (item, item.to_string()) },
+            |item: i32| -> (i32, String) { (item, item.to_string().into()) },
         );
         assert_eq!(
             parse1::parse(vec![1, 2, 3]).unwrap(),
@@ -2364,7 +2368,7 @@ mod tests {
             parse2,
             |item: &'static str| -> RequestResult<(i32, String)> {
                 let value: i32 = item.parse().map_err(|_| CommonError::InvalidNumericValue)?;
-                Ok((value, item.to_string()))
+                Ok((value, item.to_string().into()))
             },
         );
         assert_eq!(

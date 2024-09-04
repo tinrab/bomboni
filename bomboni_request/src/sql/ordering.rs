@@ -4,6 +4,7 @@ use crate::{
         Ordering, OrderingDirection,
     },
     schema::Schema,
+    string::String,
 };
 
 use super::{SqlDialect, SqlRenameMap};
@@ -21,7 +22,7 @@ impl<'a> SqlOrderingBuilder<'a> {
             dialect,
             schema,
             rename_map: None,
-            result: String::new(),
+            result: String::default(),
         }
     }
 

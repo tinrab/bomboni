@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::string::String;
+
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum OrderingError {
     #[error("invalid ordering term format `{0}`")]

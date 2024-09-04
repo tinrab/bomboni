@@ -65,8 +65,12 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
                     page_token::{plain::PlainPageTokenBuilder, FilterPageToken, PageTokenBuilder},
                     search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig},
                 },
+                parse::{RequestParse, RequestParseInto},
             },
         };
+
+        #[cfg(feature = "compact-str")]
+        use compact_str::ToCompactString;
     });
 
     result.extend(if let Some(path) = options.serde_crate.as_ref() {

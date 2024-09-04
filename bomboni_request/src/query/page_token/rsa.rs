@@ -8,6 +8,7 @@ use crate::{
             FilterPageToken, PageTokenBuilder,
         },
     },
+    string::String,
 };
 use base64ct::{Base64, Base64Url, Encoding};
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
@@ -94,9 +95,9 @@ impl PageTokenBuilder for RsaPageTokenBuilder {
             .unwrap();
 
         if self.url_safe {
-            Ok(Base64Url::encode_string(&encrypted))
+            Ok(Base64Url::encode_string(&encrypted).into())
         } else {
-            Ok(Base64::encode_string(&encrypted))
+            Ok(Base64::encode_string(&encrypted).into())
         }
     }
 }

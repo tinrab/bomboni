@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-use crate::value::Value;
+use crate::{string::String, value::Value};
 
 #[derive(Debug, Clone)]
 pub struct Schema {

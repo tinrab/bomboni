@@ -27,6 +27,7 @@ members = [
   "bomboni_wasm",
   "bomboni_wasm_core",
   "bomboni_wasm_derive",
+  # "wasm_sample",
 ]
 
 [features]
@@ -49,6 +50,11 @@ wasm = [
 js = ["bomboni_common/js", "bomboni_proto/js", "bomboni_wasm/js"]
 fs = ["dep:bomboni_fs"]
 postgres = ["bomboni_common/postgres", "bomboni_request/postgres"]
+compact-str = [
+  "bomboni_common/compact-str",
+  "bomboni_proto/compact-str",
+  "bomboni_request/compact-str",
+]
 
 [dependencies]
 bomboni_common = { path = "bomboni_common", version = "0.1.60" }

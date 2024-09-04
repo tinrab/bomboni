@@ -4,6 +4,7 @@ use thiserror::Error;
 use crate::{
     filter::{FilterComparator, Rule},
     schema::ValueType,
+    string::String,
 };
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]

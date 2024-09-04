@@ -1,10 +1,13 @@
-use crate::filter::Filter;
-use crate::ordering::Ordering;
-use crate::query::{error::QueryResult, list::ListQuery, search::SearchQuery};
-use crate::schema::{FunctionSchemaMap, Schema};
-use crate::sql::{SqlDialect, SqlRenameMap};
-use crate::sql::{SqlFilterBuilder, SqlOrderingBuilder};
-use crate::value::Value;
+use crate::{
+    filter::Filter,
+    format_string,
+    ordering::Ordering,
+    query::{error::QueryResult, list::ListQuery, search::SearchQuery},
+    schema::{FunctionSchemaMap, Schema},
+    sql::{SqlDialect, SqlFilterBuilder, SqlOrderingBuilder, SqlRenameMap},
+    string::String,
+    value::Value,
+};
 
 #[derive(Debug, Clone)]
 pub struct QuerySqlBuilder {
@@ -123,7 +126,7 @@ impl QuerySqlBuilder {
                 (where_clause.clone(), arguments.clone())
             };
 
-        let paged_limit_clause = format!("LIMIT ${}", paged_arguments.len() + 1);
+        let paged_limit_clause = format_string!("LIMIT ${}", paged_arguments.len() + 1);
         paged_arguments.push(if self.query_next_page {
             // One more than page_size to determine if there are more results
             (page_size + 1).into()

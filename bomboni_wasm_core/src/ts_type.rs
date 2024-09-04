@@ -224,7 +224,10 @@ impl TsType {
                     Self::NUMBER
                 }
             }
-            "String" | "str" | "char" | "Path" | "PathBuf" => Self::STRING,
+            "String" | "str" | "char" | "Path" | "PathBuf"
+                // For `compact_str::CompactString`
+                | "CompactString"
+                => Self::STRING,
             "bool" => Self::BOOLEAN,
             "Box" | "Cow" | "Rc" | "Arc" | "Cell" | "RefCell" if args.len() == 1 => {
                 Self::from_type(args[0])

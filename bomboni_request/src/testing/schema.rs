@@ -1,6 +1,7 @@
 use crate::schema::{
     FieldMemberSchema, MemberSchema, ResourceMemberSchema, Schema, SchemaMapped, ValueType,
 };
+use crate::string::String;
 use crate::value::Value;
 use bomboni_common::btree_map_into;
 

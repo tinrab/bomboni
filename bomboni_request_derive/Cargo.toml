@@ -14,6 +14,9 @@ name = "bomboni_request_derive"
 path = "src/lib.rs"
 proc-macro = true
 
+[features]
+compact-str = []
+
 [dependencies]
 bomboni_core = { path = "../bomboni_core", version = "0.1.60" }
 

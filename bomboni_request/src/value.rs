@@ -6,7 +6,7 @@ use std::{
 use bomboni_common::date_time::UtcDateTime;
 use pest::iterators::Pair;
 
-use crate::filter::parser::Rule;
+use crate::{filter::parser::Rule, string::String};
 
 use crate::{
     filter::error::{FilterError, FilterResult},
@@ -81,15 +81,14 @@ impl Display for Value {
                 f.write_char('"')
             }
             Self::Repeated(values) => {
-                write!(
-                    f,
-                    "[{}]",
-                    values
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
+                write!(f, "[")?;
+                for (i, value) in values.iter().enumerate() {
+                    write!(f, "{}", value)?;
+                    if i < values.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
             }
             Self::Any => f.write_char('*'),
         }
@@ -211,6 +210,9 @@ const _: () = {
                 Self::Integer(value) => value.to_sql(ty, out),
                 Self::Float(value) => value.to_sql(ty, out),
                 Self::Boolean(value) => value.to_sql(ty, out),
+                #[cfg(feature = "compact-str")]
+                Self::String(value) => value.to_string().to_sql(ty, out),
+                #[cfg(not(feature = "compact-str"))]
                 Self::String(value) => value.to_sql(ty, out),
                 Self::Timestamp(value) => value.to_sql(ty, out),
                 Self::Repeated(values) => values.to_sql(ty, out),
