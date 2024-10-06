@@ -168,7 +168,6 @@ const _: () = {
 };
 
 #[cfg(test)]
-#[cfg(feature = "testing")]
 mod tests {
     use crate::{
         ordering::Ordering, query::page_token::FilterPageToken, testing::schema::RequestItem,

@@ -108,7 +108,6 @@ impl Debug for Aes256PageTokenBuilder {
     }
 }
 
-#[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
     use crate::testing::schema::UserItem;

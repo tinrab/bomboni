@@ -377,7 +377,6 @@ impl<'a> SqlFilterBuilder<'a> {
     }
 }
 
-#[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;

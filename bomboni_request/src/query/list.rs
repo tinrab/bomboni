@@ -167,7 +167,6 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
     }
 }
 
-#[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
     use crate::{

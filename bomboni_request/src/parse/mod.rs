@@ -47,7 +47,6 @@ pub struct ParsedResource {
     pub revision_create_time: Option<UtcDateTime>,
 }
 
-#[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
     use super::*;

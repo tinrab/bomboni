@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_prost"
-version = "0.1.60"
+version = "0.1.61"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with prost. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"

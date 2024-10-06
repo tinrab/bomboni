@@ -155,7 +155,6 @@ impl Display for OrderingDirection {
     }
 }
 
-#[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
     use crate::ordering::OrderingDirection::{Ascending, Descending};

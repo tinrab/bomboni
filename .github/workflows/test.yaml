@@ -39,10 +39,10 @@ jobs:
         run: cargo test --workspace --all-targets --all-features
 
       - name: Test - no default features
-        run: cargo test --workspace --all-targets --no-default-features
+        run: cargo test --workspace --all-targets --no-default-features --features testing,request
 
       - name: Test doc
         run: cargo test --workspace --doc --all-features
 
       - name: Test doc - no default features
-        run: cargo test --workspace --doc --no-default-features
+        run: cargo test --workspace --doc --no-default-features --features testing,request

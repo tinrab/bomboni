@@ -59,8 +59,8 @@ function lint() {
 
 function test() {
 	if [[ "$2" =~ ^(--no-default-features)$ ]]; then
-		cargo test --workspace --all-targets --no-default-features -- --nocapture
-		cargo test --workspace --doc --no-default-features -- --nocapture
+		cargo test --workspace --all-targets --no-default-features --features testing,request -- --nocapture
+		cargo test --workspace --doc --no-default-features --features testing -- --nocapture
 	else
 		cargo test --workspace --all-targets --all-features -- --nocapture
 		cargo test --workspace --doc --all-features -- --nocapture

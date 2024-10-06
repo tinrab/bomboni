@@ -69,7 +69,6 @@ impl Debug for Base64PageTokenBuilder {
     }
 }
 
-#[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
     use crate::testing::schema::UserItem;
