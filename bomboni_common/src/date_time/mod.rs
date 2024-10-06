@@ -20,7 +20,7 @@ mod postgres;
     ),
     derive(bomboni_wasm::Wasm),
     wasm(
-        bomboni_crate = crate::bomboni,
+        bomboni_wasm_crate = bomboni_wasm,
         wasm_abi,
         js_value { convert_string },
     )
@@ -33,12 +33,7 @@ mod postgres;
         feature = "js",
     ),
     derive(bomboni_wasm::Wasm),
-    wasm(
-        bomboni_crate = crate::bomboni,
-        wasm_abi,
-        js_value,
-        override_type = "Date",
-    )
+    wasm(wasm_abi, js_value, override_type = "Date",)
 )]
 pub struct UtcDateTime(OffsetDateTime);
 

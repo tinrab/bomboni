@@ -18,7 +18,7 @@ use thiserror::Error;
     ),
     derive(bomboni_wasm::Wasm),
     wasm(
-        bomboni_crate = crate::bomboni,
+        bomboni_wasm_crate = bomboni_wasm,
         into_wasm_abi,
         proxy { source = Status, try_from = RequestParse::parse },
     )

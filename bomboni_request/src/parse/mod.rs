@@ -50,11 +50,13 @@ pub struct ParsedResource {
 #[cfg(feature = "testing")]
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    use serde::{Deserialize, Serialize};
     use std::collections::{BTreeMap, HashMap};
     use std::fmt::Debug;
     use std::marker::PhantomData;
 
-    use crate::schema::FunctionSchemaMap;
     use crate::{
         error::{CommonError, PathError, PathErrorStep, RequestError, RequestResult},
         filter::Filter,
@@ -65,16 +67,23 @@ mod tests {
             page_token::{plain::PlainPageTokenBuilder, FilterPageToken, PageTokenBuilder},
             search::{SearchQuery, SearchQueryBuilder, SearchQueryConfig},
         },
-        testing::{bomboni, schema::UserItem},
+        schema::FunctionSchemaMap,
+        testing::schema::UserItem,
     };
     use bomboni_common::{btree_map, btree_map_into, hash_map_into};
     use bomboni_proto::google::protobuf::{
         FloatValue, Int32Value, Int64Value, StringValue, Timestamp, UInt32Value, UInt64Value,
     };
     use bomboni_request_derive::{derived_map, parse_resource_name, Parse};
-    use serde::{Deserialize, Serialize};
 
-    use super::*;
+    mod bomboni {
+        pub mod proto {
+            pub use bomboni_proto::*;
+        }
+        pub mod request {
+            pub use crate::*;
+        }
+    }
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
     #[repr(i32)]
@@ -119,7 +128,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(source = "string")]
             s: String,
@@ -189,7 +198,7 @@ mod tests {
         struct NestedItem {}
 
         #[derive(Parse, Debug, Default, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
+        #[parse(source = NestedItem, write)]
         struct ParsedNestedItem {}
 
         #[derive(Debug, PartialEq)]
@@ -202,7 +211,7 @@ mod tests {
 
         #[derive(Parse, Debug, PartialEq)]
         #[allow(dead_code)]
-        #[parse(bomboni_crate = bomboni, source = OneofKind, write)]
+        #[parse(source = OneofKind, write)]
         enum ParsedOneofKind {
             String(String),
             Boolean(bool),
@@ -418,7 +427,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             value: i32,
             #[parse(try_from = i32, extract = [Unwrap])]
@@ -446,14 +455,14 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
+        #[parse(source = NestedItem, write)]
         struct ParsedNested {
             name: String,
             description: Option<String>,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
+        #[parse(source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
         enum ParsedOneof {
             Value(i32),
         }
@@ -665,7 +674,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             required: String,
             #[parse(extract = [StringFilterEmpty])]
@@ -736,7 +745,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(enumeration)]
             required: DataTypeEnum,
@@ -802,7 +811,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq, Default)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(derive { parse = pos_parse, write = pos_write })]
             pos: String,
@@ -850,7 +859,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
+        #[parse(source = Oneof, tagged_union { oneof = OneofKind, field = kind }, write)]
         enum ParsedOneof {
             #[parse(derive { parse = derived_oneof_parse, write = derived_oneof_write })]
             Derived(i32),
@@ -1095,7 +1104,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             values: Vec<i32>,
             #[parse(regex = "^[a-z]$")]
@@ -1110,7 +1119,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = NestedItem, write)]
+        #[parse(source = NestedItem, write)]
         struct ParsedNestedItem {
             value: i32,
         }
@@ -1278,7 +1287,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(wrapper)]
             value_f32: Option<f32>,
@@ -1313,7 +1322,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
+        #[parse(source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
         enum ParsedValue {
             #[parse(wrapper)]
             I32(i32),
@@ -1381,7 +1390,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         enum ParsedItem {
             String(String),
             Data(ParsedData),
@@ -1394,7 +1403,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, Default, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Data, write)]
+        #[parse(source = Data, write)]
         struct ParsedData {
             value: i32,
         }
@@ -1424,7 +1433,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Container, write)]
+        #[parse(source = Container, write)]
         struct ParsedContainer {
             #[parse(oneof)]
             item: ParsedItem,
@@ -1548,7 +1557,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
+        #[parse(source = Value, tagged_union { oneof = ValueKind, field = kind }, write)]
         enum ParsedValue {
             Number(i32),
             #[parse(extract = [Unbox])]
@@ -1560,7 +1569,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = NestedValue, write)]
+        #[parse(source = NestedValue, write)]
         struct ParsedNestedValue {
             value: i32,
         }
@@ -1671,7 +1680,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(keep, source = "value")]
             x: i32,
@@ -1682,7 +1691,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Oneof, write)]
+        #[parse(source = Oneof, write)]
         enum ParsedOneof {
             #[parse(keep)]
             Item(NestedItem),
@@ -1742,7 +1751,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item::<TSource>, write)]
+        #[parse(source = Item::<TSource>, write)]
         struct ParsedItem<T, TSource, S = String>
         where
             T: Default + Debug + Clone + Into<TSource>,
@@ -1756,7 +1765,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item::<i32>, write)]
+        #[parse(source = Item::<i32>, write)]
         struct ParsedItemI32<T>
         where
             T: Default + Debug + Clone + RequestParse<i32> + Into<i32>,
@@ -1806,28 +1815,28 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedListQuery {
             #[parse(list_query)]
             list_query: ListQuery,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedNoFilter {
             #[parse(list_query { filter = false })]
             query: ListQuery,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedCustomToken {
             #[parse(list_query)]
             query: ListQuery<u64>,
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedSearchQuery {
             #[parse(search_query)]
             search_query: SearchQuery,
@@ -2107,14 +2116,14 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Request, request, write)]
+        #[parse(source = Request, request, write)]
         struct ParsedRequest {
             #[parse(source = "value?")]
             value: i32,
         }
 
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Request, request { name = "Test" }, write)]
+        #[parse(source = Request, request { name = "Test" }, write)]
         struct ParsedCustomNameRequest {
             #[parse(source = "value?")]
             value: i32,
@@ -2158,7 +2167,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(resource {
                 fields {
@@ -2173,7 +2182,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItemDefaultResource {
             #[parse(resource)]
             resource: ParsedResource,
@@ -2244,7 +2253,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item, write)]
+        #[parse(source = Item, write)]
         struct ParsedItem {
             #[parse(try_from = i32)]
             value: u64,
@@ -2307,7 +2316,7 @@ mod tests {
         }
 
         #[derive(Debug, Clone, PartialEq, Parse)]
-        #[parse(bomboni_crate = bomboni, source = Item, write, serde_as)]
+        #[parse(source = Item, write, serde_as)]
         struct ParsedItem {
             value: i32,
         }
@@ -2396,7 +2405,7 @@ mod tests {
         }
 
         #[derive(Parse, Debug, PartialEq)]
-        #[parse(bomboni_crate = bomboni, source = Item)]
+        #[parse(source = Item)]
         struct ParsedItem {
             #[parse(source = "values", derive = values_parse_hash)]
             values: HashMap<i32, i32>,

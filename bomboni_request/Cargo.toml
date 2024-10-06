@@ -15,6 +15,7 @@ path = "src/lib.rs"
 
 [features]
 default = ["testing"]
+root-crate = ["bomboni_request_derive/root-crate"]
 testing = []
 derive = []
 tonic = ["bomboni_proto/tonic", "dep:tonic"]
@@ -29,36 +30,34 @@ wasm = [
 postgres = ["dep:postgres-types", "dep:bytes"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.60" }
-bomboni_proto = { path = "../bomboni_proto", version = "0.1.60" }
-bomboni_request_derive = { path = "../bomboni_request_derive", version = "0.1.60" }
-bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.60", features = [
-  "derive",
-], optional = true }
+bomboni_common = { workspace = true }
+bomboni_proto = { workspace = true }
+bomboni_request_derive = { workspace = true }
+bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 
-thiserror = "1.0.63"
-itertools = "0.13.0"
-prost = "0.13.1"
-pest = "2.7.11"
-pest_derive = "2.7.11"
+thiserror.workspace = true
+prost.workspace = true
+rand.workspace = true
+regex.workspace = true
+itertools.workspace = true
+serde = { workspace = true, features = ["derive"] }
+pest = "2.7.13"
+pest_derive = "2.7.13"
 base64ct = { version = "1.6.0", features = ["alloc"] }
 aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
 rsa = "0.9.6"
-rand = "0.8.5"
-regex = "1.10.5"
-serde = { version = "1.0.204", features = ["derive"] }
 
-tonic = { version = "0.12.1", optional = true }
-getrandom = { version = "0.2.15", features = ["js"], optional = true }
-postgres-types = { version = "0.2.7", features = [
+tonic = { workspace = true, optional = true }
+postgres-types = { workspace = true, features = [
   "with-time-0_3",
 ], optional = true }
-bytes = { version = "1.6.1", optional = true }
+bytes = { workspace = true, optional = true }
+getrandom = { version = "0.2.15", features = ["js"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.92", optional = true }
-js-sys = { version = "0.3.69", optional = true }
+wasm-bindgen = { version = "0.2.93", optional = true }
+js-sys = { version = "0.3.70", optional = true }
 
 [dev-dependencies]
-serde_json = "1.0.120"
+serde_json.workspace = true

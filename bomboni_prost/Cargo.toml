@@ -14,11 +14,11 @@ name = "bomboni_prost"
 path = "src/lib.rs"
 
 [dependencies]
-bomboni_core = { path = "../bomboni_core", version = "0.1.60" }
+bomboni_core = { workspace = true }
 
-prost = "0.13.1"
-prost-types = "0.13.1"
-proc-macro2 = "1.0.86"
-syn = { version = "2.0.72", features = ["full"] }
-quote = "1.0.36"
-prettyplease = "0.2.20"
+prost.workspace = true
+prost-types.workspace = true
+proc-macro2.workspace = true
+syn = { workspace = true, features = ["full"] }
+quote.workspace = true
+prettyplease.workspace = true

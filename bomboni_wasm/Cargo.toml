@@ -14,18 +14,19 @@ name = "bomboni_wasm"
 path = "src/lib.rs"
 
 [features]
+root-crate = ["bomboni_wasm_derive/root-crate"]
 derive = ["dep:bomboni_wasm_derive"]
 js = ["bomboni_wasm_core/js"]
 
 [dependencies]
-bomboni_wasm_core = { path = "../bomboni_wasm_core", version = "0.1.60" }
-bomboni_wasm_derive = { path = "../bomboni_wasm_derive", version = "0.1.60", optional = true }
+bomboni_wasm_core = { workspace = true }
+bomboni_wasm_derive = { workspace = true, optional = true }
 
-serde = "1.0.204"
-wasm-bindgen = "0.2.92"
-js-sys = "0.3.69"
+serde.workspace = true
+wasm-bindgen = "0.2.93"
+js-sys = "0.3.70"
 serde-wasm-bindgen = "0.6.5"
 
 [dev-dependencies]
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.120"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

@@ -701,16 +701,17 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
         },
     );
 
-    result.extend(if let Some(path) = options.bomboni_crate.as_ref() {
-        quote! {
-            use #path as _bomboni;
-        }
+    let mut use_wasm = if let Some(path) = options.bomboni_crate.as_ref() {
+        quote!(#path::wasm)
+    } else if cfg!(feature = "root-crate") {
+        quote!(bomboni::wasm)
     } else {
-        quote! {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate bomboni as _bomboni;
-        }
-    });
+        quote!(bomboni_wasm)
+    };
+
+    if let Some(path) = options.bomboni_wasm_crate.as_ref() {
+        use_wasm = quote!(#path);
+    }
 
     quote! {
         #result
@@ -724,7 +725,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
             JsObject, JsValue,
         };
         use _js_sys::JsString;
-        use _bomboni::wasm::Wasm;
+        use #use_wasm::Wasm;
     }
 }
 

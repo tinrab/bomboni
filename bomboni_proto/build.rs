@@ -1,10 +1,9 @@
-use std::{error::Error, path::PathBuf};
-
 use bomboni_prost::{
     compile,
     config::{ApiConfig, CompileConfig},
 };
 use prost_build::Config;
+use std::{error::Error, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -149,7 +148,7 @@ fn build_wasm(config: &mut Config) {
             format!(".google.rpc.{type_name}"),
             r"
                 #[derive(bomboni_wasm::Wasm)]
-                #[wasm(bomboni_crate = crate::bomboni, wasm_abi)]
+                #[wasm(bomboni_wasm_crate = bomboni_wasm, wasm_abi)]
             ",
         );
     }
@@ -177,7 +176,7 @@ fn build_wasm(config: &mut Config) {
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_crate = crate::bomboni,
+                bomboni_wasm_crate = bomboni_wasm,
                 wasm_abi,
                 js_value { convert_string },
                 override_type = "`${number}.${number}s` | `${number}s`",
@@ -189,7 +188,7 @@ fn build_wasm(config: &mut Config) {
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_crate = crate::bomboni,
+                bomboni_wasm_crate = bomboni_wasm,
                 wasm_abi,
                 js_value,
                 rename = "JsonObject",
@@ -202,7 +201,7 @@ fn build_wasm(config: &mut Config) {
         r#"
             #[derive(bomboni_wasm::Wasm)]
             #[wasm(
-                bomboni_crate = crate::bomboni,
+                bomboni_wasm_crate = bomboni_wasm,
                 wasm_abi,
                 js_value,
                 rename = "JsonValue",
@@ -217,7 +216,7 @@ fn build_wasm(config: &mut Config) {
             r#"
                 #[derive(bomboni_wasm::Wasm)]
                 #[wasm(
-                    bomboni_crate = crate::bomboni,
+                    bomboni_wasm_crate = bomboni_wasm,
                     wasm_abi,
                     js_value,
                     override_type = "undefined | null",
@@ -229,7 +228,7 @@ fn build_wasm(config: &mut Config) {
             r#"
                 #[derive(bomboni_wasm::Wasm)]
                 #[wasm(
-                    bomboni_crate = crate::bomboni,
+                    bomboni_wasm_crate = bomboni_wasm,
                     wasm_abi,
                     js_value,
                     override_type = "Date",
@@ -242,7 +241,7 @@ fn build_wasm(config: &mut Config) {
             r#"
                 #[derive(bomboni_wasm::Wasm)]
                 #[wasm(
-                    bomboni_crate = crate::bomboni,
+                    bomboni_wasm_crate = bomboni_wasm,
                     wasm_abi,
                     js_value,
                     override_type = "null",
@@ -254,7 +253,7 @@ fn build_wasm(config: &mut Config) {
             "
                 #[derive(bomboni_wasm::Wasm)]
                 #[wasm(
-                    bomboni_crate = crate::bomboni,
+                    bomboni_wasm_crate = bomboni_wasm,
                     wasm_abi,
                     js_value { convert_string },
                 )]

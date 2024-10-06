@@ -12,5 +12,3 @@ edition = "2021"
 [lib]
 name = "bomboni_fs"
 path = "src/lib.rs"
-
-[dependencies]

@@ -19,40 +19,38 @@ testing = []
 tonic = ["dep:tonic", "dep:http"]
 chrono = ["dep:chrono", "bomboni_common/chrono"]
 wasm = [
+  "bomboni_common/wasm",
   "dep:wasm-bindgen",
   "dep:js-sys",
   "dep:serde-wasm-bindgen",
-  "bomboni_common/wasm",
   "dep:bomboni_wasm",
 ]
 js = ["bomboni_common/js"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", features = [
-  "serde",
-], version = "0.1.60" }
+bomboni_common = { workspace = true, features = ["serde"] }
 
-thiserror = "1.0.63"
-time = { version = "0.3.36", features = ["serde", "formatting", "parsing"] }
-prost = "0.13.1"
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.120"
-pot = "3.0.0"
+thiserror.workspace = true
+time = { workspace = true, features = ["serde", "formatting", "parsing"] }
+prost.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+pot = "3.0.1"
 
-tonic = { version = "0.12.1", optional = true }
-http = { version = "1.1.0", optional = true }
-chrono = { version = "0.4.38", optional = true }
+tonic = { workspace = true, optional = true }
+http = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-bomboni_wasm = { path = "../bomboni_wasm", version = "0.1.60", optional = true }
+bomboni_wasm = { workspace = true, optional = true, features = ["derive"] }
 
-wasm-bindgen = { version = "0.2.92", optional = true }
-js-sys = { version = "0.3.69", optional = true }
+wasm-bindgen = { version = "0.2.93", optional = true }
+js-sys = { version = "0.3.70", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 
 [dev-dependencies]
-serde_json = "1.0.120"
+serde_json.workspace = true
 
 [build-dependencies]
-bomboni_prost = { path = "../bomboni_prost", version = "0.1.60" }
-prost-build = "0.13.1"
+bomboni_prost = { workspace = true }
+prost-build.workspace = true

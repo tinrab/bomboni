@@ -18,11 +18,11 @@ default = ["testing"]
 testing = []
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", version = "0.1.60" }
-bomboni_proto = { version = "0.1.60", path = "../bomboni_proto" }
+bomboni_common = { workspace = true }
+bomboni_proto = { workspace = true }
 
-thiserror = "1.0.63"
-handlebars = "6.0.0"
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.120"
-convert_case = "0.6.0"
+thiserror.workspace = true
+handlebars.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+convert_case.workspace = true

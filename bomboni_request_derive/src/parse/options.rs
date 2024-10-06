@@ -42,10 +42,16 @@ pub struct ParseOptions {
     #[darling(default)]
     pub request: Option<ParseRequest>,
 
-    /// Custom comboni crate path.
+    /// Custom `bomboni` crate path.
     #[darling(default)]
     pub bomboni_crate: Option<Path>,
-    /// Custom serde crate path.
+    /// Custom `bomboni_proto` crate path.
+    #[darling(default)]
+    pub bomboni_proto_crate: Option<Path>,
+    /// Custom `bomboni_request` crate path.
+    #[darling(default)]
+    pub bomboni_request_crate: Option<Path>,
+    /// Custom `serde` crate path.
     #[darling(default)]
     pub serde_crate: Option<Path>,
 }
