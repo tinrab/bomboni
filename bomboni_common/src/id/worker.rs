@@ -2,9 +2,7 @@ use std::thread;
 use std::time::Duration;
 
 #[cfg(feature = "tokio")]
-use parking_lot::Mutex;
-#[cfg(feature = "tokio")]
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc, sync::Mutex};
 
 use crate::date_time::UtcDateTime;
 use crate::id::Id;

@@ -15,7 +15,7 @@ path = "src/lib.rs"
 
 [features]
 serde = ["dep:serde"]
-tokio = ["dep:tokio", "dep:parking_lot"]
+tokio = ["dep:tokio"]
 chrono = ["dep:chrono"]
 wasm = [
   "dep:bomboni_wasm",
@@ -35,7 +35,6 @@ time = { workspace = true, features = ["formatting", "parsing"] }
 ulid.workspace = true
 
 tokio = { workspace = true, features = ["time", "sync"], optional = true }
-parking_lot = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 chrono = { workspace = true, optional = true }
 postgres-types = { workspace = true, features = [

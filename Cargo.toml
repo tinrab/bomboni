@@ -97,7 +97,6 @@ prost-types = "0.13.3"
 prost-build = "0.13.3"
 tonic = "0.12.3"
 tokio = "1.40.0"
-parking_lot = "0.12.3"
 postgres-types = "0.2.8"
 
 proc-macro2 = "1.0.86"
