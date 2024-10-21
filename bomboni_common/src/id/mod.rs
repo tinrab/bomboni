@@ -142,12 +142,23 @@ macro_rules! impl_from {
     ( $( $source:ty ),* $(,)? ) => {
         $(impl From<$source> for Id {
             fn from(x: $source) -> Self {
+                Id::new(x.into())
+            }
+        })*
+    };
+}
+impl_from!(u8, u16, u32, u64);
+
+macro_rules! impl_as {
+    ( $( $source:ty ),* $(,)? ) => {
+        $(impl From<$source> for Id {
+            fn from(x: $source) -> Self {
                 Id::new(x as u128)
             }
         })*
     };
 }
-impl_from!(i8, i16, i32, i64, i128, u8, u16, u32, u64);
+impl_as!(i8, i16, i32, i64, i128);
 
 impl From<Id> for u128 {
     fn from(id: Id) -> Self {

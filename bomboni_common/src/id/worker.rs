@@ -1,9 +1,6 @@
 use std::thread;
 use std::time::Duration;
 
-#[cfg(feature = "tokio")]
-use std::{ops::Deref, sync::Arc, sync::Mutex};
-
 use crate::date_time::UtcDateTime;
 use crate::id::Id;
 
@@ -12,10 +9,6 @@ pub struct WorkerIdGenerator {
     worker: u16,
     next: u16,
 }
-
-#[cfg(feature = "tokio")]
-#[derive(Debug, Clone)]
-pub struct WorkerIdGeneratorArc(Arc<Mutex<WorkerIdGenerator>>);
 
 /// Duration to sleep after overflowing the sequence number.
 /// Used to avoid collisions.
@@ -133,23 +126,6 @@ impl WorkerIdGenerator {
         ids
     }
 }
-
-#[cfg(feature = "tokio")]
-const _: () = {
-    impl WorkerIdGeneratorArc {
-        pub fn new(worker: u16) -> Self {
-            Self(Arc::new(Mutex::new(WorkerIdGenerator::new(worker))))
-        }
-    }
-
-    impl Deref for WorkerIdGeneratorArc {
-        type Target = Mutex<WorkerIdGenerator>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-};
 
 #[cfg(test)]
 mod tests {
