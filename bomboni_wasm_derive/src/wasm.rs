@@ -436,15 +436,14 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
     let ts_decl = TsDeclParser::new(options).parse();
     let ts_decl_name = ts_decl.name();
 
-    // let mut variants = String::new();
     let mut variants = BTreeMap::new();
     if let TsDecl::Enum(ts_enum) = &ts_decl {
         let mut unique_member_names = BTreeSet::new();
         for member in &ts_enum.members {
-            let member_name = str_to_case(&member.name, Case::Pascal);
-            let member_type_value = member.alias_type.to_string();
+            let member_name = str_to_case(&member.name, Case::ScreamingSnake);
+            let member_value = member.alias_type.to_string();
             if !unique_member_names.insert(member_name.clone())
-                || !unique_member_names.insert(member_type_value.clone())
+                || !unique_member_names.insert(member_value.clone())
             {
                 return Err(syn::Error::new_spanned(
                     &options.serde_container.ident,
@@ -452,8 +451,10 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
                 ));
             }
 
-            variants.insert(member_name.clone(), member_type_value.clone());
-            variants.insert(member_type_value, format!("\"{member_name}\""));
+            variants.insert(member_name.clone(), member_value.clone());
+            if !variants.contains_key(member_value.trim_matches('"')) {
+                variants.insert(member_value, member_name);
+            }
         }
     }
 
