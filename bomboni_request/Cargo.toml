@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_request"
-version = "0.1.61"
+version = "0.1.62"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -41,12 +41,12 @@ rand.workspace = true
 regex.workspace = true
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
-pest = "2.7.13"
-pest_derive = "2.7.13"
+pest = "2.7.14"
+pest_derive = "2.7.14"
 base64ct = { version = "1.6.0", features = ["alloc"] }
 aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
-rsa = "0.9.6"
+rsa = "0.9.7"
 
 tonic = { workspace = true, optional = true }
 postgres-types = { workspace = true, features = [
@@ -56,8 +56,8 @@ bytes = { workspace = true, optional = true }
 getrandom = { version = "0.2.15", features = ["js"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.93", optional = true }
-js-sys = { version = "0.3.70", optional = true }
+wasm-bindgen = { version = "0.2.97", optional = true }
+js-sys = { version = "0.3.74", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_wasm_core"
-version = "0.1.61"
+version = "0.1.62"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Internal WASM part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"

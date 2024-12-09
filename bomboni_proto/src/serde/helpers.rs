@@ -76,7 +76,7 @@ pub mod string_list {
     {
         struct Visitor<V, T>(PhantomData<V>, PhantomData<T>);
 
-        impl<'de, V, T> de::Visitor<'de> for Visitor<V, T>
+        impl<V, T> de::Visitor<'_> for Visitor<V, T>
         where
             V: FromIterator<T>,
             T: FromStr,

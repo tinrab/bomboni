@@ -121,11 +121,7 @@ impl Id {
 
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let buf = self.0.to_be_bytes();
-        for b in buf {
-            write!(f, "{b:02X}")?;
-        }
-        Ok(())
+        Ulid(self.0).fmt(f)
     }
 }
 
@@ -133,8 +129,9 @@ impl FromStr for Id {
     type Err = ParseIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value = u128::from_str_radix(s, 16).map_err(|_| ParseIdError::InvalidString)?;
-        Ok(Self::new(value))
+        Ulid::from_str(s)
+            .map(From::from)
+            .map_err(|_| ParseIdError::InvalidString)
     }
 }
 
@@ -248,7 +245,7 @@ mod tests {
         let id = Id::from_worker_parts(UtcDateTime::from_timestamp(3, 0).unwrap(), 5, 7);
         assert_eq!(
             serde_json::to_string(&id).unwrap(),
-            r#""00000000000000000000000300050007""#
+            r#""0000000000000000000C00A007""#
         );
     }
 }

@@ -1,166 +1,171 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
 // Filter, possibly empty.
-filter = {
-    SOI
-    ~ expression?
-    ~ EOI
+Filter = {
+    SOI ~ Expression? ~ EOI
 }
 
-//  Expressions may either be a conjunction (AND) of sequences or a simple
-//  sequence.
-//
-//  Note, the AND is case-sensitive.
-//
-//  Example: `a b AND c AND d`
-//
-//  The expression `(a b) AND c AND d` is equivalent to the example.
-expression = {
-    sequence ~ ("AND" ~ sequence)*
+// Expressions may either be a conjunction (AND) of sequences or a simple
+// sequence.
+// 
+// Note, the AND is case-sensitive.
+// 
+// Example: `a b AND c AND d`
+// 
+// The expression `(a b) AND c AND d` is equivalent to the example.
+Expression = {
+    Sequence ~ ("AND" ~ Sequence)*
 }
 
-//  Sequence is composed of one or more whitespace (WHITESPACE) separated factors.
-//
-//  A sequence expresses a logical relationship between 'factors' where
-//  the ranking of a filter result may be scored according to the number
-//  factors that match and other such criteria as the proximity of factors
-//  to each other within a document.
-//
-//  When filters are used with exact match semantics rather than fuzzy
-//  match semantics, a sequence is equivalent to AND.
-//
-//  Example: `New York Giants OR Yankees`
-//
-//  The expression `New York (Giants OR Yankees)` is equivalent to the
-//  example.
-sequence = _{
-    factor ~ factor*
+// Sequence is composed of one or more whitespace (WHITESPACE) separated factors.
+// 
+// A sequence expresses a logical relationship between 'factors' where
+// the ranking of a filter result may be scored according to the number
+// factors that match and other such criteria as the proximity of factors
+// to each other within a document.
+// 
+// When filters are used with exact match semantics rather than fuzzy
+// match semantics, a sequence is equivalent to AND.
+// 
+// Example: `New York Giants OR Yankees`
+// 
+// The expression `New York (Giants OR Yankees)` is equivalent to the
+// example.
+Sequence = _{
+    Factor ~ Factor*
 }
 
-//  Factors may either be a disjunction (OR) of terms or a simple term.
-//
-//  Note, the OR is case-sensitive.
-//
-//  Example: `a < 10 OR a >= 100`
-factor = {
-    term ~ ("OR" ~ term)*
+// Factors may either be a disjunction (OR) of terms or a simple term.
+// 
+// Note, the OR is case-sensitive.
+// 
+// Example: `a < 10 OR a >= 100`
+Factor = {
+    Term ~ ("OR" ~ Term)*
 }
 
-//  Terms may either be unary or simple expressions.
-//
-//  Unary expressions negate the simple expression, either mathematically `-`
-//  or logically `NOT`. The negation styles may be used interchangeably.
-//
-//  Note, the `NOT` is case-sensitive and must be followed by at least one
-//  whitespace (WHITESPACE).
-//
-//  Examples:
-//  * logical not     : `NOT (a OR b)`
-//  * alternative not : `-file:".java"`
-//  * negation        : `-30`
-term = @{
-    ("NOT" ~ WHITESPACE+)? ~ simple
+// Terms may either be unary or simple expressions.
+// 
+// Unary expressions negate the simple expression, either mathematically `-`
+// or logically `NOT`. The negation styles may be used interchangeably.
+// 
+// Note, the `NOT` is case-sensitive and must be followed by at least one
+// whitespace (WHITESPACE).
+// 
+// Examples:
+// * logical not     : `NOT (a OR b)`
+// * alternative not : `-file:".java"`
+// * negation        : `-30`
+Term = @{
+    ("NOT" ~ WHITESPACE+)? ~ Simple
 }
 
-//  Simple expressions may either be a restriction or a nested (composite)
-//  expression.
-simple = _{
-    restriction | composite
+// Simple expressions may either be a restriction or a nested (composite)
+// expression.
+Simple = _{
+    Restriction
+  | Composite
 }
 
-//  Restrictions express a relationship between a comparable value and a
-//  single argument. When the restriction only specifies a comparable
-//  without an operator, this is a global restriction.
-//
-//  Note, restrictions are not whitespace sensitive.
-//
-//  Examples:
-//  * equality         : `package=com.google`
-//  * inequality       : `msg != 'hello'`
-//  * greater than     : `1 > 0`
-//  * greater or equal : `2.5 >= 2.4`
-//  * less than        : `yesterday < request.time`
-//  * less or equal    : `experiment.rollout <= cohort(request.user)`
-//  * has              : `map:key`
-//  * global           : `prod`
-//
-//  In addition to the global, equality, and ordering operators, filters
-//  also support the has (`:`) operator. The has operator is unique in
-//  that it can test for presence or value based on the proto3 type of
-//  the `comparable` value. The has operator is useful for validating the
-//  structure and contents of complex values.
-restriction = !{
-    comparable ~ (comparator ~ arg)?
+// Restrictions express a relationship between a comparable value and a
+// single argument. When the restriction only specifies a comparable
+// without an operator, this is a global restriction.
+// 
+// Note, restrictions are not whitespace sensitive.
+// 
+// Examples:
+// * equality         : `package=com.google`
+// * inequality       : `msg != 'hello'`
+// * greater than     : `1 > 0`
+// * greater or equal : `2.5 >= 2.4`
+// * less than        : `yesterday < request.time`
+// * less or equal    : `experiment.rollout <= cohort(request.user)`
+// * has              : `map:key`
+// * global           : `prod`
+// 
+// In addition to the global, equality, and ordering operators, filters
+// also support the has (`:`) operator. The has operator is unique in
+// that it can test for presence or value based on the proto3 type of
+// the `comparable` value. The has operator is useful for validating the
+// structure and contents of complex values.
+Restriction = !{
+    Comparable ~ (Comparator ~ Argument)?
 }
 
-//  Comparable may either be a member, function or a value.
-comparable = {
-    function | value | name
+// Comparable may either be a member, function or a value.
+Comparable = {
+    Function
+  | Value
+  | Name
 }
 
-//  Function calls may use simple or qualified names with zero or more
-//  arguments.
-//
-//  All functions declared within the list filter, apart from the special
-//  `arguments` function must be provided by the host service.
-//
-//  Examples:
-//  * `regex(m.key, '^.*prod.*$')`
-//  * `math.mem('30mb')`
-//
-//  Antipattern: simple and qualified function names may include keywords:
-//  NOT, AND, OR. It is not recommended that any of these names be used
-//  within functions exposed by a service that supports list filters.
-function = {
-    name ~ "(" ~ argList? ~ ")"
+// Function calls may use simple or qualified names with zero or more
+// arguments.
+// 
+// All functions declared within the list filter, apart from the special
+// `arguments` function must be provided by the host service.
+// 
+// Examples:
+// * `regex(m.key, '^.*prod.*$')`
+// * `math.mem('30mb')`
+// 
+// Antipattern: simple and qualified function names may include keywords:
+// NOT, AND, OR. It is not recommended that any of these names be used
+// within functions exposed by a service that supports list filters.
+Function = {
+    Name ~ "(" ~ ArgumentList? ~ ")"
 }
 
 // Comparators supported by list filters.
-comparator = {
-    "<=" | "<" | ">=" | ">" | "!=" | "=" | ":"
+Comparator = {
+    "<="
+  | "<"
+  | ">="
+  | ">"
+  | "!="
+  | "="
+  | ":"
 }
 
-//  Composite is a parenthesized expression, commonly used to group
-//  terms or clarify operator precedence.
-//
-//  Example: `(msg.endsWith('world') AND retries < 10)`
-composite = !{
-    "(" ~ expression ~ ")"
+// Composite is a parenthesized expression, commonly used to group
+// terms or clarify operator precedence.
+// 
+// Example: `(msg.endsWith('world') AND retries < 10)`
+Composite = !{
+    "(" ~ Expression ~ ")"
 }
 
-name = @{
-    identifier ~ ("." ~ identifier)*
+Name = @{
+    Identifier ~ ("." ~ Identifier)*
 }
 
-identifier = ${ !keyword ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+Identifier = ${ !Keyword ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
-keyword = { "AND" | "OR" | "NOT" }
+Keyword = { "AND" | "OR" | "NOT" }
 
-argList = _{
-    arg ~ ("," ~ arg)*
+ArgumentList = _{
+    Argument ~ ("," ~ Argument)*
 }
 
-arg = _{
-    comparable | composite
+Argument = _{
+    Comparable
+  | Composite
 }
 
-value = _{ string | boolean | number |  any }
+Value = _{ String | Boolean | Number | Any }
 
-string = ${ "\"" ~ inner ~ "\"" }
-inner = @{ char* }
-char = {
+String = ${ "\"" ~ Inner ~ "\"" }
+Inner  = @{ Char* }
+Char   =  {
     !("\"" | "\\") ~ ANY
-    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
-    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-boolean = { "true" | "false" }
+Boolean = { "true" | "false" }
 
-number = @{
-    "-"?
-    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
-    ~ ("." ~ ASCII_DIGIT*)?
-    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+Number = @{
+    "-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
-any = { "*" }
+Any = { "*" }

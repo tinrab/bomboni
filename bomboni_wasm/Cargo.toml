@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_wasm"
-version = "0.1.61"
+version = "0.1.62"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with WASM. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -23,8 +23,8 @@ bomboni_wasm_core = { workspace = true }
 bomboni_wasm_derive = { workspace = true, optional = true }
 
 serde.workspace = true
-wasm-bindgen = "0.2.93"
-js-sys = "0.3.70"
+wasm-bindgen = "0.2.97"
+js-sys = "0.3.74"
 serde-wasm-bindgen = "0.6.5"
 
 [dev-dependencies]

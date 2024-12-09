@@ -12,11 +12,10 @@ use parser::{FilterParser, Rule};
 use pest::iterators::Pair;
 use pest::Parser;
 
-use self::error::FilterResult;
-
 use crate::filter::error::FilterError;
 use crate::schema::{FunctionSchemaMap, MemberSchema, Schema, SchemaMapped, ValueType};
 use crate::value::Value;
+use error::FilterResult;
 
 pub mod error;
 
@@ -54,13 +53,13 @@ pub enum FilterComparator {
 
 impl Filter {
     pub fn parse(source: &str) -> FilterResult<Self> {
-        let filter = FilterParser::parse(Rule::filter, source)?.next().unwrap();
+        let filter = FilterParser::parse(Rule::Filter, source)?.next().unwrap();
         Self::parse_tree(filter)
     }
 
     fn parse_tree(pair: Pair<Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
-            Rule::filter | Rule::expression => {
+            Rule::Filter | Rule::Expression => {
                 match pair
                     .into_inner()
                     .filter(|pair| pair.as_rule() != Rule::EOI)
@@ -71,11 +70,11 @@ impl Filter {
                     Err(inner_trees) => Ok(Self::Conjunction(inner_trees.try_collect()?)),
                 }
             }
-            Rule::factor => match pair.into_inner().map(Self::parse_tree).exactly_one() {
+            Rule::Factor => match pair.into_inner().map(Self::parse_tree).exactly_one() {
                 Ok(inner_tree) => inner_tree,
                 Err(inner_trees) => Ok(Self::Disjunction(inner_trees.try_collect()?)),
             },
-            Rule::term => {
+            Rule::Term => {
                 let lexeme = pair.as_str().trim();
                 if lexeme.starts_with("NOT") || lexeme.starts_with('-') {
                     Ok(Self::Negate(Box::new(Self::parse_tree(
@@ -85,7 +84,7 @@ impl Filter {
                     Self::parse_tree(pair.into_inner().next().unwrap())
                 }
             }
-            Rule::restriction => {
+            Rule::Restriction => {
                 let mut inner_pairs = pair.into_inner();
                 let comparable = inner_pairs.next().unwrap();
                 match inner_pairs.next() {
@@ -110,15 +109,15 @@ impl Filter {
                     None => Self::parse_tree(comparable),
                 }
             }
-            Rule::comparable => Self::parse_tree(pair.into_inner().next().unwrap()),
-            Rule::function => {
+            Rule::Comparable => Self::parse_tree(pair.into_inner().next().unwrap()),
+            Rule::Function => {
                 let mut name = String::new();
                 let mut arguments = Vec::new();
                 let mut argument_list = false;
                 for pair in pair.into_inner() {
                     if argument_list {
                         arguments.push(Self::parse_tree(pair)?);
-                    } else if pair.as_rule() == Rule::name {
+                    } else if pair.as_rule() == Rule::Name {
                         name = pair.as_str().into();
                     } else {
                         arguments.push(Self::parse_tree(pair)?);
@@ -127,15 +126,15 @@ impl Filter {
                 }
                 Ok(Self::Function(name, arguments))
             }
-            Rule::composite => Ok(Self::Composite(Box::new(Self::parse_tree(
+            Rule::Composite => Ok(Self::Composite(Box::new(Self::parse_tree(
                 pair.into_inner().next().unwrap(),
             )?))),
-            Rule::name => Ok(Self::Name(
+            Rule::Name => Ok(Self::Name(
                 pair.into_inner()
                     .map(|identifier| identifier.as_str())
                     .join("."),
             )),
-            Rule::string | Rule::boolean | Rule::number | Rule::any => {
+            Rule::String | Rule::Boolean | Rule::Number | Rule::Any => {
                 Ok(Self::Value(Value::parse(&pair)?))
             }
             _ => {

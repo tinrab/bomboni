@@ -1763,41 +1763,44 @@ mod tests {
             _ts: PhantomData<TSource>,
         }
 
+        #[derive(Clone, Debug, PartialEq, Eq, Copy, Default)]
+        struct Value(i32);
+
         #[derive(Debug, Clone, PartialEq, Default, Parse)]
-        #[parse(source = Item::<i32>, write)]
+        #[parse(source = Item::<Value>, write)]
         struct ParsedItemI32<T>
         where
-            T: Default + Debug + Clone + RequestParse<i32> + Into<i32>,
+            T: Default + Debug + Clone + RequestParse<Value> + Into<Value>,
         {
             value: T,
         }
 
-        impl RequestParse<i32> for i32 {
-            fn parse(value: i32) -> RequestResult<Self> {
+        impl RequestParse<Value> for Value {
+            fn parse(value: Value) -> RequestResult<Self> {
                 Ok(value)
             }
         }
 
         assert_eq!(
-            ParsedItem::<i32, i32, String>::parse(Item { value: 42 }).unwrap(),
-            ParsedItem::<i32, i32, String> {
-                value: 42,
+            ParsedItem::<Value, Value, String>::parse(Item { value: Value(42) }).unwrap(),
+            ParsedItem::<Value, Value, String> {
+                value: Value(42),
                 skipped: String::new(),
                 _ts: PhantomData,
             }
         );
         assert_eq!(
-            Item::from(ParsedItem::<i32, i32, String> {
-                value: 42,
+            Item::from(ParsedItem::<Value, Value, String> {
+                value: Value(42),
                 skipped: String::new(),
                 _ts: PhantomData,
             }),
-            Item { value: 42 }
+            Item { value: Value(42) }
         );
 
         assert_eq!(
-            ParsedItemI32::<i32>::parse(Item { value: 42 }).unwrap(),
-            ParsedItemI32::<i32> { value: 42 }
+            ParsedItemI32::<Value>::parse(Item { value: Value(42) }).unwrap(),
+            ParsedItemI32::<Value> { value: Value(42) }
         );
     }
 
@@ -2279,7 +2282,7 @@ mod tests {
         assert_eq!(
             ParsedItem::parse(Item {
                 value: 42,
-                id: Some("0000000000000000000000000000002A".into()),
+                id: Some("0000000000000000000000001A".into()),
                 nested: vec![1, 2, 3],
             })
             .unwrap(),
@@ -2301,7 +2304,7 @@ mod tests {
             }),
             Item {
                 value: 42,
-                id: Some("0000000000000000000000000000002A".into()),
+                id: Some("0000000000000000000000001A".into()),
                 nested: vec![1, 2, 3],
             }
         );

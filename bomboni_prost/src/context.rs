@@ -9,7 +9,7 @@ pub struct Context<'a> {
     pub path: Vec<String>,
 }
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     pub fn get_type_expr_path(&self, name: &str) -> ExprPath {
         let mut path = String::new();
         for parent in &self.path {

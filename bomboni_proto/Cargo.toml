@@ -1,6 +1,6 @@
 [package]
 name = "bomboni_proto"
-version = "0.1.61"
+version = "0.1.62"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Utilities for working with Protobuf/gRPC. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
@@ -44,8 +44,8 @@ chrono = { workspace = true, optional = true }
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
 bomboni_wasm = { workspace = true, optional = true, features = ["derive"] }
 
-wasm-bindgen = { version = "0.2.93", optional = true }
-js-sys = { version = "0.3.70", optional = true }
+wasm-bindgen = { version = "0.2.97", optional = true }
+js-sys = { version = "0.3.74", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 
 [dev-dependencies]

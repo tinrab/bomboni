@@ -39,7 +39,7 @@ impl Value {
 
     pub fn parse(pair: &Pair<'_, Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
-            Rule::string => {
+            Rule::String => {
                 let value = pair.as_str();
                 if let Ok(value) = UtcDateTime::parse_rfc3339(value) {
                     Ok(value.into())
@@ -48,8 +48,8 @@ impl Value {
                     Ok(Value::String(lexeme[1..lexeme.len() - 1].into()))
                 }
             }
-            Rule::boolean => Ok(Value::Boolean(pair.as_str() == "true")),
-            Rule::number => {
+            Rule::Boolean => Ok(Value::Boolean(pair.as_str() == "true")),
+            Rule::Number => {
                 if let Ok(value) = pair.as_str().parse::<i64>() {
                     Ok(Value::Integer(value))
                 } else if let Ok(value) = pair.as_str().parse::<f64>() {
@@ -58,7 +58,7 @@ impl Value {
                     Err(FilterError::InvalidNumber(pair.as_str().into()))
                 }
             }
-            Rule::any => Ok(Value::Any),
+            Rule::Any => Ok(Value::Any),
             _ => Err(FilterError::ExpectedValue),
         }
     }
