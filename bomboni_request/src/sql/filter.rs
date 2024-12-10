@@ -1,15 +1,19 @@
-use super::{SqlDialect, SqlRenameMap};
 use crate::{
     filter::{
         error::{FilterError, FilterResult},
         Filter, FilterComparator,
     },
     schema::{FunctionSchemaMap, Schema, ValueType},
+    sql::{
+        utility::{get_argument_parameter, get_identifier},
+        SqlArgumentStyle, SqlDialect, SqlRenameMap,
+    },
     value::Value,
 };
 
 pub struct SqlFilterBuilder<'a> {
     dialect: SqlDialect,
+    argument_style: SqlArgumentStyle,
     schema: &'a Schema,
     schema_functions: Option<&'a FunctionSchemaMap>,
     rename_map: Option<&'a SqlRenameMap>,
@@ -23,6 +27,7 @@ impl<'a> SqlFilterBuilder<'a> {
     pub fn new(dialect: SqlDialect, schema: &'a Schema) -> Self {
         Self {
             dialect,
+            argument_style: SqlArgumentStyle::Indexed { prefix: "$".into() },
             schema,
             schema_functions: None,
             rename_map: None,
@@ -50,6 +55,11 @@ impl<'a> SqlFilterBuilder<'a> {
 
     pub fn case_insensitive_like(&mut self) -> &mut Self {
         self.case_insensitive_like = true;
+        self
+    }
+
+    pub fn set_argument_style(&mut self, argument_style: SqlArgumentStyle) -> &mut Self {
+        self.argument_style = argument_style;
         self
     }
 
@@ -119,9 +129,14 @@ impl<'a> SqlFilterBuilder<'a> {
                     return Err(FilterError::UnknownMember(name.clone()));
                 }
                 if let Some(rename_map) = self.rename_map {
-                    self.build_identifier(&rename_map.rename_member(name), true);
+                    self.result.push_str(&get_identifier(
+                        self.dialect,
+                        &rename_map.rename_member(name),
+                        true,
+                    ));
                 } else {
-                    self.build_identifier(name, true);
+                    self.result
+                        .push_str(&get_identifier(self.dialect, name, true));
                 }
             }
             Filter::Value(value) => {
@@ -323,9 +338,14 @@ impl<'a> SqlFilterBuilder<'a> {
             .ok_or_else(|| FilterError::UnknownFunction(name.into()))?;
 
         if let Some(rename_map) = self.rename_map {
-            self.build_identifier(&rename_map.rename_function(name), false);
+            self.result.push_str(&get_identifier(
+                self.dialect,
+                &rename_map.rename_function(name),
+                false,
+            ));
         } else {
-            self.build_identifier(name, false);
+            self.result
+                .push_str(&get_identifier(self.dialect, name, false));
         }
 
         self.result.push('(');
@@ -349,29 +369,10 @@ impl<'a> SqlFilterBuilder<'a> {
         Ok(())
     }
 
-    fn build_identifier(&mut self, name: &str, escape: bool) {
-        match self.dialect {
-            SqlDialect::Postgres => {
-                if escape {
-                    let mut parts = name.split('.');
-                    if let Some(first) = parts.next() {
-                        self.result.push_str(&format!("\"{first}\""));
-                    }
-                    for part in parts {
-                        self.result.push('.');
-                        self.result.push_str(&format!("\"{part}\""));
-                    }
-                } else {
-                    self.result.push_str(name);
-                }
-            }
-        }
-    }
-
     fn build_argument(&mut self, value: Value) {
-        self.result.push_str(&format!(
-            "${}",
-            self.arguments.len() + 1 + self.argument_offset
+        self.result.push_str(&get_argument_parameter(
+            &self.argument_style,
+            self.arguments.len() + 1 + self.argument_offset,
         ));
         self.arguments.push(value);
     }

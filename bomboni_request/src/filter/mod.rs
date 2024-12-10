@@ -160,32 +160,6 @@ impl Filter {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn add_conjunction(&mut self, other: Self) {
-        match self {
-            Self::Conjunction(filters) => {
-                filters.push(other);
-            }
-            _ => {
-                *self = Self::Conjunction(vec![self.clone(), other]);
-            }
-        }
-    }
-
-    pub fn add_disjunction(&mut self, other: Self) {
-        match self {
-            Self::Disjunction(filters) => {
-                filters.push(other);
-            }
-            _ => {
-                *self = Self::Disjunction(vec![self.clone(), other]);
-            }
-        }
-    }
-
     pub fn evaluate<T>(&self, item: &T) -> Option<Value>
     where
         T: SchemaMapped,
@@ -485,6 +459,32 @@ impl Filter {
             Self::Value(_) => {}
         }
         Ok(())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn add_conjunction(&mut self, other: Self) {
+        match self {
+            Self::Conjunction(filters) => {
+                filters.push(other);
+            }
+            _ => {
+                *self = Self::Conjunction(vec![self.clone(), other]);
+            }
+        }
+    }
+
+    pub fn add_disjunction(&mut self, other: Self) {
+        match self {
+            Self::Disjunction(filters) => {
+                filters.push(other);
+            }
+            _ => {
+                *self = Self::Disjunction(vec![self.clone(), other]);
+            }
+        }
     }
 }
 

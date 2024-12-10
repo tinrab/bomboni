@@ -2,13 +2,16 @@ use crate::filter::Filter;
 use crate::ordering::Ordering;
 use crate::query::{error::QueryResult, list::ListQuery, search::SearchQuery};
 use crate::schema::{FunctionSchemaMap, Schema};
-use crate::sql::{SqlDialect, SqlRenameMap};
-use crate::sql::{SqlFilterBuilder, SqlOrderingBuilder};
+use crate::sql::{
+    utility::get_argument_parameter, SqlArgumentStyle, SqlDialect, SqlFilterBuilder,
+    SqlOrderingBuilder, SqlRenameMap,
+};
 use crate::value::Value;
 
 #[derive(Debug, Clone)]
 pub struct QuerySqlBuilder {
     dialect: SqlDialect,
+    argument_style: SqlArgumentStyle,
     schema: Schema,
     schema_functions: FunctionSchemaMap,
     rename_map: SqlRenameMap,
@@ -30,6 +33,7 @@ impl QuerySqlBuilder {
     pub fn new(dialect: SqlDialect, schema: Schema) -> Self {
         Self {
             dialect,
+            argument_style: SqlArgumentStyle::Indexed { prefix: "$".into() },
             schema,
             schema_functions: FunctionSchemaMap::new(),
             rename_map: SqlRenameMap::default(),
@@ -55,6 +59,11 @@ impl QuerySqlBuilder {
 
     pub fn query_next_page(&mut self) -> &mut Self {
         self.query_next_page = true;
+        self
+    }
+
+    pub fn set_argument_style(&mut self, argument_style: SqlArgumentStyle) -> &mut Self {
+        self.argument_style = argument_style;
         self
     }
 
@@ -95,7 +104,8 @@ impl QuerySqlBuilder {
             let mut filter_builder = SqlFilterBuilder::new(self.dialect, &self.schema);
             filter_builder
                 .set_schema_functions(&self.schema_functions)
-                .set_rename_map(&self.rename_map);
+                .set_rename_map(&self.rename_map)
+                .set_argument_style(self.argument_style.clone());
             if self.case_insensitive_like {
                 filter_builder.case_insensitive_like();
             }
@@ -113,7 +123,8 @@ impl QuerySqlBuilder {
                 let mut filter_builder = SqlFilterBuilder::new(self.dialect, &self.schema);
                 filter_builder
                     .set_schema_functions(&self.schema_functions)
-                    .set_rename_map(&self.rename_map);
+                    .set_rename_map(&self.rename_map)
+                    .set_argument_style(self.argument_style.clone());
                 if self.case_insensitive_like {
                     filter_builder.case_insensitive_like();
                 }
@@ -123,7 +134,10 @@ impl QuerySqlBuilder {
                 (where_clause.clone(), arguments.clone())
             };
 
-        let paged_limit_clause = format!("LIMIT ${}", paged_arguments.len() + 1);
+        let paged_limit_clause = format!(
+            "LIMIT {}",
+            get_argument_parameter(&self.argument_style, paged_arguments.len() + 1)
+        );
         paged_arguments.push(if self.query_next_page {
             // One more than page_size to determine if there are more results
             (page_size + 1).into()

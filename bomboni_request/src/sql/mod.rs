@@ -8,10 +8,18 @@ pub use query::{QuerySqlBuilder, QuerySqlStatement};
 mod filter;
 mod ordering;
 mod query;
+pub(crate) mod utility;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SqlDialect {
     Postgres,
+    MySql,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SqlArgumentStyle {
+    Indexed { prefix: String },
+    Positional { symbol: String },
 }
 
 #[derive(Debug, Clone, Default)]

@@ -6,7 +6,7 @@ use crate::{
     schema::Schema,
 };
 
-use super::{SqlDialect, SqlRenameMap};
+use super::{utility::get_identifier, SqlDialect, SqlRenameMap};
 
 pub struct SqlOrderingBuilder<'a> {
     dialect: SqlDialect,
@@ -37,9 +37,14 @@ impl<'a> SqlOrderingBuilder<'a> {
             }
 
             if let Some(rename_map) = self.rename_map {
-                self.build_identifier(&rename_map.rename_function(&term.name), true);
+                self.result.push_str(&get_identifier(
+                    self.dialect,
+                    &rename_map.rename_function(&term.name),
+                    true,
+                ));
             } else {
-                self.build_identifier(&term.name, true);
+                self.result
+                    .push_str(&get_identifier(self.dialect, &term.name, true));
             }
 
             self.result.push(' ');
@@ -61,25 +66,6 @@ impl<'a> SqlOrderingBuilder<'a> {
         let result = self.result.clone();
         self.result.clear();
         Ok(result)
-    }
-
-    fn build_identifier(&mut self, name: &str, escape: bool) {
-        match self.dialect {
-            SqlDialect::Postgres => {
-                if escape {
-                    let mut parts = name.split('.');
-                    if let Some(first) = parts.next() {
-                        self.result.push_str(&format!("\"{first}\""));
-                    }
-                    for part in parts {
-                        self.result.push('.');
-                        self.result.push_str(&format!("\"{part}\""));
-                    }
-                } else {
-                    self.result.push_str(name);
-                }
-            }
-        }
     }
 }
 
