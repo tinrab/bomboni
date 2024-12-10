@@ -66,6 +66,7 @@ macro_rules! impl_proto_any_serde {
             S: ::serde::Serializer,
         {
             use ::serde::Serialize;
+            use ::prost::Name;
 
             #[derive(::serde::Serialize)]
             struct Proxy<T> {
@@ -75,19 +76,36 @@ macro_rules! impl_proto_any_serde {
                 message: T,
             }
 
-            match value.type_url.as_str() {
-                $(
-                    <$message>::TYPE_URL => {
-                        Proxy {
-                            type_url: <$message>::TYPE_URL.into(),
-                            message: value.clone().unpack_into::<$message>().unwrap(),
-                        }.serialize(serializer)
-                    }
-                )*
-                _ => {
-                    ::core::unimplemented!("any serialize for type url {}", value.type_url)
+            /*
+                This crate used to provide `TYPE_URL` constant per messages.
+                Now `prost` has the `Name` trait and `Name::type_url()`.
+                TODO: Maybe change back.
+            */
+
+            // match value.type_url.as_str() {
+            //     $(
+            //         <$message>::TYPE_URL => {
+            //             Proxy {
+            //                 type_url: <$message>::TYPE_URL.into(),
+            //                 message: value.clone().unpack_into::<$message>().unwrap(),
+            //             }.serialize(serializer)
+            //         }
+            //     )*
+            //     _ => {
+            //         ::core::unimplemented!("any serialize for type url {}", value.type_url)
+            //     }
+            // }
+            $(
+                let type_url = <$message>::type_url();
+                if value.type_url == type_url {
+                    return Proxy {
+                        type_url,
+                        message: value.clone().unpack_into::<$message>().unwrap(),
+                    }.serialize(serializer);
                 }
-            }
+            )*
+
+            ::core::unimplemented!("any serialize for type url {}", value.type_url)
         }
 
         /// Deserialize different messages based on Type URL.
@@ -102,6 +120,7 @@ macro_rules! impl_proto_any_serde {
             use ::serde::Deserialize;
             use ::serde::de::Error;
             use ::pot::Value;
+            use ::prost::Name;
 
             const TYPE_FIELD_NAME: &'static str=  "@type";
 
@@ -124,24 +143,40 @@ macro_rules! impl_proto_any_serde {
                 return Err(Error::custom("expected a map"));
             };
 
-            match type_url.as_str() {
-                $(
-                    <$message>::TYPE_URL => {
-                        let message = Value::Mappings(mappings)
+            // match type_url.as_str() {
+            //     $(
+            //         <$message>::TYPE_URL => {
+            //             let message = Value::Mappings(mappings)
+            //             .deserialize_as::<$message>()
+            //             .map_err(|err| {
+            //                 Error::custom(::std::format!("failed to deserialize {}: {}", type_url, err))
+            //             })?;
+            //             $crate::google::protobuf::Any::pack_from(&message)
+            //             .map_err(|err| {
+            //                 Error::custom(::std::format!("failed to pack {}: {}", type_url, err))
+            //             })
+            //         }
+            //     )*
+            //     _ => {
+            //         ::core::unimplemented!("any deserialize for type url {}", type_url)
+            //     }
+            // }
+
+            $(
+                if <$message>::type_url() == type_url {
+                    let message = Value::Mappings(mappings)
                         .deserialize_as::<$message>()
                         .map_err(|err| {
                             Error::custom(::std::format!("failed to deserialize {}: {}", type_url, err))
                         })?;
-                        $crate::google::protobuf::Any::pack_from(&message)
+                    return $crate::google::protobuf::Any::pack_from(&message)
                         .map_err(|err| {
                             Error::custom(::std::format!("failed to pack {}: {}", type_url, err))
-                        })
-                    }
-                )*
-                _ => {
-                    ::core::unimplemented!("any deserialize for type url {}", type_url)
+                        });
                 }
-            }
+            )*
+
+            ::core::unimplemented!("any deserialize for type url {}", type_url)
         }
     };
 }

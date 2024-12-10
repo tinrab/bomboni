@@ -35,3 +35,16 @@ pub mod google {
         crate::include_proto!("google.rpc.plus");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use google::protobuf::Timestamp;
+    use prost::Name;
+
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        println!("{}", Timestamp::type_url());
+    }
+}

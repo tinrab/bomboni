@@ -1,4 +1,3 @@
-use bomboni_core::format_comment;
 use bomboni_core::string::{str_to_case, Case};
 use proc_macro2::TokenStream;
 use prost_types::DescriptorProto;
@@ -8,14 +7,8 @@ use crate::enums::write_enum;
 use crate::{context::Context, oneofs::write_message_oneofs};
 
 pub fn write_message(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    if context.config.api.names {
-        write_name(context, s, message);
-    }
     if context.config.api.field_names {
         write_field_names(context, s, message);
-    }
-    if context.config.api.type_url {
-        write_type_url(context, s, message);
     }
     if context.config.api.oneof_utility {
         write_message_oneofs(context, s, message);
@@ -48,55 +41,56 @@ pub fn write_message(context: &Context, s: &mut TokenStream, message: &Descripto
     }
 }
 
-fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    let message_ident = context.get_type_expr_path(message.name());
-    let message_proto_name = context.get_proto_type_name(message.name());
-    let package_proto_name = &context.package_name;
+// This is now provided by `prost::Name`
+// fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
+//     let message_ident = context.get_type_expr_path(message.name());
+//     let message_proto_name = context.get_proto_type_name(message.name());
+//     let package_proto_name = &context.package_name;
 
-    let type_url = if context.config.api.type_url {
-        quote!(
-            fn type_url() -> String {
-                Self::TYPE_URL.into()
-            }
-        )
-    } else {
-        quote!()
-    };
+//     let type_url = if context.config.api.type_url {
+//         quote!(
+//             fn type_url() -> String {
+//                 Self::TYPE_URL.into()
+//             }
+//         )
+//     } else {
+//         quote!()
+//     };
 
-    let comment = format_comment!("Implement [`prost::Name`] for `{}`.", message_proto_name);
+//     let comment = format_comment!("Implement [`prost::Name`] for `{}`.", message_proto_name);
 
-    s.extend(quote! {
-        #comment
-        impl ::prost::Name for #message_ident {
-            const NAME: &'static str = #message_proto_name;
-            const PACKAGE: &'static str = #package_proto_name;
-            fn full_name() -> String {
-                format!("{}.{}", Self::PACKAGE, Self::NAME)
-            }
-            #type_url
-        }
-    });
-}
+//     s.extend(quote! {
+//         #comment
+//         impl ::prost::Name for #message_ident {
+//             const NAME: &'static str = #message_proto_name;
+//             const PACKAGE: &'static str = #package_proto_name;
+//             fn full_name() -> String {
+//                 format!("{}.{}", Self::PACKAGE, Self::NAME)
+//             }
+//             #type_url
+//         }
+//     });
+// }
 
-fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-    let message_ident = context.get_type_expr_path(message.name());
-    let message_proto_name = context.get_proto_type_name(message.name());
+// fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
+//     let message_ident = context.get_type_expr_path(message.name());
+//     let message_proto_name = context.get_proto_type_name(message.name());
 
-    let type_url = if let Some(domain) = context.config.api.domain.as_ref() {
-        format!(
-            "{}/{}.{}",
-            domain, &context.package_name, message_proto_name
-        )
-    } else {
-        format!("/{}.{}", &context.package_name, message_proto_name)
-    };
+//     let type_url = if let Some(domain) = context.config.api.domain.as_ref() {
+//         format!(
+//             "{}/{}.{}",
+//             domain, &context.package_name, message_proto_name
+//         )
+//     } else {
+//         format!("/{}.{}", &context.package_name, message_proto_name)
+//     };
 
-    s.extend(quote! {
-        impl #message_ident {
-            pub const TYPE_URL: &'static str = #type_url;
-        }
-    });
-}
+//     s.extend(quote! {
+//         impl #message_ident {
+//             pub const TYPE_URL: &'static str = #type_url;
+//         }
+//     });
+// }
 
 fn write_field_names(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if message.field.is_empty() {

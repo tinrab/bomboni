@@ -25,11 +25,12 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
             .extern_path(".google", "::bomboni_proto::google")
             .protoc_arg("--experimental_allow_proto3_optional")
             .btree_map(["."])
+            .enable_type_names()
+            .type_name_domain(["."], "tests")
             .compile_protos(&proto_paths, &["./proto", "./tests/proto/"])?;
 
         compile(CompileConfig {
             api: ApiConfig {
-                domain: Some("tests".into()),
                 helpers_mod: Some("helpers".into()),
                 ..Default::default()
             },
@@ -64,6 +65,8 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         .file_descriptor_set_path(&fd_path)
         .compile_well_known_types()
         .protoc_arg("--experimental_allow_proto3_optional")
+        .enable_type_names()
+        .type_name_domain(["."], "type.googleapis.com")
         .btree_map(["."]);
 
     build_serde(&mut config);
@@ -75,7 +78,6 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     compile(CompileConfig {
         api: ApiConfig {
-            domain: Some("type.googleapis.com".into()),
             helpers_mod: Some("helpers".into()),
             ..Default::default()
         },

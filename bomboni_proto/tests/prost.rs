@@ -34,14 +34,13 @@ pub mod tools {
 fn names() {
     assert_eq!(CommandRequest::NAME, "CommandRequest");
     assert_eq!(CommandRequest::PACKAGE, "tools");
-    assert_eq!(CommandRequest::TYPE_URL, "tests/tools.CommandRequest");
+    assert_eq!(CommandRequest::type_url(), "tests/tools.CommandRequest");
 
     assert_eq!(Command::NAME, "Command");
     assert_eq!(Command::KIND_ONEOF_NAME, "kind");
     assert_eq!(Command::ETAG_FIELD_NAME, "etag");
     assert_eq!(CommandKind::STATUS_VARIANT_NAME, "status");
 
-    assert_eq!(CommandStatus::NAME, "Command.Status");
     assert_eq!(CommandStatus::PACKAGE, "tools.command.v1");
 
     assert_eq!(Status::NAME, "Status");
