@@ -2311,6 +2311,36 @@ mod tests {
     }
 
     #[test]
+    fn parse_timestamps() {
+        #[derive(Debug, PartialEq, Default)]
+        struct Item {
+            time: Timestamp,
+            time_opt: Option<Timestamp>,
+        }
+
+        #[derive(Debug, PartialEq, Parse)]
+        #[parse(source = Item, write)]
+        struct ParsedItem {
+            #[parse(source = "time", timestamp)]
+            time: UtcDateTime,
+            #[parse(source = "time_opt?", timestamp)]
+            time_opt: Option<UtcDateTime>,
+        }
+
+        assert_eq!(
+            ParsedItem::parse(Item {
+                time: Timestamp::new(42, 1337),
+                time_opt: Some(Timestamp::new(42, 1337)),
+            })
+            .unwrap(),
+            ParsedItem {
+                time: UtcDateTime::from_timestamp(42, 1337).unwrap(),
+                time_opt: Some(UtcDateTime::from_timestamp(42, 1337).unwrap()),
+            }
+        );
+    }
+
+    #[test]
     fn serde_as() {
         #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
         struct Item {

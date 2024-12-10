@@ -160,6 +160,7 @@ mod tests {
             wrapper: false,
             oneof: false,
             enumeration: false,
+            timestamp: false,
             regex: None,
             try_from: None,
             convert: None,

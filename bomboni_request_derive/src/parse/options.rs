@@ -112,27 +112,49 @@ pub struct ParseFieldOptions {
     /// Example: `bio` or `address?.city`
     #[darling(default)]
     pub source: Option<String>,
+
     /// Source field name is the same as the target.
     #[darling(default)]
     pub source_field: bool,
+
     /// Skip parsing field.
     #[darling(default)]
     pub skip: bool,
+
     /// True to keep source and target fields the same.
     /// No parsing will be done.
     #[darling(default)]
     pub keep: bool,
+
     /// True to keep source and target primitive message types the same.
     /// Only surrounding container will be extracted and parsed.
     #[darling(default)]
     pub keep_primitive: bool,
+
     /// Allow unspecified enum values and empty strings.
     /// The field will not be treated as required.
+    ///
+    /// Given the following enum:
+    ///
+    /// ```proto
+    /// message Item {
+    ///     enum ItemKind {
+    ///         ITEM_KIND_UNSPECIFIED = 0;
+    ///     }
+    ///
+    ///     ItemKind kind = 1;
+    /// }
+    /// ```
+    ///
+    /// If `kind` equals 0, then the field will be parsed into the `Unspecified` variant.
+    /// No `RequiredFieldMissing` error will be returned.
     #[darling(default)]
     pub unspecified: bool,
+
     /// Extraction plan for the field.
     #[darling(default)]
     pub extract: Option<FieldExtract>,
+
     /// Parses Protobuf's well-known wrapper type.
     ///
     /// Types are mapped as follows:
@@ -148,22 +170,30 @@ pub struct ParseFieldOptions {
     ///
     #[darling(default)]
     pub wrapper: bool,
+
     /// Parses oneof value.
     /// Special purpose parse for oneof fields.
     #[darling(default)]
     pub oneof: bool,
+
     /// Parses enum value from `i32`.
     /// Special purpose parse for enum fields with `i32` values.
     #[darling(default)]
     pub enumeration: bool,
+
     /// Check string against Regex.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,
+
+    /// Parses `google.protobuf.Timestamp` into a `UtcDateTime`.
+    #[darling(default)]
+    pub timestamp: bool,
 
     /// Convert field to a custom type.
     /// Used for `try_from` and `try_into` conversions.
     #[darling(with = parse_type_path, map = Some)]
     pub try_from: Option<TypePath>,
+
     /// Use custom conversion and writing functions.
     #[darling(default)]
     pub convert: Option<ParseConvert>,

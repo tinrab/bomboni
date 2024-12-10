@@ -244,6 +244,11 @@ pub fn expand_parse_field_type(
                     .map_err(|_| RequestError::path(#field_error_path, CommonError::InvalidEnumValue) #inner_wrap_err)?;
             });
         }
+    } else if field_options.timestamp {
+        parse_impl.extend(quote! {
+            let target = target.try_into()
+                .map_err(|_| RequestError::path(#field_error_path, CommonError::InvalidDateTime) #inner_wrap_err)?;
+        });
     } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
         if field_options.wrapper {
             if matches!(
