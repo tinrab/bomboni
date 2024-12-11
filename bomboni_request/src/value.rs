@@ -1,15 +1,16 @@
+use pest::iterators::Pair;
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter, Write},
 };
 
 use bomboni_common::date_time::UtcDateTime;
-use pest::iterators::Pair;
-
-use crate::filter::parser::Rule;
 
 use crate::{
-    filter::error::{FilterError, FilterResult},
+    filter::{
+        error::{FilterError, FilterResult},
+        parser::Rule,
+    },
     schema::ValueType,
 };
 
@@ -240,6 +241,28 @@ const _: () = {
                 elements.push(e);
             }
             elements
+        }
+    }
+};
+
+#[cfg(feature = "mysql")]
+const _: () = {
+    use mysql_common::Value as MySqlValue;
+    use time::PrimitiveDateTime;
+
+    impl From<Value> for MySqlValue {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Integer(value) => value.into(),
+                Value::Float(value) => value.into(),
+                Value::Boolean(value) => value.into(),
+                Value::String(value) => value.into(),
+                Value::Timestamp(value) => PrimitiveDateTime::from(value).into(),
+                Value::Repeated(_values) => {
+                    todo!("repeated values are not yet supported for mysql")
+                }
+                Value::Any => MySqlValue::NULL,
+            }
         }
     }
 };

@@ -17,7 +17,7 @@ path = "src/lib.rs"
 default = ["testing"]
 testing = []
 tonic = ["dep:tonic", "dep:http"]
-chrono = ["dep:chrono", "bomboni_common/chrono"]
+chrono = ["dep:chrono"]
 wasm = [
   "bomboni_common/wasm",
   "dep:wasm-bindgen",
@@ -31,7 +31,7 @@ js = ["bomboni_common/js"]
 bomboni_common = { workspace = true, features = ["serde"] }
 
 thiserror.workspace = true
-time = { workspace = true, features = ["serde", "formatting", "parsing"] }
+time.workspace = true
 prost.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -44,8 +44,8 @@ chrono = { workspace = true, optional = true }
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
 bomboni_wasm = { workspace = true, optional = true, features = ["derive"] }
 
-wasm-bindgen = { version = "0.2.97", optional = true }
-js-sys = { version = "0.3.74", optional = true }
+wasm-bindgen = { version = "0.2.99", optional = true }
+js-sys = { version = "0.3.76", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 
 [dev-dependencies]

@@ -1,11 +1,11 @@
-use bomboni_common::date_time::{UtcDateTime, UtcDateTimeError};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
     time::SystemTime,
 };
-use time::OffsetDateTime;
+
+use bomboni_common::date_time::{UtcDateTime, UtcDateTimeError};
 
 use crate::google::protobuf::Timestamp;
 
@@ -77,7 +77,7 @@ impl From<UtcDateTime> for Timestamp {
         let (seconds, nanoseconds) = value.timestamp();
         Self {
             seconds,
-            nanos: nanoseconds as i32,
+            nanos: nanoseconds,
         }
     }
 }
@@ -89,66 +89,50 @@ impl TryFrom<Timestamp> for UtcDateTime {
         if value.nanos < 0 {
             return Err(UtcDateTimeError::InvalidNanoseconds);
         }
-        UtcDateTime::from_timestamp(value.seconds, value.nanos as u32)
+        UtcDateTime::from_timestamp(value.seconds, value.nanos)
     }
 }
 
-impl From<OffsetDateTime> for Timestamp {
-    fn from(value: OffsetDateTime) -> Self {
+// #[cfg(feature = "chrono")]
+// const _: () = {
+//     use chrono::{DateTime, NaiveDateTime, Utc};
+
+//     impl TryFrom<Timestamp> for DateTime<Utc> {
+//         type Error = TimestampError;
+
+//         fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+//             DateTime::from_timestamp(value.seconds, value.nanos as u32)
+//                 .ok_or(TimestampError::NotUtc)
+//         }
+//     }
+
+//     impl From<DateTime<Utc>> for Timestamp {
+//         fn from(value: DateTime<Utc>) -> Self {
+//             Timestamp {
+//                 seconds: value.timestamp(),
+//                 nanos: value.timestamp_subsec_nanos() as i32,
+//             }
+//         }
+//     }
+
+//     impl TryFrom<Timestamp> for NaiveDateTime {
+//         type Error = TimestampError;
+
+//         fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+//             Ok(DateTime::try_from(value)?.naive_utc())
+//         }
+//     }
+
+//     impl From<NaiveDateTime> for Timestamp {
+//         fn from(value: NaiveDateTime) -> Self {
+//             value.and_utc().into()
+//         }
+//     }
+// };
+
+impl From<SystemTime> for Timestamp {
+    fn from(value: SystemTime) -> Self {
         UtcDateTime::from(value).into()
-    }
-}
-
-impl TryFrom<Timestamp> for OffsetDateTime {
-    type Error = UtcDateTimeError;
-
-    fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-        UtcDateTime::try_from(value).map(Into::into)
-    }
-}
-
-#[cfg(feature = "chrono")]
-const _: () = {
-    use chrono::{DateTime, NaiveDateTime, Utc};
-
-    impl TryFrom<NaiveDateTime> for Timestamp {
-        type Error = UtcDateTimeError;
-
-        fn try_from(value: NaiveDateTime) -> Result<Self, Self::Error> {
-            UtcDateTime::try_from(value).map(Into::into)
-        }
-    }
-
-    impl TryFrom<Timestamp> for NaiveDateTime {
-        type Error = UtcDateTimeError;
-
-        fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-            UtcDateTime::try_from(value)?.try_into()
-        }
-    }
-
-    impl TryFrom<DateTime<Utc>> for Timestamp {
-        type Error = UtcDateTimeError;
-
-        fn try_from(value: DateTime<Utc>) -> Result<Self, Self::Error> {
-            UtcDateTime::try_from(value).map(Into::into)
-        }
-    }
-
-    impl TryFrom<Timestamp> for DateTime<Utc> {
-        type Error = UtcDateTimeError;
-
-        fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-            UtcDateTime::try_from(value)?.try_into()
-        }
-    }
-};
-
-impl TryFrom<SystemTime> for Timestamp {
-    type Error = UtcDateTimeError;
-
-    fn try_from(system_time: SystemTime) -> Result<Self, Self::Error> {
-        UtcDateTime::try_from(system_time).map(Into::into)
     }
 }
 
@@ -204,7 +188,7 @@ const _: () = {
 
     impl From<Timestamp> for JsValue {
         fn from(value: Timestamp) -> Self {
-            UtcDateTime::try_from(value).unwrap().into()
+            OffsetDateTime::try_from(value).unwrap().into()
         }
     }
 
@@ -212,7 +196,7 @@ const _: () = {
         type Error = JsValue;
 
         fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-            UtcDateTime::try_from(value).map(Into::into)
+            OffsetDateTime::try_from(value).map(Into::into)
         }
     }
 };

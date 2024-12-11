@@ -1,12 +1,13 @@
-use crate::error::RequestResult;
-use bomboni_common::date_time::UtcDateTime;
-use bomboni_common::id::Id;
+use bomboni_common::{date_time::UtcDateTime, id::Id};
+
 #[cfg(all(
     target_family = "wasm",
     not(any(target_os = "emscripten", target_os = "wasi")),
     feature = "wasm"
 ))]
 use wasm_bindgen::prelude::*;
+
+use crate::error::RequestResult;
 
 pub mod helpers;
 
@@ -2334,8 +2335,8 @@ mod tests {
             })
             .unwrap(),
             ParsedItem {
-                time: UtcDateTime::from_timestamp(42, 1337).unwrap(),
-                time_opt: Some(UtcDateTime::from_timestamp(42, 1337).unwrap()),
+                time: UtcDateTime::new(42, 1337),
+                time_opt: Some(UtcDateTime::new(42, 1337)),
             }
         );
     }

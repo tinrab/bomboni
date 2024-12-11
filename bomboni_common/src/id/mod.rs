@@ -7,15 +7,17 @@ use std::{
     str::FromStr,
 };
 use thiserror::Error;
+use time::{Duration, OffsetDateTime};
 use ulid::Ulid;
 
 #[cfg(feature = "serde")]
 use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::date_time::UtcDateTime;
-
+#[cfg(feature = "mysql")]
+mod mysql;
 #[cfg(feature = "postgres")]
 mod postgres;
+
 pub mod worker;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -70,17 +72,17 @@ impl Id {
 
     /// Encodes the [`Id`] from worker parts.
     #[must_use]
-    pub fn from_worker_parts(time: UtcDateTime, worker: u16, sequence: u16) -> Self {
-        let timestamp = time.unix_timestamp() as u128;
+    pub fn from_worker_parts(time: OffsetDateTime, worker: u16, sequence: u16) -> Self {
+        let timestamp_ms = time.unix_timestamp_nanos() as u128 / 1_000_000;
         let worker = u128::from(worker);
         let sequence = u128::from(sequence);
 
-        assert!(timestamp < (1 << TIMESTAMP_BITS));
+        assert!(timestamp_ms < (1 << TIMESTAMP_BITS));
         assert!(worker < (1 << WORKER_BITS));
         assert!(sequence < (1 << SEQUENCE_BITS));
 
         Self(
-            (timestamp & ((1 << TIMESTAMP_BITS) - 1)) << (WORKER_BITS + SEQUENCE_BITS)
+            (timestamp_ms & ((1 << TIMESTAMP_BITS) - 1)) << (WORKER_BITS + SEQUENCE_BITS)
                 | ((worker & ((1 << WORKER_BITS) - 1)) << SEQUENCE_BITS)
                 | (sequence & ((1 << SEQUENCE_BITS) - 1)),
         )
@@ -88,7 +90,7 @@ impl Id {
 
     /// Encodes the [`Id`] from time and a random number.
     #[must_use]
-    pub fn from_time_and_random(time: UtcDateTime, random: u128) -> Self {
+    pub fn from_time_and_random(time: OffsetDateTime, random: u128) -> Self {
         let timestamp_ms = time.unix_timestamp_nanos() / 1_000_000;
         let id = Ulid::from_parts(timestamp_ms as u64, random);
         Self::new(id.0)
@@ -96,26 +98,27 @@ impl Id {
 
     /// Decodes [`Id`]'s worker parts.
     #[must_use]
-    pub fn decode_worker(self) -> (UtcDateTime, u16, u16) {
-        let timestamp =
-            UtcDateTime::from_timestamp((self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as i64, 0)
-                .unwrap();
+    pub fn decode_worker(self) -> (OffsetDateTime, u16, u16) {
+        let milliseconds = (self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as i64;
+        let timestamp = OffsetDateTime::UNIX_EPOCH + Duration::milliseconds(milliseconds);
+
         let worker = ((self.0 >> SEQUENCE_BITS) & ((1 << WORKER_BITS) - 1)) as u16;
         let sequence = (self.0 & ((1 << SEQUENCE_BITS) - 1)) as u16;
+
         (timestamp, worker, sequence)
     }
 
     /// Decodes [`Id`]'s time and randomness parts.
     #[must_use]
-    pub fn decode_time_and_random(self) -> (UtcDateTime, u128) {
+    pub fn decode_time_and_random(self) -> (OffsetDateTime, u128) {
         let id = Ulid::from(self.0);
-        let timestamp_ms = id.timestamp_ms();
-        let seconds = timestamp_ms / 1000;
-        let nanoseconds = timestamp_ms % 1000 * 1_000_000;
-        (
-            UtcDateTime::from_timestamp(seconds as i64, nanoseconds as u32).unwrap(),
-            id.random(),
-        )
+
+        let milliseconds = id.timestamp_ms() as i64;
+        let timestamp = OffsetDateTime::UNIX_EPOCH + Duration::milliseconds(milliseconds);
+
+        let random = id.random();
+
+        (timestamp, random)
     }
 }
 
@@ -201,7 +204,6 @@ impl<'de> Deserialize<'de> for Id {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -230,9 +232,13 @@ mod tests {
 
     #[test]
     fn worker_parts() {
-        let ts = UtcDateTime::from_timestamp(10, 0).unwrap();
+        let ts = OffsetDateTime::from_unix_timestamp(42).unwrap() + Duration::milliseconds(1337);
+
         let id = Id::from_worker_parts(ts, 1, 1);
-        assert_eq!(id, Id(0b1010_0000_0000_0000_0001_0000_0000_0000_0001));
+        assert_eq!(
+            id,
+            Id(0b1010_1001_0100_1001_0000_0000_0000_0001_0000_0000_0000_0001)
+        );
         let (timestamp, worker, sequence) = id.decode_worker();
         assert_eq!(timestamp, ts);
         assert_eq!(worker, 1);
@@ -242,10 +248,10 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn serialize() {
-        let id = Id::from_worker_parts(UtcDateTime::from_timestamp(3, 0).unwrap(), 5, 7);
+        let id = Id::from_worker_parts(OffsetDateTime::from_unix_timestamp(42).unwrap(), 5, 7);
         assert_eq!(
             serde_json::to_string(&id).unwrap(),
-            r#""0000000000000000000C00A007""#
+            r#""0000000000000000542000A007""#
         );
     }
 }

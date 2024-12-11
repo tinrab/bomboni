@@ -185,7 +185,7 @@ pub struct ParseFieldOptions {
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,
 
-    /// Parses `google.protobuf.Timestamp` into a `UtcDateTime`.
+    /// Parses `google.protobuf.Timestamp` into a `OffsetDateTime`.
     #[darling(default)]
     pub timestamp: bool,
 

@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::Duration;
+use time::OffsetDateTime;
 
-use crate::date_time::UtcDateTime;
 use crate::id::Id;
 
 #[derive(Debug, Clone, Copy)]
@@ -33,7 +33,7 @@ impl WorkerIdGenerator {
     /// assert_ne!(g.generate(), g.generate());
     /// ```
     pub fn generate(&mut self) -> Id {
-        let id = Id::from_worker_parts(UtcDateTime::now(), self.worker, self.next);
+        let id = Id::from_worker_parts(OffsetDateTime::now_utc(), self.worker, self.next);
 
         self.next += 1;
         if self.next == u16::MAX {
@@ -49,7 +49,7 @@ impl WorkerIdGenerator {
     /// The same as [`generate`] but async.
     #[cfg(feature = "tokio")]
     pub async fn generate_async(&mut self) -> Id {
-        let id = Id::from_worker_parts(UtcDateTime::now(), self.worker, self.next);
+        let id = Id::from_worker_parts(OffsetDateTime::now_utc(), self.worker, self.next);
 
         self.next += 1;
         if self.next == u16::MAX {
@@ -82,7 +82,7 @@ impl WorkerIdGenerator {
         }
 
         let mut ids = Vec::with_capacity(count);
-        let mut now = UtcDateTime::now();
+        let mut now = OffsetDateTime::now_utc();
 
         for _ in 0..count {
             let id = Id::from_worker_parts(now, self.worker, self.next);
@@ -92,7 +92,7 @@ impl WorkerIdGenerator {
             if self.next == u16::MAX {
                 self.next = 0;
                 thread::sleep(SLEEP_DURATION);
-                now = UtcDateTime::now();
+                now = OffsetDateTime::now_utc();
             }
         }
 
@@ -109,7 +109,7 @@ impl WorkerIdGenerator {
         }
 
         let mut ids = Vec::with_capacity(count);
-        let mut now = UtcDateTime::now();
+        let mut now = OffsetDateTime::now_utc();
 
         for _ in 0..count {
             let id = Id::from_worker_parts(now, self.worker, self.next);
@@ -119,7 +119,7 @@ impl WorkerIdGenerator {
             if self.next == u16::MAX {
                 self.next = 0;
                 tokio::time::sleep(SLEEP_DURATION).await;
-                now = UtcDateTime::now();
+                now = OffsetDateTime::now_utc();
             }
         }
 
