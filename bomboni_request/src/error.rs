@@ -533,6 +533,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -557,8 +559,7 @@ mod tests {
                 RequestError::from(QueryError::InvalidPageSize).wrap_request("List"),
             ))
             .unwrap(),
-            serde_json::from_str::<serde_json::Value>(
-                r#"{
+            json!({
                 "code": "INVALID_ARGUMENT",
                 "message": "invalid `List` request",
                 "details": [
@@ -572,9 +573,7 @@ mod tests {
                         ]
                     }
                 ]
-            }"#
-            )
-            .unwrap()
+            }),
         );
     }
 
