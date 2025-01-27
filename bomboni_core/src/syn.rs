@@ -14,7 +14,7 @@ pub fn type_is_phantom(ty: &Type) -> bool {
     if let Type::Path(TypePath { path, .. }) = ty {
         path.segments
             .last()
-            .map_or(false, |path| path.ident == "PhantomData")
+            .is_some_and(|path| path.ident == "PhantomData")
     } else {
         false
     }
@@ -24,7 +24,7 @@ pub fn type_is_option(ty: &Type) -> bool {
     if let Type::Path(TypePath { path, .. }) = ty {
         path.segments
             .last()
-            .map_or(false, |path| path.ident == "Option")
+            .is_some_and(|path| path.ident == "Option")
     } else {
         false
     }

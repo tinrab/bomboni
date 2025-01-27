@@ -41,57 +41,6 @@ pub fn write_message(context: &Context, s: &mut TokenStream, message: &Descripto
     }
 }
 
-// This is now provided by `prost::Name`
-// fn write_name(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-//     let message_ident = context.get_type_expr_path(message.name());
-//     let message_proto_name = context.get_proto_type_name(message.name());
-//     let package_proto_name = &context.package_name;
-
-//     let type_url = if context.config.api.type_url {
-//         quote!(
-//             fn type_url() -> String {
-//                 Self::TYPE_URL.into()
-//             }
-//         )
-//     } else {
-//         quote!()
-//     };
-
-//     let comment = format_comment!("Implement [`prost::Name`] for `{}`.", message_proto_name);
-
-//     s.extend(quote! {
-//         #comment
-//         impl ::prost::Name for #message_ident {
-//             const NAME: &'static str = #message_proto_name;
-//             const PACKAGE: &'static str = #package_proto_name;
-//             fn full_name() -> String {
-//                 format!("{}.{}", Self::PACKAGE, Self::NAME)
-//             }
-//             #type_url
-//         }
-//     });
-// }
-
-// fn write_type_url(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
-//     let message_ident = context.get_type_expr_path(message.name());
-//     let message_proto_name = context.get_proto_type_name(message.name());
-
-//     let type_url = if let Some(domain) = context.config.api.domain.as_ref() {
-//         format!(
-//             "{}/{}.{}",
-//             domain, &context.package_name, message_proto_name
-//         )
-//     } else {
-//         format!("/{}.{}", &context.package_name, message_proto_name)
-//     };
-
-//     s.extend(quote! {
-//         impl #message_ident {
-//             pub const TYPE_URL: &'static str = #type_url;
-//         }
-//     });
-// }
-
 fn write_field_names(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if message.field.is_empty() {
         return;

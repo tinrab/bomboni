@@ -198,6 +198,8 @@ pub fn expand_parse_field_type(
     if let Some(regex) = field_options.regex.as_ref() {
         parse_impl.extend(quote! {
             static REGEX: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
+            // TODO: optimize
+            #[allow(regex_creation_in_loops)]
             let re = REGEX.get_or_init(|| ::regex::Regex::new(#regex).unwrap());
         });
     }

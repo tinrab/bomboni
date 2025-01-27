@@ -23,8 +23,8 @@ bomboni_wasm_core = { workspace = true }
 bomboni_wasm_derive = { workspace = true, optional = true }
 
 serde.workspace = true
-wasm-bindgen = "0.2.99"
-js-sys = "0.3.76"
+wasm-bindgen = "0.2.100"
+js-sys = "0.3.77"
 serde-wasm-bindgen = "0.6.5"
 
 [dev-dependencies]

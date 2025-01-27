@@ -60,8 +60,8 @@ mysql_common = { workspace = true, features = ["time"], optional = true }
 getrandom = { version = "0.2.15", features = ["js"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.99", optional = true }
-js-sys = { version = "0.3.76", optional = true }
+wasm-bindgen = { version = "0.2.100", optional = true }
+js-sys = { version = "0.3.77", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

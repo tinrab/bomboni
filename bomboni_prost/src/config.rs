@@ -15,9 +15,7 @@ pub struct CompileConfig {
 pub struct ApiConfig {
     pub names: bool,
     pub field_names: bool,
-    pub type_url: bool,
     pub oneof_utility: bool,
-    pub domain: Option<String>,
     pub serde: bool,
     pub helpers_mod: Option<String>,
 }
@@ -40,9 +38,7 @@ impl Default for ApiConfig {
         Self {
             names: true,
             field_names: true,
-            type_url: true,
             oneof_utility: true,
-            domain: None,
             serde: true,
             helpers_mod: None,
         }

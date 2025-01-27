@@ -45,6 +45,9 @@ mod tests {
 
     #[test]
     fn it_works() {
-        println!("{}", Timestamp::type_url());
+        assert_eq!(
+            Timestamp::type_url(),
+            "type.googleapis.com/google.protobuf.Timestamp"
+        );
     }
 }
