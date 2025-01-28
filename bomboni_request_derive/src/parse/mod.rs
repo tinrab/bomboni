@@ -50,17 +50,6 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
         }
     });
 
-    result.extend(if let Some(path) = options.prost_crate.as_ref() {
-        quote! {
-            use #path as _prost;
-        }
-    } else {
-        quote! {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate prost as _prost;
-        }
-    });
-
     let (mut use_proto, mut use_request) = if let Some(path) = options.bomboni_crate.as_ref() {
         (quote!(#path::proto), quote!(#path::request))
     } else if cfg!(feature = "root-crate") {
@@ -92,7 +81,6 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
             },
             parse::{RequestParse, RequestParseInto},
         };
-        use _prost::Name;
     });
 
     result

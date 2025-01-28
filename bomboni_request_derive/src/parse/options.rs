@@ -54,9 +54,6 @@ pub struct ParseOptions {
     /// Custom `serde` crate path.
     #[darling(default)]
     pub serde_crate: Option<Path>,
-    /// Custom `prost` crate path.
-    #[darling(default)]
-    pub prost_crate: Option<Path>,
 }
 
 #[derive(Debug, FromMeta)]

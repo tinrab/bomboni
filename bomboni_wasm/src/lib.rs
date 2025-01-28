@@ -1,19 +1,28 @@
+use std::error::Error;
+
 use wasm_bindgen::prelude::*;
 
 pub mod macros;
 
-const JSON_SERIALIZER: serde_wasm_bindgen::Serializer =
-    serde_wasm_bindgen::Serializer::json_compatible();
+// const JSON_SERIALIZER: serde_wasm_bindgen::Serializer =
+//     serde_wasm_bindgen::Serializer::json_compatible();
 
 pub trait Wasm {
     type JsType: JsCast;
 
-    fn to_js(&self) -> Result<Self::JsType, serde_wasm_bindgen::Error>
+    fn to_js(&self) -> Result<JsValue, Box<dyn Error>>
     where
         Self: serde::Serialize,
     {
-        self.serialize(&JSON_SERIALIZER)
-            .map(JsCast::unchecked_from_js)
+        use gloo_utils::format::JsValueSerdeExt;
+        let js_value = JsValue::from_serde(self)?;
+        Ok(js_value)
+
+        // In some cases, this doesn't work.
+        // Values parsed from WASM memory get read from invalid memory locations.
+        // I have no idea why, so I'm using gloo_utils instead.
+        // self.serialize(&JSON_SERIALIZER)
+        //     .map(JsCast::unchecked_from_js)
     }
 
     fn from_js<T: Into<JsValue>>(js: T) -> Result<Self, serde_wasm_bindgen::Error>
