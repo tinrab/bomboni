@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euxo pipefail
 
-set -eo pipefail
 current_path="$(realpath $0)"
 current_dir="$(dirname $current_path)"
 
@@ -58,7 +58,7 @@ function lint() {
 }
 
 function test() {
-	if [[ "$2" =~ ^(--no-default-features)$ ]]; then
+	if [[ "${2:-}" =~ ^(--no-default-features)$ ]]; then
 		cargo test --workspace --all-targets --no-default-features --features testing,request -- --nocapture
 		cargo test --workspace --doc --no-default-features --features testing -- --nocapture
 	else
@@ -97,17 +97,22 @@ function publish() {
 	fi
 }
 
+function build() {
+	cargo build --workspace --all-features
+}
+
 function help() {
 	echo "Usage: $(basename "$0") [OPTIONS]
 
 Commands:
+  build          Build the project
   lint           Run lints
   test           Run all tests
   help           Show help
 "
 }
 
-if [[ $1 =~ ^(format|lint|test|publish|help)$ ]]; then
+if [[ $1 =~ ^(format|build|lint|test|publish|help)$ ]]; then
 	"$@"
 else
 	help

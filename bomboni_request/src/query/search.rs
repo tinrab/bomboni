@@ -8,9 +8,8 @@ use crate::{
     query::{
         error::{QueryError, QueryResult},
         page_token::{
-            aes256::Aes256PageTokenBuilder, base64::Base64PageTokenBuilder,
-            plain::PlainPageTokenBuilder, rsa::RsaPageTokenBuilder, FilterPageToken,
-            PageTokenBuilder,
+            FilterPageToken, PageTokenBuilder, aes256::Aes256PageTokenBuilder,
+            base64::Base64PageTokenBuilder, plain::PlainPageTokenBuilder, rsa::RsaPageTokenBuilder,
         },
         utility::{parse_query_filter, parse_query_ordering},
     },
@@ -175,7 +174,7 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
 mod tests {
     use crate::{
         filter::error::FilterError,
-        ordering::{error::OrderingError, OrderingDirection},
+        ordering::{OrderingDirection, error::OrderingError},
         query::page_token::plain::PlainPageTokenBuilder,
         testing::schema::UserItem,
     };

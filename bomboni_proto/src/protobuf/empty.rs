@@ -1,5 +1,6 @@
-use crate::google::protobuf::Empty;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::google::protobuf::Empty;
 
 impl Empty {
     #[must_use]

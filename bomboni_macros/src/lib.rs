@@ -11,7 +11,7 @@ pub mod collections;
 /// # Examples
 ///
 /// ```
-/// use bomboni_common::regex;
+/// use bomboni_macros::regex;
 ///
 /// let re = regex!("\\d{4}-\\d{2}-\\d{2}");
 /// assert!(re.is_match("2021-08-012"));

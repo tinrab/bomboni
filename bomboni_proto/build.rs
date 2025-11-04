@@ -2,52 +2,23 @@ use bomboni_prost::{
     compile,
     config::{ApiConfig, CompileConfig},
 };
-use prost_build::Config;
 use std::{error::Error, path::PathBuf};
+
+use prost_build::Config;
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let fd_path = out_dir.join("fd.pb");
 
-    #[cfg(feature = "testing")]
-    {
-        let fd_path = out_dir.join("test.pb");
-
-        let proto_paths = ["./tests/proto/tools.proto"];
-        for proto_path in &proto_paths {
-            println!("cargo:rerun-if-changed={proto_path}");
-        }
-
-        let mut config = Config::new();
-        config
-            .file_descriptor_set_path(&fd_path)
-            .compile_well_known_types()
-            .extern_path(".google", "::bomboni_proto::google")
-            .protoc_arg("--experimental_allow_proto3_optional")
-            .btree_map(["."])
-            .enable_type_names()
-            .type_name_domain(["."], "tests")
-            .compile_protos(&proto_paths, &["./proto", "./tests/proto/"])?;
-
-        compile(CompileConfig {
-            api: ApiConfig {
-                helpers_mod: Some("helpers".into()),
-                ..Default::default()
-            },
-            file_descriptor_set_path: out_dir.join(fd_path),
-            external_paths: [(".google", "::bomboni_proto::google")].into(),
-            ..Default::default()
-        })?;
-    }
-
     let root_path = PathBuf::from("./proto");
     let proto_paths: Vec<_> = [
+        "google/protobuf/any.proto",
+        "google/protobuf/duration.proto",
+        "google/protobuf/empty.proto",
+        "google/protobuf/field_mask.proto",
+        "google/protobuf/struct.proto",
         "google/protobuf/timestamp.proto",
         "google/protobuf/wrappers.proto",
-        "google/protobuf/any.proto",
-        "google/protobuf/field_mask.proto",
-        "google/protobuf/empty.proto",
-        "google/protobuf/struct.proto",
         "google/rpc/error_details.proto",
         "google/rpc/code.proto",
         "google/rpc/status.proto",
@@ -62,12 +33,12 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     let mut config = Config::new();
     config
-        .file_descriptor_set_path(&fd_path)
-        .compile_well_known_types()
         .protoc_arg("--experimental_allow_proto3_optional")
         .enable_type_names()
+        .file_descriptor_set_path(&fd_path)
         .type_name_domain(["."], "type.googleapis.com")
-        .btree_map(["."]);
+        .btree_map(["."])
+        .compile_well_known_types();
 
     build_serde(&mut config);
     if std::env::var("CARGO_CFG_TARGET_FAMILY") == Ok("wasm".into()) && cfg!(feature = "wasm") {
@@ -76,14 +47,19 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     config.compile_protos(&proto_paths, &["./proto"])?;
 
-    compile(CompileConfig {
+    let mut compile_config = CompileConfig {
         api: ApiConfig {
             helpers_mod: Some("helpers".into()),
+            serde: true,
             ..Default::default()
         },
         file_descriptor_set_path: out_dir.join(fd_path),
         ..Default::default()
-    })?;
+    };
+    compile_config
+        .external_paths
+        .insert(".google", "crate::google");
+    compile(compile_config)?;
 
     Ok(())
 }

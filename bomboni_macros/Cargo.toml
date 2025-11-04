@@ -1,14 +1,13 @@
 [package]
-name = "bomboni_fs"
+name = "bomboni_macros"
 version = "0.1.62"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
-description = "Utilites for working with the file system. Part of Bomboni library."
+description = "Common macros for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "../README.md"
 edition = "2024"
 
-[lib]
-name = "bomboni_fs"
-path = "src/lib.rs"
+[dev-dependencies]
+regex.workspace = true

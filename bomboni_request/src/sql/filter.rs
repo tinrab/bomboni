@@ -1,12 +1,12 @@
 use crate::{
     filter::{
-        error::{FilterError, FilterResult},
         Filter, FilterComparator,
+        error::{FilterError, FilterResult},
     },
     schema::{FunctionSchemaMap, Schema, ValueType},
     sql::{
-        utility::{get_argument_parameter, get_identifier},
         SqlArgumentStyle, SqlDialect, SqlRenameMap,
+        utility::{get_argument_parameter, get_identifier},
     },
     value::Value,
 };
@@ -383,7 +383,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use crate::{schema::FunctionSchema, testing::schema::RequestItem};
-    use bomboni_common::btree_map_into;
+    use bomboni_macros::btree_map_into;
 
     use super::*;
 
@@ -433,17 +433,25 @@ mod tests {
         assert_eq!(sql, r#"REGEX("user"."displayName", $1)"#);
         assert_eq!(args[0], Value::String("a".into()));
 
-        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
-            .build(&Filter::parse("logs").unwrap())
-            .is_err());
-        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
-            .build(&Filter::parse("user.logs").unwrap())
-            .is_err());
-        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
-            .build(&Filter::parse("user.id = 42").unwrap())
-            .is_err());
-        assert!(SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
-            .build(&Filter::parse("task.deleted < false").unwrap())
-            .is_err());
+        assert!(
+            SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
+                .build(&Filter::parse("logs").unwrap())
+                .is_err()
+        );
+        assert!(
+            SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
+                .build(&Filter::parse("user.logs").unwrap())
+                .is_err()
+        );
+        assert!(
+            SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
+                .build(&Filter::parse("user.id = 42").unwrap())
+                .is_err()
+        );
+        assert!(
+            SqlFilterBuilder::new(SqlDialect::Postgres, &schema)
+                .build(&Filter::parse("task.deleted < false").unwrap())
+                .is_err()
+        );
     }
 }

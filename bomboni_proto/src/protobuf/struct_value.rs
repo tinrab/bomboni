@@ -1,12 +1,13 @@
-use crate::google::protobuf::{
-    value::Kind as ValueKind, Empty, ListValue, NullValue, Struct, Value,
-};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
     fmt::Display,
+};
+
+use crate::google::protobuf::{
+    Empty, ListValue, NullValue, Struct, Value, value::Kind as ValueKind,
 };
 
 impl Struct {

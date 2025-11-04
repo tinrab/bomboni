@@ -5,7 +5,7 @@
 /// # Examples
 ///
 /// ```
-/// use bomboni_common::count_repeating;
+/// use bomboni_macros::count_repeating;
 ///
 /// let count = count_repeating!(1, 1, 2, 3, 5);
 /// assert_eq!(count, 5);
@@ -23,7 +23,7 @@ macro_rules! count_repeating {
 /// Create a map of key-value pairs.
 ///
 /// ```
-/// use bomboni_common::btree_map;
+/// use bomboni_macros::btree_map;
 ///
 /// let map = btree_map! {
 ///     1 => "first",
@@ -55,7 +55,7 @@ macro_rules! btree_map {
 ///
 /// ```
 /// # use std::collections::BTreeMap;
-/// use bomboni_common::btree_map_into;
+/// use bomboni_macros::btree_map_into;
 ///
 /// let map: BTreeMap<i32, String> = btree_map_into! {
 ///     1 => "first",
@@ -78,7 +78,7 @@ macro_rules! btree_map_into {
 /// Create a map of key-value pairs.
 ///
 /// ```
-/// use bomboni_common::hash_map;
+/// use bomboni_macros::hash_map;
 ///
 /// let map = hash_map! {
 ///     1 => "first",
@@ -91,7 +91,7 @@ macro_rules! btree_map_into {
 /// Create a map with a given capacity.
 ///
 /// ```
-/// use bomboni_common::hash_map;
+/// use bomboni_macros::hash_map;
 /// # use std::collections::HashMap;
 ///
 /// let _map: HashMap<i32, String> = hash_map!(100);
@@ -121,7 +121,7 @@ macro_rules! hash_map {
 ///
 /// ```
 /// # use std::collections::HashMap;
-/// use bomboni_common::hash_map_into;
+/// use bomboni_macros::hash_map_into;
 ///
 /// let map: HashMap<i32, String> = hash_map_into! {
 ///     1 => "first",
@@ -142,7 +142,7 @@ macro_rules! hash_map_into {
 /// # Examples
 ///
 /// ```
-/// use bomboni_common::btree_set;
+/// use bomboni_macros::btree_set;
 ///
 /// let set = btree_set![1, 2, 3];
 /// assert!(set.contains(&1));
@@ -170,7 +170,7 @@ macro_rules! btree_set {
 ///
 /// ```
 /// # use std::collections::BTreeSet;
-/// use bomboni_common::btree_set_into;
+/// use bomboni_macros::btree_set_into;
 ///
 /// let set: BTreeSet<i32> = btree_set_into![1, 2, 3];
 /// assert!(set.contains(&1));
@@ -189,7 +189,7 @@ macro_rules! btree_set_into {
 /// # Examples
 ///
 /// ```
-/// use bomboni_common::hash_set;
+/// use bomboni_macros::hash_set;
 ///
 /// let set = hash_set![1, 2, 3];
 /// assert!(set.contains(&1));
@@ -217,7 +217,7 @@ macro_rules! hash_set {
 ///
 /// ```
 /// # use std::collections::HashSet;
-/// use bomboni_common::hash_set_into;
+/// use bomboni_macros::hash_set_into;
 ///
 /// let set: HashSet<i32> = hash_set_into![1, 2, 3];
 /// assert!(set.contains(&1));
@@ -237,7 +237,7 @@ macro_rules! hash_set_into {
 ///
 /// ```
 /// # use std::collections::VecDeque;
-/// use bomboni_common::vec_deque;
+/// use bomboni_macros::vec_deque;
 ///
 /// let deque = vec_deque![1, 2, 3];
 /// assert_eq!(deque, VecDeque::from(vec![1, 2, 3]));
@@ -262,7 +262,7 @@ macro_rules! vec_deque {
 ///
 /// ```
 /// # use std::collections::VecDeque;
-/// use bomboni_common::vec_deque_into;
+/// use bomboni_macros::vec_deque_into;
 ///
 /// let deque: VecDeque<i32> = vec_deque_into![1, 2, 3];
 /// assert_eq!(deque, VecDeque::from(vec![1, 2, 3]));

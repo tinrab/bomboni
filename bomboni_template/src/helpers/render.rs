@@ -59,7 +59,7 @@ fn set_decorator(
 #[cfg(test)]
 mod tests {
     use crate::helpers::string::register_string_helpers;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     use super::*;
 

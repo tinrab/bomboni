@@ -7,13 +7,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bomboni_core::string::{str_to_case, Case};
+use bomboni_core::string::{Case, str_to_case};
 use bomboni_wasm_core::{
     options::{JsValueWasm, ProxyWasm, WasmOptions},
     ts_decl::{TsDecl, TsDeclParser},
 };
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{self, DeriveInput};
 
 pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
@@ -440,7 +440,7 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
     if let TsDecl::Enum(ts_enum) = &ts_decl {
         let mut unique_member_names = BTreeSet::new();
         for member in &ts_enum.members {
-            let member_name = str_to_case(&member.name, Case::ScreamingSnake);
+            let member_name = str_to_case(&member.name, Case::Constant);
             let member_value = member.alias_type.to_string();
             if !unique_member_names.insert(member_name.clone())
                 || !unique_member_names.insert(member_value.clone())
@@ -723,7 +723,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
                 VectorFromWasmAbi, VectorIntoWasmAbi,
             },
             describe::{WasmDescribe, WasmDescribeVector},
-            JsObject, JsValue,
+            JsValue,
         };
         use _js_sys::JsString;
         use #use_wasm::Wasm;

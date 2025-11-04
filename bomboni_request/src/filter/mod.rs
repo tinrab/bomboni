@@ -9,8 +9,8 @@ use std::fmt::{Display, Formatter, Write};
 
 use itertools::Itertools;
 use parser::{FilterParser, Rule};
-use pest::iterators::Pair;
 use pest::Parser;
+use pest::iterators::Pair;
 
 use crate::filter::error::FilterError;
 use crate::schema::{FunctionSchemaMap, MemberSchema, Schema, SchemaMapped, ValueType};

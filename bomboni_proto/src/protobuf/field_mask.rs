@@ -1,7 +1,7 @@
-use crate::serde::helpers as serde_helpers;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::google::protobuf::FieldMask;
+use crate::serde::helpers as serde_helpers;
 
 impl FieldMask {
     #[must_use]

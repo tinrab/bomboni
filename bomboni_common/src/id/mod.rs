@@ -11,7 +11,7 @@ use time::{Duration, OffsetDateTime};
 use ulid::Ulid;
 
 #[cfg(feature = "serde")]
-use serde::{de::Unexpected, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Unexpected};
 
 #[cfg(feature = "mysql")]
 mod mysql;

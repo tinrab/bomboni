@@ -1,17 +1,17 @@
 use bomboni_core::syn::type_is_phantom;
 use darling::{
+    FromDeriveInput, FromField, FromMeta, FromVariant,
     ast::{Data, Fields, NestedMeta, Style},
     util::parse_expr,
-    FromDeriveInput, FromField, FromMeta, FromVariant,
 };
 use proc_macro2::Ident;
 use quote::format_ident;
 use syn::{
-    self, parse_quote, DeriveInput, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr,
-    Meta, MetaList, MetaNameValue, Path, Type, TypePath,
+    self, DeriveInput, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr, Meta,
+    MetaList, MetaNameValue, Path, Type, TypePath, parse_quote,
 };
 
-use super::field_type_info::{get_field_type_info, FieldTypeInfo};
+use super::field_type_info::{FieldTypeInfo, get_field_type_info};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse), supports(struct_any, enum_any))]

@@ -1,13 +1,16 @@
-use crate::query::error::QueryError;
-use bomboni_proto::google::protobuf::Any;
-use bomboni_proto::google::rpc::bad_request::FieldViolation;
-use bomboni_proto::google::rpc::BadRequest;
-use bomboni_proto::google::rpc::{Code, Status};
+use bomboni_proto::google::{
+    protobuf::Any,
+    rpc::{BadRequest, Code, Status, bad_request::FieldViolation},
+};
 use prost::{DecodeError, EncodeError};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+};
 use thiserror::Error;
+
+use crate::query::error::QueryError;
 
 #[derive(Error, Debug)]
 #[cfg_attr(
@@ -337,17 +340,19 @@ impl RequestError {
 
     pub fn details(&self) -> Vec<Any> {
         match self {
-            Self::BadRequest { violations, .. } => vec![BadRequest {
-                field_violations: violations
-                    .iter()
-                    .map(|error| FieldViolation {
-                        field: error.path_to_string(),
-                        description: error.error.to_string(),
-                    })
-                    .collect(),
-            }
-            .try_into()
-            .unwrap()],
+            Self::BadRequest { violations, .. } => vec![
+                BadRequest {
+                    field_violations: violations
+                        .iter()
+                        .map(|error| FieldViolation {
+                            field: error.path_to_string(),
+                            description: error.error.to_string(),
+                        })
+                        .collect(),
+                }
+                .try_into()
+                .unwrap(),
+            ],
             Self::Path(error) => error.details(),
             Self::Generic(error) => error.details(),
             _ => Vec::new(),
@@ -540,7 +545,7 @@ mod tests {
         let err = RequestError::bad_request("Test", [("x", CommonError::InvalidId)]);
         assert_eq!(err.to_string(), "invalid `Test` request");
         assert_eq!(
-            err.details().remove(0).unpack_into::<BadRequest>().unwrap(),
+            err.details().remove(0).to_msg::<BadRequest>().unwrap(),
             BadRequest {
                 field_violations: vec![FieldViolation {
                     field: "x".into(),

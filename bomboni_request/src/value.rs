@@ -197,7 +197,7 @@ impl From<Vec<Self>> for Value {
 #[cfg(feature = "postgres")]
 const _: () = {
     use bytes::BytesMut;
-    use postgres_types::{to_sql_checked, IsNull, ToSql, Type};
+    use postgres_types::{IsNull, ToSql, Type, to_sql_checked};
 
     impl ToSql for Value {
         fn to_sql(

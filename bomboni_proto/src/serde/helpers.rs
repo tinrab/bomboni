@@ -1,10 +1,13 @@
-use crate::google::protobuf::Duration;
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    fmt::{self, Display, Formatter},
+    marker::PhantomData,
+    str::FromStr,
+};
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de, ser};
 use serde_json::Value as JsonValue;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
-use std::str::FromStr;
+
+use crate::google::protobuf::Duration;
 
 pub fn is_default<T>(value: &T) -> bool
 where
@@ -19,7 +22,7 @@ pub fn default_bool_true() -> bool {
 }
 
 pub mod as_string {
-    use super::{de, Deserialize, Deserializer, FromStr, Serializer};
+    use super::{Deserialize, Deserializer, FromStr, Serializer, de};
 
     pub fn serialize<T, S>(
         value: &T,
@@ -48,7 +51,7 @@ pub mod as_string {
 
 pub mod string_list {
     use super::{
-        de, fmt, Deserializer, Display, Formatter, FromStr, PhantomData, Serialize, Serializer,
+        Deserializer, Display, Formatter, FromStr, PhantomData, Serialize, Serializer, de, fmt,
     };
 
     pub fn serialize<T, S>(
@@ -106,8 +109,8 @@ pub mod string_list {
 #[must_use]
 pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
     match value {
-        JsonValue::Bool(ref i) => *i,
-        JsonValue::Number(ref n) => {
+        JsonValue::Bool(b) => *b,
+        JsonValue::Number(n) => {
             if include_zero {
                 n.as_f64().is_some_and(|f| !f.is_nan())
             } else {
@@ -116,9 +119,9 @@ pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
             }
         }
         JsonValue::Null => false,
-        JsonValue::String(ref i) => !i.is_empty(),
-        JsonValue::Array(ref i) => !i.is_empty(),
-        JsonValue::Object(ref i) => !i.is_empty(),
+        JsonValue::String(s) => !s.is_empty(),
+        JsonValue::Array(a) => !a.is_empty(),
+        JsonValue::Object(obj) => !obj.is_empty(),
     }
 }
 
@@ -139,7 +142,7 @@ pub fn merge_json(a: &mut JsonValue, b: JsonValue) {
 }
 
 pub mod duration {
-    use super::{de, ser, Deserialize, Deserializer, Display, Duration, FromStr, Serializer};
+    use super::{Deserialize, Deserializer, Display, Duration, FromStr, Serializer, de, ser};
 
     pub fn serialize<T, S>(
         value: &T,

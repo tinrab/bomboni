@@ -1,6 +1,6 @@
 use mysql_common::{
-    value::convert::{FromValue, ParseIr},
     Value,
+    value::convert::{FromValue, ParseIr},
 };
 use time::PrimitiveDateTime;
 

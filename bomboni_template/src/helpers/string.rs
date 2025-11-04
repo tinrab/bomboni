@@ -103,7 +103,7 @@ fn convert_case_helper(
         UPPER_CAMEL_CASE_HELPER_NAME => value.to_case(Case::UpperCamel),
         SNAKE_CASE_HELPER_NAME => value.to_case(Case::Snake),
         UPPER_SNAKE_CASE_HELPER_NAME => value.to_case(Case::UpperSnake),
-        SCREAMING_SNAKE_CASE_HELPER_NAME => value.to_case(Case::ScreamingSnake),
+        SCREAMING_SNAKE_CASE_HELPER_NAME => value.to_case(Case::Constant),
         KEBAB_CASE_HELPER_NAME => value.to_case(Case::Kebab),
         COBOL_CASE_HELPER_NAME => value.to_case(Case::Cobol),
         TRAIN_CASE_HELPER_NAME => value.to_case(Case::Train),

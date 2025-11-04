@@ -1,4 +1,4 @@
-use mysql_common::{value::convert::FromValue, FromValueError, Value};
+use mysql_common::{FromValueError, Value, value::convert::FromValue};
 
 use crate::id::{Id, ParseIdError};
 

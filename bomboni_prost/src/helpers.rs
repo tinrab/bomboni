@@ -1,4 +1,4 @@
-use bomboni_core::string::{str_to_case, Case};
+use bomboni_core::string::{Case, str_to_case};
 use proc_macro2::TokenStream;
 use prost_types::DescriptorProto;
 use prost_types::{EnumDescriptorProto, FileDescriptorProto};

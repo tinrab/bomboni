@@ -1,8 +1,9 @@
+use bomboni_macros::btree_map_into;
+
 use crate::schema::{
     FieldMemberSchema, MemberSchema, ResourceMemberSchema, Schema, SchemaMapped, ValueType,
 };
 use crate::value::Value;
-use bomboni_common::btree_map_into;
 
 pub struct RequestItem {
     pub user: UserItem,

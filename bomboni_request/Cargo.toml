@@ -7,7 +7,7 @@ repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "../README.md"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "bomboni_request"
@@ -25,31 +25,33 @@ wasm = [
   "bomboni_proto/wasm",
   "dep:wasm-bindgen",
   "dep:js-sys",
-  "dep:getrandom",
   "time/wasm-bindgen",
 ]
-postgres = ["dep:postgres-types", "dep:bytes"]
+postgres = ["dep:postgres-types", "dep:bytes", "bomboni_common/postgres"]
 mysql = ["dep:mysql_common"]
 
 [dependencies]
 bomboni_common = { workspace = true }
 bomboni_proto = { workspace = true }
 bomboni_request_derive = { workspace = true }
+bomboni_macros = { workspace = true }
 bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 
 thiserror.workspace = true
 prost.workspace = true
-rand.workspace = true
+prost-types.workspace = true
+rand = "0.9.2"
+rand_core = "0.6.4"
 regex.workspace = true
 itertools.workspace = true
 time.workspace = true
 serde = { workspace = true, features = ["derive"] }
-pest = "2.7.15"
-pest_derive = "2.7.15"
-base64ct = { version = "1.6.0", features = ["alloc"] }
+pest = "2.8.3"
+pest_derive = "2.8.3"
+base64ct = { version = "1.8.0", features = ["alloc"] }
 aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
-rsa = "0.9.7"
+rsa = { version = "0.9.8", features = ["sha2"] }
 
 tonic = { workspace = true, optional = true }
 postgres-types = { workspace = true, features = [
@@ -57,11 +59,10 @@ postgres-types = { workspace = true, features = [
 ], optional = true }
 bytes = { workspace = true, optional = true }
 mysql_common = { workspace = true, features = ["time"], optional = true }
-getrandom = { version = "0.2.15", features = ["js"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.99", optional = true }
-js-sys = { version = "0.3.76", optional = true }
+wasm-bindgen = { version = "0.2.105", optional = true }
+js-sys = { version = "0.3.82", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

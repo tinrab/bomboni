@@ -1,4 +1,4 @@
-use bomboni_core::string::{str_to_case, Case};
+use bomboni_core::string::{Case, str_to_case};
 use proc_macro2::TokenStream;
 use prost_types::EnumDescriptorProto;
 use quote::{format_ident, quote};
@@ -36,10 +36,8 @@ fn write_value_names(context: &Context, s: &mut TokenStream, enum_type: &EnumDes
     let mut value_names_array = TokenStream::new();
 
     for value in &enum_type.value {
-        let value_name_ident = format_ident!(
-            "{}_VALUE_NAME",
-            str_to_case(value.name(), Case::ScreamingSnake)
-        );
+        let value_name_ident =
+            format_ident!("{}_VALUE_NAME", str_to_case(value.name(), Case::Constant));
         let value_name = value.name();
 
         value_names.extend(quote! {

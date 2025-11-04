@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use bomboni_core::string::{str_to_case, Case};
+use bomboni_core::string::{Case, str_to_case};
 use proc_macro2::{Ident, TokenStream};
-use prost_types::{field_descriptor_proto, DescriptorProto, OneofDescriptorProto};
+use prost_types::{DescriptorProto, OneofDescriptorProto, field_descriptor_proto};
 use quote::{format_ident, quote};
 use syn::TypePath;
 
@@ -53,10 +53,8 @@ fn write_name(
     oneof: &OneofDescriptorProto,
 ) {
     let message_ident = context.get_type_expr_path(message.name());
-    let oneof_name_ident = format_ident!(
-        "{}_ONEOF_NAME",
-        str_to_case(oneof.name(), Case::ScreamingSnake)
-    );
+    let oneof_name_ident =
+        format_ident!("{}_ONEOF_NAME", str_to_case(oneof.name(), Case::Constant));
     let oneof_name_literal = oneof.name();
     s.extend(quote! {
         impl #message_ident {
@@ -78,10 +76,8 @@ fn write_variant_names(
         .iter()
         .filter(|field| field.oneof_index == Some(oneof_index as i32))
     {
-        let variant_name_ident = format_ident!(
-            "{}_VARIANT_NAME",
-            str_to_case(field.name(), Case::ScreamingSnake)
-        );
+        let variant_name_ident =
+            format_ident!("{}_VARIANT_NAME", str_to_case(field.name(), Case::Constant));
         let variant_name_literal = field.name();
         variant_names.extend(quote! {
             pub const #variant_name_ident: &'static str = #variant_name_literal;
@@ -150,8 +146,10 @@ fn write_variant_from(
         }
         .to_string();
 
-        let variant_ident = format_ident!("{}", str_to_case(field.name(), Case::Pascal));
-        from_map.entry(source_type).or_default().push(variant_ident);
+        if field.type_name() != ".google.protobuf.Empty" {
+            let variant_ident = format_ident!("{}", str_to_case(field.name(), Case::Pascal));
+            from_map.entry(source_type).or_default().push(variant_ident);
+        }
     }
 
     // Only implement from if there is a single variant for the given type.
@@ -207,10 +205,8 @@ fn write_variant_utility(
         .iter()
         .filter(|field| field.oneof_index == Some(oneof_index as i32))
     {
-        let variant_name_ident = format_ident!(
-            "{}_VARIANT_NAME",
-            str_to_case(field.name(), Case::ScreamingSnake)
-        );
+        let variant_name_ident =
+            format_ident!("{}_VARIANT_NAME", str_to_case(field.name(), Case::Constant));
         let oneof_field_ident = format_ident!("{}", str_to_case(field.name(), Case::Pascal));
         variant_cases.extend(quote! {
             Self::#oneof_field_ident(_) => Self::#variant_name_ident,

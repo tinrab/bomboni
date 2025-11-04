@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use std::collections::BTreeSet;
 
 use crate::parse::{
@@ -251,6 +251,7 @@ pub fn expand_parse_field_type(
         });
     } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
         if field_options.wrapper {
+            // TODO: Verify that these `.value`s don't require `.unwrap_or_default()`
             if matches!(
                 primitive_ident.as_str(),
                 "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "isize" | "usize"
@@ -268,26 +269,50 @@ pub fn expand_parse_field_type(
 
         if primitive_ident == "String" {
             if !field_options.unspecified {
-                parse_impl.extend(quote! {
-                    if target.is_empty() {
-                        return Err(RequestError::path(
-                            #field_error_path,
-                            CommonError::RequiredFieldMissing,
-                        ) #inner_wrap_err);
-                    }
-                });
+                if field_options.wrapper {
+                    parse_impl.extend(quote! {
+                        if target.is_empty() {
+                            return Err(RequestError::path(
+                                #field_error_path,
+                                CommonError::RequiredFieldMissing,
+                            ) #inner_wrap_err);
+                        }
+                    });
+                } else {
+                    parse_impl.extend(quote! {
+                        if target.is_empty() {
+                            return Err(RequestError::path(
+                                #field_error_path,
+                                CommonError::RequiredFieldMissing,
+                            ) #inner_wrap_err);
+                        }
+                    });
+                }
             }
             if let Some(regex) = field_options.regex.as_ref() {
-                parse_impl.extend(quote! {
-                    if !re.is_match(&target) {
-                        return Err(RequestError::path(
-                            #field_error_path,
-                            CommonError::InvalidStringFormat {
-                                expected: #regex.into(),
-                            },
-                        ) #inner_wrap_err);
-                    }
-                });
+                if field_options.wrapper {
+                    parse_impl.extend(quote! {
+                        if !re.is_match(&target) {
+                            return Err(RequestError::path(
+                                #field_error_path,
+                                CommonError::InvalidStringFormat {
+                                    expected: #regex.into(),
+                                },
+                            ) #inner_wrap_err);
+                        }
+                    });
+                } else {
+                    parse_impl.extend(quote! {
+                        if !re.is_match(&target) {
+                            return Err(RequestError::path(
+                                #field_error_path,
+                                CommonError::InvalidStringFormat {
+                                    expected: #regex.into(),
+                                },
+                            ) #inner_wrap_err);
+                        }
+                    });
+                }
             }
         } else if field_type_info.primitive_message && !field_options.keep_primitive {
             parse_impl.extend(quote! {

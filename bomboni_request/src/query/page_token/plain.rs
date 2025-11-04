@@ -3,7 +3,7 @@ use crate::{
     ordering::Ordering,
     query::{
         error::{QueryError, QueryResult},
-        page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
+        page_token::{FilterPageToken, PageTokenBuilder, utility::get_page_filter},
     },
     schema::SchemaMapped,
 };

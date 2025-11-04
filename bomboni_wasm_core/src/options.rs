@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
 use convert_case::Boundary;
-use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta, FromVariant};
+use darling::{FromDeriveInput, FromField, FromMeta, FromVariant, ast::Fields};
 use proc_macro2::Ident;
 use serde_derive_internals::{
+    Ctxt,
     ast::{self, Container as SerdeContainer},
-    attr, Ctxt,
+    attr,
 };
 use syn::{self, DeriveInput, Generics, Member, Path};
 
@@ -169,7 +170,7 @@ impl<'a> WasmOptions<'a> {
             None
         };
         let rename_boundary = if let Some(rename_boundary) = attributes.rename_boundary.as_ref() {
-            Boundary::list_from(rename_boundary)
+            Boundary::defaults_from(rename_boundary)
         } else {
             Vec::new()
         };
@@ -237,7 +238,7 @@ impl<'a> WasmOptions<'a> {
         )
     }
 
-    pub fn serde_data(&self) -> &ast::Data {
+    pub fn serde_data(&self) -> &ast::Data<'_> {
         &self.serde_container.data
     }
 

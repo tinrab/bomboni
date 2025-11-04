@@ -1,7 +1,8 @@
-use crate::config::CompileConfig;
-use bomboni_core::string::{str_to_case, Case};
+use bomboni_core::string::{Case, str_to_case};
 use prost_types::{DescriptorProto, OneofDescriptorProto};
-use syn::{parse_quote, ExprPath, PathSegment};
+use syn::{ExprPath, PathSegment, parse_quote};
+
+use crate::config::CompileConfig;
 
 pub struct Context<'a> {
     pub config: &'a CompileConfig,

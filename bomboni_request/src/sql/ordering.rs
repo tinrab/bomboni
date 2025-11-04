@@ -1,12 +1,12 @@
 use crate::{
     ordering::{
-        error::{OrderingError, OrderingResult},
         Ordering, OrderingDirection,
+        error::{OrderingError, OrderingResult},
     },
     schema::Schema,
 };
 
-use super::{utility::get_identifier, SqlDialect, SqlRenameMap};
+use super::{SqlDialect, SqlRenameMap, utility::get_identifier};
 
 pub struct SqlOrderingBuilder<'a> {
     dialect: SqlDialect,

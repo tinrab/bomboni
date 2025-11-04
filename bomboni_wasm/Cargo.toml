@@ -7,7 +7,7 @@ repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "../README.md"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "bomboni_wasm"
@@ -23,8 +23,8 @@ bomboni_wasm_core = { workspace = true }
 bomboni_wasm_derive = { workspace = true, optional = true }
 
 serde.workspace = true
-wasm-bindgen = "0.2.99"
-js-sys = "0.3.76"
+wasm-bindgen = "0.2.105"
+js-sys = "0.3.82"
 serde-wasm-bindgen = "0.6.5"
 
 [dev-dependencies]

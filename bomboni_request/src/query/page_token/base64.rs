@@ -3,7 +3,7 @@ use crate::{
     ordering::Ordering,
     query::{
         error::{QueryError, QueryResult},
-        page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
+        page_token::{FilterPageToken, PageTokenBuilder, utility::get_page_filter},
     },
 };
 use base64ct::{Base64, Base64Url, Encoding};

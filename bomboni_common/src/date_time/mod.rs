@@ -4,9 +4,9 @@ use std::time::SystemTime;
 use thiserror::Error;
 use time::PrimitiveDateTime;
 use time::{
+    OffsetDateTime,
     convert::{Nanosecond, Second},
     format_description::well_known::Rfc3339,
-    OffsetDateTime,
 };
 
 #[cfg(feature = "mysql")]
@@ -52,6 +52,8 @@ pub enum UtcDateTimeError {
     NotUtc,
     #[error("invalid date time string format `{0}`")]
     InvalidFormat(String),
+    #[error("timestamp is out of range")]
+    OutOfRange,
 }
 
 impl UtcDateTime {

@@ -130,7 +130,7 @@ impl Display for EnumTsDecl {
                 write!(
                     f,
                     "\n  {} = {},",
-                    str_to_case(&member.name, Case::ScreamingSnake),
+                    str_to_case(&member.name, Case::Constant),
                     &member.alias_type
                 )?;
             }
@@ -442,7 +442,7 @@ impl<'a> TsDeclParser<'a> {
                 RenameRule::PascalCase => str_to_case(s, Case::Pascal),
                 RenameRule::CamelCase => str_to_case(s, Case::Camel),
                 RenameRule::SnakeCase => str_to_case(s, Case::Snake),
-                RenameRule::ScreamingSnakeCase => str_to_case(s, Case::ScreamingSnake),
+                RenameRule::ScreamingSnakeCase => str_to_case(s, Case::Constant),
                 RenameRule::KebabCase => str_to_case(s, Case::Kebab),
                 RenameRule::ScreamingKebabCase => str_to_case(s, Case::Cobol),
             }
@@ -466,7 +466,7 @@ impl<'a> TsDeclParser<'a> {
                     .to_case(Case::Snake),
                 RenameRule::ScreamingSnakeCase => s
                     .with_boundaries(&self.options.rename_boundary)
-                    .to_case(Case::ScreamingSnake),
+                    .to_case(Case::Constant),
                 RenameRule::KebabCase => s
                     .with_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Kebab),

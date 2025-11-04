@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use proc_macro2::{Ident, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
     ExprClosure, GenericArgument, Pat, PatType, Path, PathArguments, ReturnType, Token, Type,

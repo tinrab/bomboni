@@ -96,12 +96,14 @@ mod tests {
         let s = Status::new(
             Code::InvalidArgument,
             "error".to_string(),
-            vec![Any::pack_from(&ErrorInfo {
-                reason: "a".to_string(),
-                domain: "b".to_string(),
-                metadata: BTreeMap::default(),
-            })
-            .unwrap()],
+            vec![
+                Any::from_msg(&ErrorInfo {
+                    reason: "a".to_string(),
+                    domain: "b".to_string(),
+                    metadata: BTreeMap::default(),
+                })
+                .unwrap(),
+            ],
         );
         let js = serde_json::to_string(&s).unwrap();
         assert_eq!(

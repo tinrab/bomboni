@@ -7,7 +7,7 @@ repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "../README.md"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "bomboni_core"

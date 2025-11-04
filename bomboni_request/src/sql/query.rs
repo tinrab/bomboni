@@ -3,8 +3,8 @@ use crate::ordering::Ordering;
 use crate::query::{error::QueryResult, list::ListQuery, search::SearchQuery};
 use crate::schema::{FunctionSchemaMap, Schema};
 use crate::sql::{
-    utility::get_argument_parameter, SqlArgumentStyle, SqlDialect, SqlFilterBuilder,
-    SqlOrderingBuilder, SqlRenameMap,
+    SqlArgumentStyle, SqlDialect, SqlFilterBuilder, SqlOrderingBuilder, SqlRenameMap,
+    utility::get_argument_parameter,
 };
 use crate::value::Value;
 

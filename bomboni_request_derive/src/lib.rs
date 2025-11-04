@@ -8,7 +8,7 @@ use proc_macro::TokenStream;
 
 mod parse;
 
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
 /// A procedural macro that generates a function that parses a resource name into a tuple of typed segments.
 /// Resource name format is documented in Google's AIP [1].

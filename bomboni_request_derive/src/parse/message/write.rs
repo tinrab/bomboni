@@ -1,6 +1,6 @@
 use bomboni_core::syn::type_is_phantom;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 
 use crate::parse::{
     message::utility::get_field_extract,
