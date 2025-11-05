@@ -1,3 +1,5 @@
+#![allow(clippy::option_if_let_else)]
+
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::Path;

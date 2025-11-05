@@ -22,27 +22,37 @@ use crate::{
 /// List queries list paged, filtered and ordered items.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListQuery<T: Clone + ToString = FilterPageToken> {
+    /// Page size.
     pub page_size: i32,
+    /// Page token.
     pub page_token: Option<T>,
+    /// Filter.
     pub filter: Filter,
+    /// Ordering.
     pub ordering: Ordering,
 }
 
 /// Config for list query builder.
 ///
 /// `primary_ordering_term` should probably never be `None`.
-/// If the request does not contain an `order_by` field, usage of this function should pre-insert one.
-/// The default ordering term can the primary key of the schema item.
-/// If ordering is not specified, then behavior of query's page tokens [`PageToken`] is undefined.
+/// If you request does not contain an `order_by` field, usage of this function should pre-insert one.
+/// The default ordering term can be primary key of schema item.
+/// If ordering is not specified, then behavior of query's page tokens [`crate::query::page_token::FilterPageToken`] is undefined.
 #[derive(Debug, Clone)]
 pub struct ListQueryConfig {
+    /// Maximum page size.
     pub max_page_size: Option<i32>,
+    /// Default page size.
     pub default_page_size: i32,
+    /// Primary ordering term.
     pub primary_ordering_term: Option<OrderingTerm>,
+    /// Maximum filter length.
     pub max_filter_length: Option<usize>,
+    /// Maximum ordering length.
     pub max_ordering_length: Option<usize>,
 }
 
+/// Builder for list queries.
 #[derive(Debug, Clone)]
 pub struct ListQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
@@ -51,12 +61,17 @@ pub struct ListQueryBuilder<P: PageTokenBuilder> {
     page_token_builder: P,
 }
 
+/// Plain list query builder.
 pub type PlainListQueryBuilder = ListQueryBuilder<PlainPageTokenBuilder>;
+/// AES256 list query builder.
 pub type Aes256ListQueryBuilder = ListQueryBuilder<Aes256PageTokenBuilder>;
+/// Base64 list query builder.
 pub type Base64ListQueryBuilder = ListQueryBuilder<Base64PageTokenBuilder>;
+/// RSA list query builder.
 pub type RsaListQueryBuilder = ListQueryBuilder<RsaPageTokenBuilder>;
 
 impl ListQuery {
+    /// Creates salt for page token.
     pub fn make_salt(page_size: i32) -> Vec<u8> {
         page_size.to_be_bytes().to_vec()
     }
@@ -75,7 +90,8 @@ impl Default for ListQueryConfig {
 }
 
 impl<P: PageTokenBuilder> ListQueryBuilder<P> {
-    pub fn new(
+    /// Creates a new list query builder.
+    pub const fn new(
         schema: Schema,
         schema_functions: FunctionSchemaMap,
         options: ListQueryConfig,
@@ -89,6 +105,11 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
         }
     }
 
+    /// Builds a list query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query parameters are invalid.
     pub fn build(
         &self,
         page_size: Option<i32>,
@@ -107,13 +128,12 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
 
         // Pre-insert primary ordering term.
         // This is needed for page tokens to work.
-        if let Some(primary_ordering_term) = self.options.primary_ordering_term.as_ref() {
-            if ordering
+        if let Some(primary_ordering_term) = self.options.primary_ordering_term.as_ref()
+            && ordering
                 .iter()
                 .all(|term| term.name != primary_ordering_term.name)
-            {
-                ordering.insert(0, primary_ordering_term.clone());
-            }
+        {
+            ordering.insert(0, primary_ordering_term.clone());
         }
 
         // Handle paging.
@@ -148,6 +168,11 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
         })
     }
 
+    /// Builds the next page token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if token building fails.
     pub fn build_next_page_token<T: SchemaMapped>(
         &self,
         query: &ListQuery<P::PageToken>,
@@ -161,7 +186,8 @@ impl<P: PageTokenBuilder> ListQueryBuilder<P> {
         )
     }
 
-    pub fn page_token_builder(&self) -> &P {
+    /// Gets the page token builder.
+    pub const fn page_token_builder(&self) -> &P {
         &self.page_token_builder
     }
 }

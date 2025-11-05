@@ -1,3 +1,5 @@
+#![allow(clippy::use_self)]
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{
     fmt::{self, Display, Formatter},
@@ -13,6 +15,7 @@ use crate::google::protobuf::Timestamp;
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum TimestampError {
     #[error("invalid format")]
     InvalidFormat,
@@ -21,6 +24,7 @@ pub enum TimestampError {
 }
 
 impl Timestamp {
+    /// Creates a new `Timestamp` with the given seconds and nanoseconds.
     #[must_use]
     pub const fn new(seconds: i64, nanos: i32) -> Self {
         Self { seconds, nanos }
@@ -98,7 +102,7 @@ impl TryFrom<Timestamp> for UtcDateTime {
         if value.nanos < 0 {
             return Err(UtcDateTimeError::InvalidNanoseconds);
         }
-        UtcDateTime::from_timestamp(value.seconds, value.nanos)
+        Self::from_timestamp(value.seconds, value.nanos)
     }
 }
 

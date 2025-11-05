@@ -22,33 +22,32 @@ pub fn get_field_extract(field: &ParseField) -> syn::Result<FieldExtract> {
         steps.extend(extract.steps);
     }
 
-    if let Some(field_type_info) = field.type_info.as_ref() {
-        if field.options.extract.is_none()
-            && field.options.source.is_none()
-            && field.options.derive.is_none()
-            && !field.options.oneof
-            && !field.options.enumeration
+    if let Some(field_type_info) = field.type_info.as_ref()
+        && field.options.extract.is_none()
+        && field.options.source.is_none()
+        && field.options.derive.is_none()
+        && !field.options.oneof
+        && !field.options.enumeration
+    {
+        if
+        // In proto3 generated code, primitive message fields are wrapped in an Option.
+        // Insert an unwrap step for these fields by default.
+        field_type_info.primitive_message
+                && field_type_info.primitive_ident.is_some()
+                && field_type_info.generic_param.is_none()
+                && matches!(
+                    field_type_info.container_ident.as_deref(),
+                    None | Some("Option"),
+                )
+                && field.options.convert.is_none()
+            // Insert Unwrap step by default if target is an Option.
+            || field_type_info.container_ident.as_deref() == Some("Option")
         {
-            if
-            // In proto3 generated code, primitive message fields are wrapped in an Option.
-            // Insert an unwrap step for these fields by default.
-            field_type_info.primitive_message
-                    && field_type_info.primitive_ident.is_some()
-                    && field_type_info.generic_param.is_none()
-                    && matches!(
-                        field_type_info.container_ident.as_deref(),
-                        None | Some("Option"),
-                    )
-                    && field.options.convert.is_none()
-                // Insert Unwrap step by default if target is an Option.
-                || field_type_info.container_ident.as_deref() == Some("Option")
-            {
-                steps.push(FieldExtractStep::Unwrap);
-            }
+            steps.push(FieldExtractStep::Unwrap);
+        }
 
-            if field_type_info.container_ident.as_deref() == Some("Box") {
-                steps.push(FieldExtractStep::Unbox);
-            }
+        if field_type_info.container_ident.as_deref() == Some("Box") {
+            steps.push(FieldExtractStep::Unbox);
         }
     }
 
@@ -99,14 +98,14 @@ pub fn get_field_clone_set(fields: &[ParseField]) -> syn::Result<BTreeSet<String
     }
 
     for field in fields.iter().filter(|field| !field.options.skip) {
-        if let Some(resource) = field.resource.as_ref() {
-            if resource.name.parse {
-                let field_path = resource.name.source.to_string();
-                if visited.contains(&field_path) {
-                    clone_set.insert(field_path.clone());
-                }
-                visited.insert(field_path);
+        if let Some(resource) = field.resource.as_ref()
+            && resource.name.parse
+        {
+            let field_path = resource.name.source.to_string();
+            if visited.contains(&field_path) {
+                clone_set.insert(field_path.clone());
             }
+            visited.insert(field_path);
         }
     }
 
@@ -114,16 +113,13 @@ pub fn get_field_clone_set(fields: &[ParseField]) -> syn::Result<BTreeSet<String
 }
 
 pub fn get_query_field_token_type(ty: &Type) -> Option<&Type> {
-    if let Type::Path(TypePath { path, .. }) = ty {
-        if path.segments.len() == 1
-            && (path.segments[0].ident == "ListQuery" || path.segments[0].ident == "SearchQuery")
-        {
-            if let PathArguments::AngleBracketed(args) = &path.segments[0].arguments {
-                if let GenericArgument::Type(ty) = args.args.first().unwrap() {
-                    return Some(ty);
-                }
-            }
-        }
+    if let Type::Path(TypePath { path, .. }) = ty
+        && path.segments.len() == 1
+        && (path.segments[0].ident == "ListQuery" || path.segments[0].ident == "SearchQuery")
+        && let PathArguments::AngleBracketed(args) = &path.segments[0].arguments
+        && let GenericArgument::Type(ty) = args.args.first().unwrap()
+    {
+        return Some(ty);
     }
     None
 }

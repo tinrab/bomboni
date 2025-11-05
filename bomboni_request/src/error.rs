@@ -26,107 +26,163 @@ use crate::query::error::QueryError;
         proxy { source = Status, try_from = RequestParse::parse },
     )
 )]
+/// Request error types.
 pub enum RequestError {
+    /// Invalid request with field violations.
     #[error("invalid `{name}` request")]
     BadRequest {
+        /// Request name.
         name: String,
+        /// Field violations.
         violations: Vec<PathError>,
     },
+    /// Path-specific error.
     #[error(transparent)]
     Path(PathError),
+    /// Generic error.
     #[error("{0}")]
     Generic(GenericErrorBox),
+    /// Encode error.
     #[error("encode error: {0}")]
     Encode(#[from] EncodeError),
+    /// Decode error.
     #[error("decode error: {0}")]
     Decode(#[from] DecodeError),
 }
 
+/// Request result type.
 pub type RequestResult<T> = Result<T, RequestError>;
 
+/// Error with path information.
 #[derive(Debug)]
 pub struct PathError {
+    /// Error path.
     pub path: Vec<PathErrorStep>,
+    /// Underlying error.
     pub error: GenericErrorBox,
 }
 
-#[derive(Debug, PartialEq)]
+/// Path error step.
+#[derive(Debug, PartialEq, Eq)]
 pub enum PathErrorStep {
+    /// Field access.
     Field(String),
+    /// Index access.
     Index(usize),
+    /// Key access.
     Key(String),
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Common error types.
+#[derive(Error, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum CommonError {
+    /// Resource was not found.
     #[error("requested entity was not found")]
     ResourceNotFound,
+    /// Unauthorized access.
     #[error("unauthorized")]
     Unauthorized,
+    /// Required field is missing.
     #[error("no value provided for required field")]
     RequiredFieldMissing,
+    /// Invalid name format.
     #[error("expected `{expected_format}`, but got `{name}`.")]
     InvalidName {
+        /// Expected format.
         expected_format: String,
+        /// Actual name.
         name: String,
     },
+    /// Invalid name with alternative format.
     #[error(
         "expected either `{expected_format}` or `{alternative_expected_format}`, but got `{name}`"
     )]
     InvalidNameAlternative {
+        /// Expected format.
         expected_format: String,
+        /// Alternative expected format.
         alternative_expected_format: String,
+        /// Actual name.
         name: String,
     },
+    /// Invalid resource parent.
     #[error("expected resource parent `{expected}`, but got `{parent}`")]
-    InvalidParent { expected: String, parent: String },
+    InvalidParent {
+        /// Expected parent.
+        expected: String,
+        /// Actual parent.
+        parent: String,
+    },
+    /// Invalid string format.
     #[error("expected a string in format `{expected}`")]
-    InvalidStringFormat { expected: String },
+    InvalidStringFormat {
+        /// Expected format.
+        expected: String,
+    },
+    /// Invalid ID format.
     #[error("invalid ID format")]
     InvalidId,
+    /// Duplicate ID.
     #[error("duplicate ID")]
     DuplicateId,
+    /// Invalid display name format.
     #[error("invalid display name format")]
     InvalidDisplayName,
+    /// Invalid date time format.
     #[error("invalid date time format")]
     InvalidDateTime,
+    /// Invalid enum value.
     #[error("invalid enum value")]
     InvalidEnumValue,
+    /// Unknown oneof variant.
     #[error("unknown oneof variant")]
     UnknownOneofVariant,
+    /// Invalid numeric value.
     #[error("invalid numeric value")]
     InvalidNumericValue,
+    /// Failed to convert value.
     #[error("failed to convert value")]
     FailedConvertValue,
+    /// Numeric value out of range.
     #[error("out of range")]
     NumericOutOfRange,
+    /// Duplicate value.
     #[error("duplicate value")]
     DuplicateValue,
+    /// Resource already exists.
     #[error("already exists")]
     AlreadyExists,
+    /// Resource not found.
     #[error("not found")]
     NotFound,
+    /// Type mismatch.
     #[error("type mismatch")]
     TypeMismatch,
 }
 
+/// Generic error trait.
 pub trait GenericError: Error {
+    /// Returns the error as `Any` for downcasting.
     fn as_any(&self) -> &dyn std::any::Any;
 
+    /// Returns the gRPC status code.
     fn code(&self) -> Code {
         Code::InvalidArgument
     }
 
+    /// Returns the error details.
     fn details(&self) -> Vec<Any> {
         Vec::default()
     }
 }
 
+/// Boxed generic error.
 pub type GenericErrorBox = Box<dyn GenericError + Send + Sync>;
 
 impl RequestError {
     #[must_use]
+    /// Creates a bad request error.
     pub fn bad_request<N, V, F, E>(name: N, violations: V) -> Self
     where
         N: Display,
@@ -147,11 +203,13 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates a generic error.
     pub fn generic<E: Into<GenericErrorBox>>(error: E) -> Self {
         Self::Generic(error.into())
     }
 
     #[must_use]
+    /// Creates a path error.
     pub fn path<P, E>(path: P, error: E) -> Self
     where
         P: IntoIterator<Item = PathErrorStep>,
@@ -164,6 +222,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates a field error.
     pub fn field<F, E>(field: F, error: E) -> Self
     where
         F: Display,
@@ -173,6 +232,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates a field index error.
     pub fn field_index<F, E>(field: F, index: usize, error: E) -> Self
     where
         F: Display,
@@ -188,6 +248,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates a field key error.
     pub fn field_key<F, K, E>(field: F, key: K, error: E) -> Self
     where
         F: Display,
@@ -204,6 +265,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates a field parse error.
     pub fn field_parse<F, E>(field: F, error: E) -> Self
     where
         F: Display,
@@ -213,6 +275,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates an index error.
     pub fn index<E>(index: usize, error: E) -> Self
     where
         E: Into<GenericErrorBox>,
@@ -221,6 +284,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Creates a key error.
     pub fn key<K, E>(key: K, error: E) -> Self
     where
         K: Display,
@@ -230,6 +294,11 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Wraps the error with a path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if trying to wrap a path for an error type that doesn't support it.
     pub fn wrap_path<P>(self, path: P) -> Self
     where
         P: IntoIterator<Item = PathErrorStep>,
@@ -250,6 +319,11 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Inserts a path at the specified index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if trying to insert a path for an error type that doesn't support it.
     pub fn insert_path<P>(self, path: P, index: usize) -> Self
     where
         P: IntoIterator<Item = PathErrorStep>,
@@ -271,21 +345,25 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Wraps the error with a field.
     pub fn wrap_field<F: Display>(self, field: F) -> Self {
         self.wrap_path([PathErrorStep::Field(field.to_string())])
     }
 
     #[must_use]
+    /// Wraps error with an index.
     pub fn wrap_index(self, index: usize) -> Self {
         self.wrap_path([PathErrorStep::Index(index)])
     }
 
     #[must_use]
+    /// Wraps error with a key.
     pub fn wrap_key<K: Display>(self, key: K) -> Self {
         self.wrap_path([PathErrorStep::Key(key.to_string())])
     }
 
     #[must_use]
+    /// Wraps error with a field and index.
     pub fn wrap_field_index<F>(self, field: F, index: usize) -> Self
     where
         F: Display,
@@ -297,6 +375,7 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Wraps error with a field and key.
     pub fn wrap_field_key<F, K>(self, field: F, key: K) -> Self
     where
         F: Display,
@@ -309,10 +388,12 @@ impl RequestError {
     }
 
     #[must_use]
+    /// Wraps error for a request.
     pub fn wrap_request<N: Display>(self, name: N) -> Self {
         match self {
             Self::Path(error) => Self::bad_request(name, [(error.path_to_string(), error.error)]),
             Self::Generic(error) => {
+                #[allow(clippy::option_if_let_else, trivial_casts)]
                 if let Some(error) = error.as_any().downcast_ref::<QueryError>() {
                     #[allow(trivial_casts)]
                     Self::bad_request(
@@ -323,21 +404,27 @@ impl RequestError {
                         )],
                     )
                 } else {
-                    RequestError::Generic(error)
+                    Self::Generic(error)
                 }
             }
             error => error,
         }
     }
 
+    /// Returns the error code.
     pub fn code(&self) -> Code {
         match self {
-            Self::Encode(_) | Self::Decode(_) | Self::BadRequest { .. } => Code::InvalidArgument,
             Self::Path(error) => error.code(),
             Self::Generic(error) => error.code(),
+            Self::BadRequest { .. } | Self::Encode(_) | Self::Decode(_) => Code::InvalidArgument,
         }
     }
 
+    /// Returns the error details.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the bad request violations cannot be converted to protobuf format.
     pub fn details(&self) -> Vec<Any> {
         match self {
             Self::BadRequest { violations, .. } => vec![
@@ -362,40 +449,50 @@ impl RequestError {
 
 impl From<RequestError> for Status {
     fn from(err: RequestError) -> Self {
-        Status::from(&err)
+        Self::from(&err)
     }
 }
 
 impl From<&RequestError> for Status {
     fn from(err: &RequestError) -> Self {
-        Status::new(err.code(), err.to_string(), err.details())
+        Self::new(err.code(), err.to_string(), err.details())
     }
 }
 
 #[cfg(feature = "tonic")]
 impl From<RequestError> for tonic::Status {
     fn from(err: RequestError) -> Self {
-        Status::from(&err).into()
+        let status = Status::from(&err);
+        status
+            .try_into()
+            .unwrap_or_else(|()| Self::internal("Failed to convert to tonic Status"))
     }
 }
 
 #[cfg(feature = "tonic")]
 impl From<&RequestError> for tonic::Status {
     fn from(err: &RequestError) -> Self {
-        Status::from(err).into()
+        let status = Status::from(err);
+        status
+            .try_into()
+            .unwrap_or_else(|()| Self::internal("Failed to convert to tonic Status"))
     }
 }
 
 impl PathError {
+    /// Returns the error code.
     pub fn code(&self) -> Code {
         self.error.code()
     }
 
+    /// Returns the error details.
     pub fn details(&self) -> Vec<Any> {
         self.error.details()
     }
 
+    /// Converts the path to a string representation.
     pub fn path_to_string(&self) -> String {
+        use std::fmt::Write;
         let mut path = String::new();
         for (i, step) in self.path.iter().enumerate() {
             match step {
@@ -403,16 +500,21 @@ impl PathError {
                     if i == 0 {
                         path.push_str(field);
                     } else {
-                        path.push_str(&format!(".{field}"));
+                        write!(path, ".{field}").unwrap();
                     }
                 }
-                PathErrorStep::Index(index) => path.push_str(&format!("[{index}]")),
-                PathErrorStep::Key(key) => path.push_str(&format!("{{{key}}}")),
+                PathErrorStep::Index(index) => write!(path, "[{index}]").unwrap(),
+                PathErrorStep::Key(key) => write!(path, "{{{key}}}").unwrap(),
             }
         }
         path
     }
 
+    /// Parses a path string into path error steps.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the path contains invalid index syntax.
     pub fn parse_path<P: AsRef<str>>(path: P) -> Vec<PathErrorStep> {
         let parts: Vec<_> = path.as_ref().split('.').collect();
         let mut steps = Vec::with_capacity(parts.len());
@@ -489,21 +591,28 @@ where
 
 impl<T: 'static + GenericError + Send + Sync> From<T> for RequestError {
     fn from(err: T) -> Self {
-        RequestError::Generic(Box::new(err))
+        Self::Generic(Box::new(err))
     }
 }
 
+/// Extension trait for request errors.
 pub trait RequestErrorExt {
+    /// Wraps error with a field.
     fn wrap<F: Display>(self, field: F) -> RequestError;
 
+    /// Wraps error with an index.
     fn wrap_index(self, index: usize) -> RequestError;
 
+    /// Wraps error with a key.
     fn wrap_key<K: Display>(self, key: K) -> RequestError;
 
+    /// Wraps error with a field and index.
     fn wrap_field_index<F: Display>(self, field: F, index: usize) -> RequestError;
 
+    /// Wraps error with a field and key.
     fn wrap_field_key<F: Display, K: Display>(self, field: F, key: K) -> RequestError;
 
+    /// Wraps error for a request.
     fn wrap_request<N: Display>(self, name: N) -> RequestError;
 }
 

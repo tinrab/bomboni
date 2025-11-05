@@ -1,17 +1,18 @@
 use super::{SqlArgumentStyle, SqlDialect};
 
 pub fn get_identifier(dialect: SqlDialect, name: &str, escape: bool) -> String {
+    use std::fmt::Write;
     match dialect {
         SqlDialect::Postgres => {
             if escape {
                 let mut parts = name.split('.');
                 let mut result = String::new();
                 if let Some(first) = parts.next() {
-                    result.push_str(&format!("\"{first}\""));
+                    write!(result, "\"{first}\"").unwrap();
                 }
                 for part in parts {
                     result.push('.');
-                    result.push_str(&format!("\"{part}\""));
+                    write!(result, "\"{part}\"").unwrap();
                 }
                 result
             } else {
@@ -23,11 +24,11 @@ pub fn get_identifier(dialect: SqlDialect, name: &str, escape: bool) -> String {
                 let mut parts = name.split('.');
                 let mut result = String::new();
                 if let Some(first) = parts.next() {
-                    result.push_str(&format!("`{first}`"));
+                    write!(result, "`{first}`").unwrap();
                 }
                 for part in parts {
                     result.push('.');
-                    result.push_str(&format!("`{part}`"));
+                    write!(result, "`{part}`").unwrap();
                 }
                 result
             } else {

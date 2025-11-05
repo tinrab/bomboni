@@ -18,8 +18,7 @@ lint:
         unsafe_code
         trivial_casts
         trivial_numeric_casts
-        # unreachable_pub
-        # missing_docs
+        missing_docs
         unused_extern_crates
         unused_import_braces
         unused_qualifications
@@ -31,9 +30,9 @@ lint:
         clippy::perf
         clippy::style
         clippy::pedantic
-        # clippy::nursery
-        # clippy::missing_errors_doc
-        # clippy::missing_panics_doc
+        clippy::nursery
+        clippy::missing_errors_doc
+        clippy::missing_panics_doc
     )
     allow=(
         unused_braces
@@ -45,27 +44,26 @@ lint:
         clippy::too_many_lines
         clippy::needless_pass_by_value
         clippy::struct_excessive_bools
-        clippy::missing_errors_doc
-        clippy::missing_panics_doc
         clippy::struct_field_names
     )
 
+    cargo clippy --workspace --no-default-features \
+        -- ${disallow[@]/#/-D } ${allow[@]/#/-A }
     cargo clippy --workspace --all-features \
         -- ${disallow[@]/#/-D } ${allow[@]/#/-A }
 
-    cargo clippy --workspace --target wasm32-unknown-unknown \
-        --features wasm,derive,prost,proto,request,serde,chrono \
-        -- ${disallow[@]/#/-D } ${allow[@]/#/-A }
-
 test:
-    #!/usr/bin/env bash
-    set -euxo pipefail
-
     cargo test --workspace --all-features -- --nocapture
     cargo test --workspace --doc --all-features -- --nocapture
 
     cargo test --workspace --no-default-features --features testing -- --nocapture
     cargo test --workspace --doc --no-default-features --features testing -- --nocapture
+
+docs:
+    cargo doc --workspace --all-features --no-deps
+
+docs-open:
+    cargo doc --workspace --all-features --no-deps --open
 
 publish:
     #!/usr/bin/env bash

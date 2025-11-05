@@ -1,8 +1,14 @@
+/// ID conversion helpers.
 pub mod id_convert {
     use bomboni_common::id::Id;
 
     use crate::error::{CommonError, RequestResult};
 
+    /// Parses an ID from a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the ID format is invalid.
     pub fn parse<S: AsRef<str>>(source: S) -> RequestResult<Id> {
         Ok(source
             .as_ref()
@@ -10,6 +16,7 @@ pub mod id_convert {
             .map_err(|_| CommonError::InvalidId)?)
     }
 
+    /// Writes an ID to a string.
     pub fn write(id: Id) -> String {
         id.to_string()
     }

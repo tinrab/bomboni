@@ -1,5 +1,9 @@
+#![doc = include_str!("../README.md")]
+
 mod protobuf;
 mod rpc;
+
+/// Serde integration for protobuf types.
 pub mod serde;
 
 /// Includes generated protobuf code.
@@ -22,12 +26,25 @@ macro_rules! include_file_descriptor_set {
     };
 }
 
-#[allow(unused_qualifications, clippy::all, clippy::pedantic)]
+#[allow(
+    unused_qualifications,
+    missing_docs,
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::invalid_html_tags
+)]
+/// Generated Google protobuf and RPC types.
 pub mod google {
+    /// Generated Google protobuf message types.
+    #[allow(rustdoc::broken_intra_doc_links, rustdoc::invalid_html_tags)]
     pub mod protobuf {
         crate::include_proto!("google.protobuf");
         crate::include_proto!("google.protobuf.plus");
     }
+    /// Generated Google RPC status and error types.
+    #[allow(rustdoc::broken_intra_doc_links, rustdoc::invalid_html_tags)]
     pub mod rpc {
         crate::include_proto!("google.rpc");
         crate::include_proto!("google.rpc.plus");

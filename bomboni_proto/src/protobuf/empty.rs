@@ -3,6 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::google::protobuf::Empty;
 
 impl Empty {
+    /// Creates a new empty message.
     #[must_use]
     pub const fn new() -> Self {
         Self {}

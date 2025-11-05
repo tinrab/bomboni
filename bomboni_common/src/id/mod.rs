@@ -18,8 +18,13 @@ mod mysql;
 #[cfg(feature = "postgres")]
 mod postgres;
 
+/// Worker ID generation utilities.
 pub mod worker;
 
+/// A semi-globally unique and sortable identifier.
+///
+/// This is based on ULID (Universally Unique Lexicographically Sortable Identifier)
+/// and provides both uniqueness and sortability.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     all(
@@ -36,8 +41,10 @@ pub mod worker;
 )]
 pub struct Id(u128);
 
+/// Errors that can occur when parsing an `Id` from a string.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ParseIdError {
+    /// The string is not a valid ID format.
     #[error("invalid id string")]
     InvalidString,
 }
@@ -47,21 +54,27 @@ const WORKER_BITS: i64 = 16;
 const SEQUENCE_BITS: i64 = 16;
 
 impl Id {
+    /// Creates a new ID from a 128-bit integer.
     #[must_use]
     pub const fn new(id: u128) -> Self {
         Self(id)
     }
 
-    /// Generates a new random sortable id.
+    /// Generates a new random sortable ID.
     #[must_use]
     pub fn generate() -> Self {
         Self(Ulid::new().0)
     }
 
-    /// Generate multiple random sortable ids.
-    /// Generated ids are monotonically increasing.
+    /// Generate multiple random sortable IDs.
+    ///
+    /// Generated IDs are monotonically increasing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the ULID generator fails to generate an ID.
     #[must_use]
-    pub fn generate_multiple(count: usize) -> Vec<Id> {
+    pub fn generate_multiple(count: usize) -> Vec<Self> {
         let mut ids = Vec::with_capacity(count);
         let mut g = ulid::Generator::new();
         for _ in 0..count {
@@ -70,7 +83,11 @@ impl Id {
         ids
     }
 
-    /// Encodes the [`Id`] from worker parts.
+    /// Creates an ID from worker parts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timestamp, worker ID, or sequence number is too large.
     #[must_use]
     pub fn from_worker_parts(time: OffsetDateTime, worker: u16, sequence: u16) -> Self {
         let timestamp_ms = time.unix_timestamp_nanos() as u128 / 1_000_000;
@@ -88,15 +105,15 @@ impl Id {
         )
     }
 
-    /// Encodes the [`Id`] from time and a random number.
+    /// Creates an ID from time and a random number.
     #[must_use]
-    pub fn from_time_and_random(time: OffsetDateTime, random: u128) -> Self {
+    pub const fn from_time_and_random(time: OffsetDateTime, random: u128) -> Self {
         let timestamp_ms = time.unix_timestamp_nanos() / 1_000_000;
         let id = Ulid::from_parts(timestamp_ms as u64, random);
         Self::new(id.0)
     }
 
-    /// Decodes [`Id`]'s worker parts.
+    /// Decodes the ID into worker parts.
     #[must_use]
     pub fn decode_worker(self) -> (OffsetDateTime, u16, u16) {
         let milliseconds = (self.0 >> (WORKER_BITS + SEQUENCE_BITS)) as i64;
@@ -108,7 +125,7 @@ impl Id {
         (timestamp, worker, sequence)
     }
 
-    /// Decodes [`Id`]'s time and randomness parts.
+    /// Decodes the ID into time and randomness parts.
     #[must_use]
     pub fn decode_time_and_random(self) -> (OffsetDateTime, u128) {
         let id = Ulid::from(self.0);
@@ -174,7 +191,7 @@ impl From<Ulid> for Id {
 
 impl From<Id> for Ulid {
     fn from(id: Id) -> Self {
-        Ulid::from(id.0)
+        Self::from(id.0)
     }
 }
 

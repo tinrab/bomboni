@@ -4,13 +4,17 @@ use handlebars::{
 };
 use std::collections::BTreeMap;
 
+/// Name of the render helper.
 pub const RENDER_HELPER_NAME: &str = "render";
+/// Name of the set decorator.
 pub const SET_DECORATOR_NAME: &str = "set";
 
+/// Registers all render helpers with the Handlebars registry.
 pub fn register_render_helpers(handlebars_registry: &mut Handlebars) {
     register_render_helpers_with_name_map(handlebars_registry, BTreeMap::default());
 }
 
+/// Registers render helpers with custom name mapping.
 pub fn register_render_helpers_with_name_map(
     handlebars_registry: &mut Handlebars,
     name_map: BTreeMap<String, String>,

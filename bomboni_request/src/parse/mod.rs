@@ -9,13 +9,26 @@ use wasm_bindgen::prelude::*;
 
 use crate::error::RequestResult;
 
+/// Parsing helper functions.
 pub mod helpers;
 
+/// Trait for parsing values from a source type.
 pub trait RequestParse<T>: Sized {
+    /// Parses a value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parsing fails.
     fn parse(value: T) -> RequestResult<Self>;
 }
 
+/// Trait for parsing self into another type.
 pub trait RequestParseInto<T>: Sized {
+    /// Parses self into another type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parsing fails.
     fn parse_into(self) -> RequestResult<T>;
 }
 
@@ -37,14 +50,23 @@ where
     ),
     wasm_bindgen(getter_with_clone, inspectable)
 )]
+/// A parsed resource with metadata.
 pub struct ParsedResource {
+    /// Resource name.
     pub name: String,
+    /// Creation time.
     pub create_time: Option<UtcDateTime>,
+    /// Update time.
     pub update_time: Option<UtcDateTime>,
+    /// Deletion time.
     pub delete_time: Option<UtcDateTime>,
+    /// Whether the resource is deleted.
     pub deleted: bool,
+    /// `ETag` for optimistic concurrency.
     pub etag: Option<String>,
+    /// Revision ID.
     pub revision_id: Option<Id>,
+    /// Revision creation time.
     pub revision_create_time: Option<UtcDateTime>,
 }
 

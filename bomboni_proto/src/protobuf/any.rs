@@ -3,10 +3,15 @@ use prost::{DecodeError, EncodeError, Message, Name};
 use crate::google::protobuf::Any;
 
 impl Any {
-    pub fn new(type_url: String, value: Vec<u8>) -> Self {
+    /// Creates a new `Any` message with the given type URL and value.
+    pub const fn new(type_url: String, value: Vec<u8>) -> Self {
         Self { type_url, value }
     }
 
+    /// Converts a protobuf message to an `Any` message.
+    ///
+    /// # Errors
+    /// Returns an error if the message cannot be encoded.
     pub fn from_msg<T>(message: &T) -> Result<Self, EncodeError>
     where
         T: Name,
@@ -17,6 +22,10 @@ impl Any {
         Ok(Self { type_url, value })
     }
 
+    /// Converts an `Any` message back to the original protobuf message.
+    ///
+    /// # Errors
+    /// Returns an error if the type URL doesn't match or decoding fails.
     pub fn to_msg<T>(self) -> Result<T, DecodeError>
     where
         T: Default + Name,
@@ -32,6 +41,7 @@ impl Any {
     }
 }
 
+/// Implements `TryFrom` conversions between protobuf messages and `Any` type.
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_convert {
     ($($message:ty),* $(,)?) => {
@@ -55,6 +65,7 @@ macro_rules! impl_proto_any_convert {
     };
 }
 
+/// Implements serde serialization/deserialization for `Any` types.
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_serde {
     ([$($message:ty),* $(,)?]) => {
@@ -182,6 +193,7 @@ macro_rules! impl_proto_any_serde {
     };
 }
 
+/// Implements serde serialization/deserialization for sequences of `Any` types.
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_seq_serde {
     ($any_serde:ident) => {

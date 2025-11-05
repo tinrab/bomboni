@@ -1,3 +1,5 @@
+#![allow(clippy::option_if_let_else)]
+
 use darling::ast::Data;
 use options::ParseOptions;
 use proc_macro2::TokenStream;

@@ -9,6 +9,7 @@ use serde_json::Value as JsonValue;
 
 use crate::google::protobuf::Duration;
 
+/// Checks if a value is equal to its default value.
 pub fn is_default<T>(value: &T) -> bool
 where
     T: Default + PartialEq<T>,
@@ -16,14 +17,20 @@ where
     value == &T::default()
 }
 
+/// Returns `true` as a default value.
 #[must_use]
-pub fn default_bool_true() -> bool {
+pub const fn default_bool_true() -> bool {
     true
 }
 
+/// Serialization utilities for converting values to strings.
 pub mod as_string {
     use super::{Deserialize, Deserializer, FromStr, Serializer, de};
 
+    /// Serializes a value as a string.
+    ///
+    /// # Errors
+    /// Returns an error if serialization fails.
     pub fn serialize<T, S>(
         value: &T,
         serializer: S,
@@ -35,6 +42,10 @@ pub mod as_string {
         serializer.serialize_str(&value.to_string())
     }
 
+    /// Deserializes a string value.
+    ///
+    /// # Errors
+    /// Returns an error if deserialization fails or the string cannot be parsed.
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
     where
         T: FromStr,
@@ -49,11 +60,16 @@ pub mod as_string {
     }
 }
 
+/// Serialization utilities for comma-separated string lists.
 pub mod string_list {
     use super::{
         Deserializer, Display, Formatter, FromStr, PhantomData, Serialize, Serializer, de, fmt,
     };
 
+    /// Serializes a slice of values as a comma-separated string.
+    ///
+    /// # Errors
+    /// Returns an error if serialization fails.
     pub fn serialize<T, S>(
         value: &[T],
         serializer: S,
@@ -70,6 +86,10 @@ pub mod string_list {
         value.serialize(serializer)
     }
 
+    /// Deserializes a comma-separated string into a collection.
+    ///
+    /// # Errors
+    /// Returns an error if deserialization fails or string cannot be parsed.
     pub fn deserialize<'de, V, T, D>(deserializer: D) -> Result<V, D::Error>
     where
         V: FromIterator<T>,
@@ -105,7 +125,9 @@ pub mod string_list {
     }
 }
 
-// Credit: https://github.com/sunng87/handlebars-rust/blob/v4.5.0/src/json/value.rs#L113
+/// Checks if a JSON value is truthy.
+///
+/// Credit: <https://github.com/sunng87/handlebars-rust/blob/v4.5.0/src/json/value.rs#L113>
 #[must_use]
 pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
     match value {
@@ -125,25 +147,31 @@ pub fn is_truthy(value: &JsonValue, include_zero: bool) -> bool {
     }
 }
 
+/// Merges two JSON values recursively.
 pub fn merge_json(a: &mut JsonValue, b: JsonValue) {
-    if let JsonValue::Object(a) = a {
-        if let JsonValue::Object(b) = b {
-            for (k, v) in b {
-                if v.is_null() {
-                    a.remove(&k);
-                } else {
-                    merge_json(a.entry(k).or_insert(JsonValue::Null), v);
-                }
+    if let JsonValue::Object(a) = a
+        && let JsonValue::Object(b) = b
+    {
+        for (k, v) in b {
+            if v.is_null() {
+                a.remove(&k);
+            } else {
+                merge_json(a.entry(k).or_insert(JsonValue::Null), v);
             }
-            return;
         }
+        return;
     }
     *a = b;
 }
 
+/// Serialization utilities for duration values.
 pub mod duration {
     use super::{Deserialize, Deserializer, Display, Duration, FromStr, Serializer, de, ser};
 
+    /// Serializes a duration value.
+    ///
+    /// # Errors
+    /// Returns an error if serialization fails or duration conversion fails.
     pub fn serialize<T, S>(
         value: &T,
         serializer: S,
@@ -161,6 +189,10 @@ pub mod duration {
         serializer.serialize_str(&d.to_string())
     }
 
+    /// Deserializes a duration value.
+    ///
+    /// # Errors
+    /// Returns an error if deserialization fails or duration conversion fails.
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
     where
         T: Clone + TryFrom<Duration>,

@@ -5,26 +5,40 @@ use crate::schema::{
 };
 use crate::value::Value;
 
+/// A test request item containing user and task data.
 pub struct RequestItem {
+    /// The user item.
     pub user: UserItem,
+    /// The task item.
     pub task: TaskItem,
 }
 
+/// A test user item.
 pub struct UserItem {
+    /// The user ID.
     pub id: String,
+    /// The user's display name.
     pub display_name: String,
+    /// The user's age.
     pub age: i32,
 }
 
+/// A test task item.
 pub struct TaskItem {
+    /// The task ID.
     pub id: String,
+    /// The user ID this task belongs to.
     pub user_id: String,
+    /// The task content.
     pub content: String,
+    /// Whether the task is deleted.
     pub deleted: bool,
+    /// The task tags.
     pub tags: Vec<String>,
 }
 
 impl RequestItem {
+    /// Gets the schema for the request item.
     pub fn get_schema() -> Schema {
         Schema {
             members: btree_map_into! {
@@ -61,6 +75,7 @@ impl SchemaMapped for RequestItem {
 }
 
 impl UserItem {
+    /// Gets the schema for the user item.
     pub fn get_schema() -> Schema {
         Schema {
             members: btree_map_into!(
@@ -89,6 +104,7 @@ impl SchemaMapped for UserItem {
 }
 
 impl TaskItem {
+    /// Gets the schema for the task item.
     pub fn get_schema() -> Schema {
         Schema {
             members: btree_map_into!(

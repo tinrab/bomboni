@@ -11,6 +11,7 @@ use crate::{
     value::Value,
 };
 
+/// Builder for SQL filter statements.
 pub struct SqlFilterBuilder<'a> {
     dialect: SqlDialect,
     argument_style: SqlArgumentStyle,
@@ -24,6 +25,7 @@ pub struct SqlFilterBuilder<'a> {
 }
 
 impl<'a> SqlFilterBuilder<'a> {
+    /// Creates a new SQL filter builder.
     pub fn new(dialect: SqlDialect, schema: &'a Schema) -> Self {
         Self {
             dialect,
@@ -38,31 +40,44 @@ impl<'a> SqlFilterBuilder<'a> {
         }
     }
 
-    pub fn set_schema_functions(&mut self, schema_functions: &'a FunctionSchemaMap) -> &mut Self {
+    /// Sets the schema functions.
+    pub const fn set_schema_functions(
+        &mut self,
+        schema_functions: &'a FunctionSchemaMap,
+    ) -> &mut Self {
         self.schema_functions = Some(schema_functions);
         self
     }
 
-    pub fn set_rename_map(&mut self, rename_map: &'a SqlRenameMap) -> &mut Self {
+    /// Sets the rename map.
+    pub const fn set_rename_map(&mut self, rename_map: &'a SqlRenameMap) -> &mut Self {
         self.rename_map = Some(rename_map);
         self
     }
 
-    pub fn set_document_offset(&mut self, offset: usize) -> &mut Self {
+    /// Sets the document offset.
+    pub const fn set_document_offset(&mut self, offset: usize) -> &mut Self {
         self.argument_offset = offset;
         self
     }
 
-    pub fn case_insensitive_like(&mut self) -> &mut Self {
+    /// Enables case insensitive like.
+    pub const fn case_insensitive_like(&mut self) -> &mut Self {
         self.case_insensitive_like = true;
         self
     }
 
+    /// Sets the argument style.
     pub fn set_argument_style(&mut self, argument_style: SqlArgumentStyle) -> &mut Self {
         self.argument_style = argument_style;
         self
     }
 
+    /// Builds a SQL filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the filter is invalid.
     pub fn build(&mut self, filter: &Filter) -> FilterResult<(String, Vec<Value>)> {
         self.build_tree(filter)?;
 

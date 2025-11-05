@@ -22,6 +22,7 @@ pub enum DurationError {
 }
 
 impl Duration {
+    /// Creates a new `Duration` with the given seconds and nanoseconds.
     #[must_use]
     pub const fn new(seconds: i64, nanos: i32) -> Self {
         Self { seconds, nanos }

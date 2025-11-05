@@ -18,7 +18,7 @@ mod ir {
                         let id = x
                             .parse()
                             .map_err(|err: ParseIdError| FromValueError(err.to_string().into()))?;
-                        Ok(ParseIdIr(x, id))
+                        Ok(Self(x, id))
                     }
                     Err(e) => Err(FromValueError(Value::Bytes(e.into_bytes()))),
                 },
@@ -35,7 +35,7 @@ mod ir {
 
     impl From<ParseIdIr<String>> for Value
     where
-        <String as FromValue>::Intermediate: Into<Value>,
+        <String as FromValue>::Intermediate: Into<Self>,
     {
         fn from(ir: ParseIdIr<String>) -> Self {
             ir.0.into()
@@ -51,6 +51,6 @@ impl FromValue for Id {
 
 impl From<Id> for Value {
     fn from(value: Id) -> Self {
-        Value::Bytes(value.to_string().into_bytes())
+        Self::Bytes(value.to_string().into_bytes())
     }
 }

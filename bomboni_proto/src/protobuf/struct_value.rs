@@ -1,3 +1,5 @@
+#![allow(clippy::use_self, clippy::fallible_impl_from)]
+
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 use std::{
@@ -11,17 +13,22 @@ use crate::google::protobuf::{
 };
 
 impl Struct {
+    /// Creates a new struct with the given fields.
     #[must_use]
-    pub fn new(fields: BTreeMap<String, Value>) -> Self {
+    pub const fn new(fields: BTreeMap<String, Value>) -> Self {
         Self { fields }
     }
 }
 
-impl From<JsonValue> for Struct {
-    fn from(value: JsonValue) -> Self {
+impl TryFrom<JsonValue> for Struct {
+    type Error = &'static str;
+
+    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
         match value {
-            JsonValue::Object(o) => Self::new(o.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            _ => panic!("JsonValue::Object is expected"),
+            JsonValue::Object(o) => Ok(Self::new(
+                o.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            )),
+            _ => Err("JsonValue::Object is expected"),
         }
     }
 }
@@ -112,10 +119,10 @@ impl<'de> Deserialize<'de> for Struct {
 impl From<Value> for JsonValue {
     fn from(value: Value) -> Self {
         let Some(kind) = value.kind else {
-            return JsonValue::Null;
+            return Self::Null;
         };
         match kind {
-            ValueKind::NullValue(_) => JsonValue::Null,
+            ValueKind::NullValue(_) => Self::Null,
             ValueKind::NumberValue(n) => JsonValue::Number(
                 JsonNumber::from_f64(n).expect("NumberValue is expected to be a valid f64"),
             ),
@@ -337,7 +344,11 @@ mod tests {
             "msg": "Hello, World!",
             "seq": [1, 2, 3],
         });
-        let s: Struct = js.into();
+        let s: Struct = if let serde_json::Value::Object(map) = js {
+            map.into_iter().collect::<BTreeMap<_, _>>().into()
+        } else {
+            panic!("Expected object");
+        };
         assert_eq!(
             &serde_json::from_str::<Struct>(&serde_json::to_string_pretty(&s).unwrap()).unwrap(),
             &s

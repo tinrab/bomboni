@@ -28,7 +28,8 @@ pub struct Aes256PageTokenBuilder {
 }
 
 impl Aes256PageTokenBuilder {
-    pub fn new(url_safe: bool) -> Self {
+    /// Creates a new AES256 page token builder.
+    pub const fn new(url_safe: bool) -> Self {
         Self { url_safe }
     }
 }

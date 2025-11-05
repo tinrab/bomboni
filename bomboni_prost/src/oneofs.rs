@@ -1,3 +1,5 @@
+//! Oneof field code generation utilities.
+
 use std::collections::BTreeMap;
 
 use bomboni_core::string::{Case, str_to_case};
@@ -8,6 +10,38 @@ use syn::TypePath;
 
 use crate::context::Context;
 
+/// Writes utility functions for oneof fields in a message.
+///
+/// This function generates helper functions for working with protobuf oneof fields,
+/// including getters, setters, and type checking utilities. These functions
+/// make it easier to work with oneof fields in Rust code.
+///
+/// # Arguments
+///
+/// * `context` - The generation context containing configuration
+/// * `s` - The token stream to write generated code to
+/// * `message` - The protobuf message descriptor containing oneof fields
+///
+/// # Generated Functions
+///
+/// For each oneof field, this generates:
+/// - Getter functions for each variant
+/// - Type checking functions
+/// - Utility functions for working with the oneof
+///
+/// # Examples
+///
+/// Given a protobuf message with:
+/// ```proto
+/// message User {
+///   oneof data {
+///     string email = 1;
+///     string phone = 2;
+///   }
+/// }
+/// ```
+///
+/// This function generates utility functions for working with the `data` oneof field.
 pub fn write_message_oneofs(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if message.oneof_decl.is_empty() {
         return;

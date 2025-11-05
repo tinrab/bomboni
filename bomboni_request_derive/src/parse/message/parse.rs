@@ -1,3 +1,5 @@
+#![allow(clippy::option_if_let_else)]
+
 use bomboni_core::syn::type_is_phantom;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};

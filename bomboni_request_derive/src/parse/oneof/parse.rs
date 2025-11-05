@@ -1,3 +1,5 @@
+#![allow(clippy::option_if_let_else)]
+
 use std::collections::BTreeSet;
 
 use proc_macro2::TokenStream;

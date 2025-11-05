@@ -4,7 +4,7 @@ use syn::{
 
 use crate::parse::options::{ParseFieldOptions, ParseOptions};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FieldTypeInfo {
     pub container_ident: Option<String>,
     pub primitive_ident: Option<String>,

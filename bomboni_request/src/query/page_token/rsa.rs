@@ -25,7 +25,8 @@ pub struct RsaPageTokenBuilder {
 }
 
 impl RsaPageTokenBuilder {
-    pub fn new(private_key: RsaPrivateKey, public_key: RsaPublicKey, url_safe: bool) -> Self {
+    /// Creates a new RSA page token builder.
+    pub const fn new(private_key: RsaPrivateKey, public_key: RsaPublicKey, url_safe: bool) -> Self {
         Self {
             private_key,
             public_key,

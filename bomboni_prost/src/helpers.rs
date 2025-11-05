@@ -1,3 +1,5 @@
+//! Helper function generation utilities.
+
 use bomboni_core::string::{Case, str_to_case};
 use proc_macro2::TokenStream;
 use prost_types::DescriptorProto;
@@ -6,6 +8,25 @@ use quote::{format_ident, quote};
 
 use crate::context::Context;
 
+/// Writes helper functions for all messages in the given files.
+///
+/// This function iterates through all messages in the provided protobuf files
+/// and generates helper functions based on the configuration. The generated
+/// helpers include name functions, field name functions, and other utilities.
+///
+/// # Arguments
+///
+/// * `context` - The generation context containing configuration
+/// * `s` - The token stream to write generated code to
+/// * `files` - Slice of file descriptors to process
+///
+/// # Generated Functions
+///
+/// Depending on configuration, this may generate:
+/// - Message name functions
+/// - Field name functions
+/// - Type URL functions
+/// - Oneof utility functions
 pub fn write_helpers(context: &Context, s: &mut TokenStream, files: &[&FileDescriptorProto]) {
     let mut src = quote!();
     for file in files {

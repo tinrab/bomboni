@@ -1,3 +1,5 @@
+#![allow(clippy::option_if_let_else)]
+
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use std::collections::BTreeSet;
@@ -269,50 +271,26 @@ pub fn expand_parse_field_type(
 
         if primitive_ident == "String" {
             if !field_options.unspecified {
-                if field_options.wrapper {
-                    parse_impl.extend(quote! {
-                        if target.is_empty() {
-                            return Err(RequestError::path(
-                                #field_error_path,
-                                CommonError::RequiredFieldMissing,
-                            ) #inner_wrap_err);
-                        }
-                    });
-                } else {
-                    parse_impl.extend(quote! {
-                        if target.is_empty() {
-                            return Err(RequestError::path(
-                                #field_error_path,
-                                CommonError::RequiredFieldMissing,
-                            ) #inner_wrap_err);
-                        }
-                    });
-                }
+                parse_impl.extend(quote! {
+                    if target.is_empty() {
+                        return Err(RequestError::path(
+                            #field_error_path,
+                            CommonError::RequiredFieldMissing,
+                        ) #inner_wrap_err);
+                    }
+                });
             }
             if let Some(regex) = field_options.regex.as_ref() {
-                if field_options.wrapper {
-                    parse_impl.extend(quote! {
-                        if !re.is_match(&target) {
-                            return Err(RequestError::path(
-                                #field_error_path,
-                                CommonError::InvalidStringFormat {
-                                    expected: #regex.into(),
-                                },
-                            ) #inner_wrap_err);
-                        }
-                    });
-                } else {
-                    parse_impl.extend(quote! {
-                        if !re.is_match(&target) {
-                            return Err(RequestError::path(
-                                #field_error_path,
-                                CommonError::InvalidStringFormat {
-                                    expected: #regex.into(),
-                                },
-                            ) #inner_wrap_err);
-                        }
-                    });
-                }
+                parse_impl.extend(quote! {
+                    if !re.is_match(&target) {
+                        return Err(RequestError::path(
+                            #field_error_path,
+                            CommonError::InvalidStringFormat {
+                                expected: #regex.into(),
+                            },
+                        ) #inner_wrap_err);
+                    }
+                });
             }
         } else if field_type_info.primitive_message && !field_options.keep_primitive {
             parse_impl.extend(quote! {

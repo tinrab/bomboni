@@ -1,3 +1,5 @@
+#![allow(clippy::option_if_let_else)]
+
 use std::ops::Deref;
 
 use proc_macro2::{Ident, TokenStream};
@@ -41,26 +43,22 @@ pub fn expand(options: DerivedMap) -> syn::Result<TokenStream> {
 
     let mut is_request_result = false;
     let mut parse_return_type = None;
+
     if let ReturnType::Type(_, return_type) = &parse_item_closure.output {
         if let Type::Path(TypePath {
             path: Path { segments, .. },
             ..
         }) = &**return_type
-        {
-            if let Some(syn::PathSegment {
+            && let Some(syn::PathSegment {
                 ident,
                 arguments: PathArguments::AngleBracketed(args),
             }) = segments.first()
-            {
-                if let Some(GenericArgument::Type(ty)) = args.args.first() {
-                    if ident == "RequestResult" {
-                        is_request_result = true;
-                        parse_return_type = Some(ty.clone());
-                    }
-                }
-            }
-        }
-        if parse_return_type.is_none() {
+            && let Some(GenericArgument::Type(ty)) = args.args.first()
+            && ident == "RequestResult"
+        {
+            is_request_result = true;
+            parse_return_type = Some(ty.clone());
+        } else if parse_return_type.is_none() {
             parse_return_type = Some(return_type.deref().clone());
         }
     }

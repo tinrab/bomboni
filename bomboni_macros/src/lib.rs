@@ -1,7 +1,4 @@
-//! # Common macros.
-//!
-
-//! A collection of common macros for Rust.
+#![doc = include_str!("../README.md")]
 
 #[doc(hidden)]
 pub mod collections;

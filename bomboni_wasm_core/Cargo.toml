@@ -1,12 +1,12 @@
 [package]
 name = "bomboni_wasm_core"
-version = "0.1.62"
+version = "0.2.0"
 authors = ["Tin Rabzelj <tin@flinect.com>"]
 description = "Internal WASM part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
-readme = "../README.md"
+readme = "README.md"
 edition = "2024"
 
 [lib]

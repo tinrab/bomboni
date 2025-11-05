@@ -10,62 +10,103 @@ use syn::{
     TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
 };
 
+/// TypeScript type representation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TsType {
+    /// Keyword type (number, string, etc.).
     Keyword(KeywordTsType),
+    /// Literal type.
     Literal(String),
+    /// Array type.
     Array(Box<Self>),
+    /// Tuple type.
     Tuple(Vec<Self>),
+    /// Optional type.
     Option(Box<Self>),
+    /// Reference type with name and type parameters.
     Reference {
+        /// Name of the referenced type.
         name: String,
+        /// Type parameters.
         type_params: Vec<Self>,
     },
+    /// Function type.
     Fn {
+        /// Function parameters.
         params: Vec<Self>,
+        /// Return type.
         alias_type: Box<Self>,
     },
+    /// Type literal.
     TypeLiteral(TypeLiteralTsType),
+    /// Intersection type.
     Intersection(Vec<Self>),
+    /// Union type.
     Union(Vec<Self>),
+    /// Override type.
     Override(String),
+    /// Partial type.
     Partial(Box<Self>),
 }
 
+/// TypeScript keyword types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordTsType {
+    /// Number type.
     Number,
+    /// `BigInt` type.
     Bigint,
+    /// Boolean type.
     Boolean,
+    /// String type.
     String,
+    /// Void type.
     Void,
+    /// Undefined type.
     Undefined,
+    /// Null type.
     Null,
+    /// Never type.
     Never,
 }
 
+/// TypeScript type literal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeLiteralTsType {
+    /// Members of the type literal.
     pub members: Vec<TsTypeElement>,
 }
 
+/// TypeScript type element.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TsTypeElement {
+    /// Element key.
     pub key: String,
+    /// Element type.
     pub alias_type: TsType,
+    /// Whether the element is optional.
     pub optional: bool,
 }
 
 impl TsType {
-    pub const NUMBER: TsType = TsType::Keyword(KeywordTsType::Number);
-    pub const BIGINT: TsType = TsType::Keyword(KeywordTsType::Bigint);
-    pub const BOOLEAN: TsType = TsType::Keyword(KeywordTsType::Boolean);
-    pub const STRING: TsType = TsType::Keyword(KeywordTsType::String);
-    pub const VOID: TsType = TsType::Keyword(KeywordTsType::Void);
-    pub const UNDEFINED: TsType = TsType::Keyword(KeywordTsType::Undefined);
-    pub const NULL: TsType = TsType::Keyword(KeywordTsType::Null);
-    pub const NEVER: TsType = TsType::Keyword(KeywordTsType::Never);
+    /// Number type constant.
+    pub const NUMBER: Self = Self::Keyword(KeywordTsType::Number);
+    /// `BigInt` type constant.
+    pub const BIGINT: Self = Self::Keyword(KeywordTsType::Bigint);
+    /// Boolean type constant.
+    pub const BOOLEAN: Self = Self::Keyword(KeywordTsType::Boolean);
+    /// String type constant.
+    pub const STRING: Self = Self::Keyword(KeywordTsType::String);
+    /// Void type constant.
+    pub const VOID: Self = Self::Keyword(KeywordTsType::Void);
+    /// Undefined type constant.
+    pub const UNDEFINED: Self = Self::Keyword(KeywordTsType::Undefined);
+    /// Null type constant.
+    pub const NULL: Self = Self::Keyword(KeywordTsType::Null);
+    /// Never type constant.
+    pub const NEVER: Self = Self::Keyword(KeywordTsType::Never);
 
+    /// Creates a TypeScript type from a Rust type.
     pub fn from_type(value: &Type) -> Self {
         match value {
             Type::Array(TypeArray { elem, len, .. }) => {
@@ -131,6 +172,9 @@ impl TsType {
         }
     }
 
+    /// Gets the nullish type for the current platform.
+    ///
+    /// Returns `UNDEFINED` for JavaScript targets and `NULL` otherwise.
     pub const fn nullish() -> Self {
         if cfg!(feature = "js") {
             Self::UNDEFINED
@@ -139,10 +183,12 @@ impl TsType {
         }
     }
 
-    pub fn is_reference(&self) -> bool {
+    /// Checks if the type is a reference type.
+    pub const fn is_reference(&self) -> bool {
         matches!(self, Self::Reference { .. })
     }
 
+    /// Gets all reference names used in this type.
     pub fn get_reference_names(&self) -> BTreeSet<String> {
         let mut names = BTreeSet::new();
         self.visit(&mut |ty| {
@@ -162,10 +208,14 @@ impl TsType {
             Self::Keyword(_) | Self::Literal(_) | Self::Override(_) => (),
             Self::Array(element) => element.visit(f),
             Self::Tuple(elements) => {
-                elements.iter().for_each(|t| t.visit(f));
+                for t in elements {
+                    t.visit(f);
+                }
             }
             Self::Reference { type_params, .. } => {
-                type_params.iter().for_each(|t| t.visit(f));
+                for t in type_params {
+                    t.visit(f);
+                }
             }
             Self::Fn { params, alias_type } => {
                 params
@@ -174,10 +224,14 @@ impl TsType {
                     .for_each(|t| t.visit(f));
             }
             Self::TypeLiteral(TypeLiteralTsType { members }) => {
-                members.iter().for_each(|m| m.alias_type.visit(f));
+                for m in members {
+                    m.alias_type.visit(f);
+                }
             }
             Self::Intersection(types) | Self::Union(types) => {
-                types.iter().for_each(|t| t.visit(f));
+                for t in types {
+                    t.visit(f);
+                }
             }
             Self::Option(t) | Self::Partial(t) => t.visit(f),
         }
@@ -263,6 +317,7 @@ impl TsType {
         }
     }
 
+    /// Creates a type with the given tag type.
     #[must_use]
     pub fn with_tag_type(self, tag_type: &TagType, name: &str, style: Style) -> Self {
         match tag_type {
@@ -279,7 +334,7 @@ impl TsType {
                 }
             }
             TagType::Internal { tag } => {
-                if self == TsType::nullish() {
+                if self == Self::nullish() {
                     TsTypeElement {
                         key: tag.clone(),
                         alias_type: Self::Literal(name.into()),
@@ -287,7 +342,7 @@ impl TsType {
                     }
                     .into()
                 } else {
-                    TsType::from(TsTypeElement {
+                    Self::from(TsTypeElement {
                         key: tag.clone(),
                         alias_type: Self::Literal(name.into()),
                         optional: false,
@@ -298,7 +353,7 @@ impl TsType {
             TagType::Adjacent { tag, content } => {
                 let tag_field = TsTypeElement {
                     key: tag.clone(),
-                    alias_type: TsType::Literal(name.into()),
+                    alias_type: Self::Literal(name.into()),
                     optional: false,
                 };
                 if matches!(style, Style::Unit) {
@@ -321,6 +376,7 @@ impl TsType {
         }
     }
 
+    /// Creates an intersection type with another type.
     #[must_use]
     pub fn intersection(self, other: Self) -> Self {
         match (self, other) {
@@ -329,7 +385,7 @@ impl TsType {
                 let mut vec = Vec::with_capacity(x.len() + y.len());
                 vec.extend(x);
                 vec.extend(y);
-                TsType::Intersection(vec)
+                Self::Intersection(vec)
             }
             (Self::Intersection(x), y) => {
                 let mut vec = Vec::with_capacity(x.len() + 1);
@@ -347,6 +403,7 @@ impl TsType {
         }
     }
 
+    /// Changes reference names according to the provided map.
     #[must_use]
     pub fn change_reference(self, rename_map: &ReferenceChangeMap) -> Self {
         if rename_map.name.is_none() && rename_map.types.is_empty() {
@@ -410,6 +467,7 @@ impl TsType {
         }
     }
 
+    /// Renames protobuf wrapper types to their simplified forms.
     #[must_use]
     pub fn rename_protobuf_wrapper(self) -> Self {
         let rename_map = ReferenceChangeMap {
@@ -428,7 +486,7 @@ impl TsType {
             .map(|(s, t)| {
                 (
                     s.into(),
-                    TsType::Reference {
+                    Self::Reference {
                         name: t.into(),
                         type_params: Vec::new(),
                     },
@@ -556,10 +614,11 @@ impl Display for TsType {
 }
 
 impl TypeLiteralTsType {
+    /// Creates an intersection with another type literal.
     #[must_use]
     pub fn intersection(self, other: Self) -> Self {
         self.members.into_iter().chain(other.members).fold(
-            TypeLiteralTsType {
+            Self {
                 members: Vec::new(),
             },
             |mut acc, member| {

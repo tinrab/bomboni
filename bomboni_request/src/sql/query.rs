@@ -8,6 +8,7 @@ use crate::sql::{
 };
 use crate::value::Value;
 
+/// Builder for query SQL statements.
 #[derive(Debug, Clone)]
 pub struct QuerySqlBuilder {
     dialect: SqlDialect,
@@ -19,17 +20,25 @@ pub struct QuerySqlBuilder {
     query_next_page: bool,
 }
 
+/// Query SQL statement.
 #[derive(Debug, Clone)]
 pub struct QuerySqlStatement {
+    /// WHERE clause.
     pub where_clause: Option<String>,
+    /// Query arguments.
     pub arguments: Vec<Value>,
+    /// Paged WHERE clause.
     pub paged_where_clause: Option<String>,
+    /// Paged LIMIT clause.
     pub paged_limit_clause: String,
+    /// Paged arguments.
     pub paged_arguments: Vec<Value>,
+    /// ORDER BY clause.
     pub order_by_clause: Option<String>,
 }
 
 impl QuerySqlBuilder {
+    /// Creates a new query SQL builder.
     pub fn new(dialect: SqlDialect, schema: Schema) -> Self {
         Self {
             dialect,
@@ -42,31 +51,41 @@ impl QuerySqlBuilder {
         }
     }
 
+    /// Sets the schema functions.
     pub fn set_schema_functions(&mut self, schema_functions: FunctionSchemaMap) -> &mut Self {
         self.schema_functions = schema_functions;
         self
     }
 
+    /// Sets the rename map.
     pub fn set_rename_map(&mut self, rename_map: SqlRenameMap) -> &mut Self {
         self.rename_map = rename_map;
         self
     }
 
-    pub fn case_insensitive_like(&mut self) -> &mut Self {
+    /// Enables case insensitive like.
+    pub const fn case_insensitive_like(&mut self) -> &mut Self {
         self.case_insensitive_like = true;
         self
     }
 
-    pub fn query_next_page(&mut self) -> &mut Self {
+    /// Enables query next page.
+    pub const fn query_next_page(&mut self) -> &mut Self {
         self.query_next_page = true;
         self
     }
 
+    /// Sets the argument style.
     pub fn set_argument_style(&mut self, argument_style: SqlArgumentStyle) -> &mut Self {
         self.argument_style = argument_style;
         self
     }
 
+    /// Builds a list query SQL statement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if query building fails.
     pub fn build_list(&self, query: &ListQuery) -> QueryResult<QuerySqlStatement> {
         self.build(
             query.page_size,
@@ -79,6 +98,11 @@ impl QuerySqlBuilder {
         )
     }
 
+    /// Builds a search query SQL statement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if query building fails.
     pub fn build_search(&self, query: &SearchQuery) -> QueryResult<QuerySqlStatement> {
         self.build(
             query.page_size,
@@ -91,6 +115,11 @@ impl QuerySqlBuilder {
         )
     }
 
+    /// Builds a query SQL statement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if query building fails.
     pub fn build(
         &self,
         page_size: i32,
@@ -171,10 +200,12 @@ const _: () = {
     use postgres_types::ToSql;
 
     impl QuerySqlStatement {
+        /// Gets the SQL parameters for the query.
         pub fn get_sql_params(&self) -> Vec<&(dyn ToSql + Sync)> {
             self.arguments.iter().collect()
         }
 
+        /// Gets the SQL parameters for the paged query.
         pub fn get_paged_sql_params(&self) -> Vec<&(dyn ToSql + Sync)> {
             self.paged_arguments.iter().collect()
         }

@@ -5,6 +5,11 @@ use crate::{
     schema::{FunctionSchemaMap, Schema},
 };
 
+/// Parses a query filter.
+///
+/// # Errors
+///
+/// Returns an error if the filter is invalid or too long.
 pub fn parse_query_filter(
     filter: Option<&str>,
     schema: &Schema,
@@ -24,6 +29,11 @@ pub fn parse_query_filter(
     }
 }
 
+/// Parses a query ordering.
+///
+/// # Errors
+///
+/// Returns an error if the ordering is invalid or too long.
 pub fn parse_query_ordering(
     ordering: Option<&str>,
     schema: &Schema,

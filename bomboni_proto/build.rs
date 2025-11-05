@@ -1,3 +1,5 @@
+//! Build script for `bomboni_proto`.
+
 use bomboni_prost::{
     compile,
     config::{ApiConfig, CompileConfig},

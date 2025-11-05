@@ -14,38 +14,59 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+/// TypeScript declaration.
 #[derive(Debug)]
 pub enum TsDecl {
+    /// Type alias declaration.
     TypeAlias(TypeAliasTsDecl),
+    /// Interface declaration.
     Interface(InterfaceTsDecl),
+    /// Enum declaration.
     Enum(EnumTsDecl),
 }
 
+/// TypeScript type alias declaration.
 #[derive(Debug)]
 pub struct TypeAliasTsDecl {
+    /// Name of the type alias.
     pub name: String,
+    /// Type parameters.
     pub type_params: Vec<String>,
+    /// The aliased type.
     pub alias_type: TsType,
 }
 
+/// TypeScript interface declaration.
 #[derive(Debug)]
 pub struct InterfaceTsDecl {
+    /// Name of the interface.
     pub name: String,
+    /// Type parameters.
     pub type_params: Vec<String>,
+    /// Extended interfaces.
     pub extends: Vec<TsType>,
+    /// Interface body elements.
     pub body: Vec<TsTypeElement>,
 }
 
+/// TypeScript enum declaration.
 #[derive(Debug)]
 pub struct EnumTsDecl {
+    /// Name of the enum.
     pub name: String,
+    /// Type parameters.
     pub type_params: Vec<String>,
+    /// Enum members.
     pub members: Vec<TypeAliasTsDecl>,
+    /// Whether to use external tagging.
     pub external_tag: bool,
+    /// Whether to include enum values.
     pub enum_value: bool,
 }
 
+/// Parser for generating TypeScript declarations from Rust types.
 pub struct TsDeclParser<'a> {
+    /// Wasm options for configuration.
     options: &'a WasmOptions<'a>,
 }
 
@@ -182,6 +203,7 @@ impl Display for EnumTsDecl {
 }
 
 impl TsDecl {
+    /// Gets the name of the declaration.
     pub fn name(&self) -> &str {
         match self {
             Self::TypeAlias(decl) => &decl.name,
@@ -209,10 +231,12 @@ enum ParsedFields {
 }
 
 impl<'a> TsDeclParser<'a> {
-    pub fn new(options: &'a WasmOptions<'a>) -> Self {
+    /// Creates a new TypeScript declaration parser.
+    pub const fn new(options: &'a WasmOptions<'a>) -> Self {
         Self { options }
     }
 
+    /// Parses the Rust type into a TypeScript declaration.
     pub fn parse(&self) -> TsDecl {
         if let Some(override_type) = self.options.override_type.as_ref() {
             return TypeAliasTsDecl {
@@ -378,10 +402,10 @@ impl<'a> TsDeclParser<'a> {
         }
 
         let mut field_type = TsType::from_type(field.ty);
-        if wasm_field.always_some.unwrap_or_default() {
-            if let TsType::Option(some_type) = field_type {
-                field_type = *some_type;
-            }
+        if wasm_field.always_some.unwrap_or_default()
+            && let TsType::Option(some_type) = field_type
+        {
+            field_type = *some_type;
         }
         if wasm_field
             .rename_wrapper
@@ -532,14 +556,14 @@ impl From<ParsedFields> for TsType {
     fn from(fields: ParsedFields) -> Self {
         match fields {
             ParsedFields::Named(members, extends) => {
-                let ty = TsType::from(TypeLiteralTsType { members });
+                let ty = Self::from(TypeLiteralTsType { members });
                 if extends.is_empty() {
                     ty
                 } else {
-                    ty.intersection(TsType::Intersection(extends))
+                    ty.intersection(Self::Intersection(extends))
                 }
             }
-            ParsedFields::Unnamed(elements) => TsType::Tuple(elements),
+            ParsedFields::Unnamed(elements) => Self::Tuple(elements),
             ParsedFields::Transparent(ty) => ty,
         }
     }

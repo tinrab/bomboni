@@ -1,3 +1,5 @@
+//! Enum code generation utilities.
+
 use bomboni_core::string::{Case, str_to_case};
 use proc_macro2::TokenStream;
 use prost_types::EnumDescriptorProto;
@@ -5,6 +7,24 @@ use quote::{format_ident, quote};
 
 use crate::context::Context;
 
+/// Writes Rust code for a protobuf enum.
+///
+/// This function generates helper functions and implementations for protobuf enums,
+/// including name functions, value name functions, type URLs, and serde support.
+///
+/// # Arguments
+///
+/// * `context` - The generation context containing configuration
+/// * `s` - The token stream to write generated code to
+/// * `enum_type` - The protobuf enum descriptor
+///
+/// # Generated Functions
+///
+/// Depending on configuration, this may generate:
+/// - `name()` function for getting enum name
+/// - `value_name()` function for getting variant names
+/// - `type_url()` function for Google API compatibility
+/// - `Serialize` and `Deserialize` implementations
 pub fn write_enum(context: &Context, s: &mut TokenStream, enum_type: &EnumDescriptorProto) {
     if context.config.api.names {
         write_name(context, s, enum_type);
