@@ -1,13 +1,13 @@
 [package]
 name = "bomboni_request_derive"
-version = "0.2.0"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Internal request derive macros for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "README.md"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "bomboni_request_derive"
@@ -15,10 +15,11 @@ path = "src/lib.rs"
 proc-macro = true
 
 [features]
+# Generate `bomboni::request` instead of `bomboni_request`
 root-crate = []
 
 [dependencies]
-bomboni_core = { workspace = true }
+bomboni_core = { path = "../bomboni_core" }
 
 proc-macro2 = { workspace = true, features = ["proc-macro"] }
 syn.workspace = true

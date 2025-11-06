@@ -12,6 +12,7 @@ macro_rules! format_comment {
 }
 
 /// Checks if a type is `PhantomData`.
+#[must_use]
 pub fn type_is_phantom(ty: &Type) -> bool {
     if let Type::Path(TypePath { path, .. }) = ty {
         path.segments
@@ -23,6 +24,7 @@ pub fn type_is_phantom(ty: &Type) -> bool {
 }
 
 /// Checks if a type is `Option`.
+#[must_use]
 pub fn type_is_option(ty: &Type) -> bool {
     if let Type::Path(TypePath { path, .. }) = ty {
         path.segments

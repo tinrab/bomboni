@@ -60,6 +60,7 @@ mod tests {
     #[test]
     fn structs() {
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         pub struct Simple {
             a: String,
             b: i32,
@@ -76,7 +77,7 @@ mod tests {
     #[test]
     fn renames() {
         #[derive(Serialize, Deserialize, Wasm)]
-        #[wasm(rename_all = "camelCase")]
+        #[wasm(bomboni_wasm_crate = "crate", rename_all = "camelCase")]
         struct Item {
             test_name: String,
             #[wasm(rename = "x")]
@@ -92,12 +93,14 @@ mod tests {
     #[test]
     fn enums() {
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         pub enum ExternalTag {
             String(String),
             Number(f64),
         }
 
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         #[serde(tag = "kind", content = "data")]
         pub enum AdjacentTag {
             String(String),
@@ -105,6 +108,7 @@ mod tests {
         }
 
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         #[serde(tag = "kind")]
         pub enum InternalTag {
             String { value: String },

@@ -1,0 +1,11 @@
+[package]
+name = "request-individual-crates"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bomboni_request = { path = "../../bomboni_request", features = ["derive"] }
+bomboni_proto = { path = "../../bomboni_proto" }
+prost = "0.14.1"
+serde = "1.0.228"

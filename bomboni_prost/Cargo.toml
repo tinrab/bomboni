@@ -1,20 +1,20 @@
 [package]
 name = "bomboni_prost"
-version = "0.2.0"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Utilities for working with prost. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "README.md"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "bomboni_prost"
 path = "src/lib.rs"
 
 [dependencies]
-bomboni_core = { workspace = true }
+bomboni_core = { path = "../bomboni_core" }
 
 prost.workspace = true
 prost-types.workspace = true

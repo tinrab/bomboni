@@ -1,0 +1,10 @@
+[package]
+name = "test-root-crate"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bomboni = {  path = "../..", features = ["request", "proto", "derive"] }
+prost = "0.14.1"
+serde = "1.0.228"

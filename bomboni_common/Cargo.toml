@@ -1,13 +1,13 @@
 [package]
 name = "bomboni_common"
-version = "0.2.0"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Common things for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "README.md"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "bomboni_common"
@@ -22,17 +22,20 @@ wasm = [
   "dep:js-sys",
   "dep:wasm-bindgen",
   "time/wasm-bindgen",
+  "dep:getrandom",
+  "serde",
 ]
 js = []
 postgres = ["dep:postgres-types", "dep:bytes"]
 mysql = ["dep:mysql_common"]
 
 [dependencies]
-bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
+bomboni_wasm = { path = "../bomboni_wasm", features = ["derive"], optional = true }
 
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
 ulid.workspace = true
+getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true }
 
 tokio = { workspace = true, features = ["time", "sync"], optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }

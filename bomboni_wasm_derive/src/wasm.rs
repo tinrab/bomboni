@@ -717,7 +717,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
                     if cfg!(feature = "root-crate") {
                         quote!(bomboni::wasm)
                     } else {
-                        quote!(comboni_wasm)
+                        quote!(bomboni_wasm)
                     }
                 },
                 |path| quote!(#path::wasm),

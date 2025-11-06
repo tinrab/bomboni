@@ -1,13 +1,13 @@
 [package]
 name = "bomboni_wasm"
-version = "0.2.0"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Utilities for working with WASM. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "README.md"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "bomboni_wasm"
@@ -19,8 +19,8 @@ derive = ["dep:bomboni_wasm_derive"]
 js = ["bomboni_wasm_core/js"]
 
 [dependencies]
-bomboni_wasm_core = { workspace = true }
-bomboni_wasm_derive = { workspace = true, optional = true }
+bomboni_wasm_core = { path = "../bomboni_wasm_core" }
+bomboni_wasm_derive = { path = "../bomboni_wasm_derive", optional = true }
 
 serde.workspace = true
 wasm-bindgen = "0.2.105"

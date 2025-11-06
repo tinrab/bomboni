@@ -66,13 +66,15 @@ impl UtcDateTime {
     pub const UNIX_EPOCH: Self = Self(OffsetDateTime::UNIX_EPOCH);
 
     /// Returns the current UTC date and time.
+    #[must_use]
     pub fn now() -> Self {
         Self(OffsetDateTime::now_utc())
     }
 
     /// Creates a new UTC date time from seconds and nanoseconds.
     ///
-    /// If the timestamp is invalid, returns the Unix epoch.
+    /// If the timestamp is invalid, returns Unix epoch.
+    #[must_use]
     pub const fn new(seconds: i64, nanoseconds: i32) -> Self {
         match OffsetDateTime::from_unix_timestamp_nanos(
             (seconds as i128) * (Nanosecond::per(Second) as i128) + nanoseconds as i128,
@@ -270,15 +272,15 @@ const _: () = {
     impl From<UtcDateTime> for JsValue {
         fn from(value: UtcDateTime) -> Self {
             let mut date = js_sys::Date::new_with_year_month_day_hr_min_sec(
-                value.year() as u32,
-                Into::<u8>::into(value.month()) as i32 - 1,
-                value.day() as i32,
-                value.hour() as i32 + 1,
-                value.minute() as i32,
-                value.second() as i32,
+                value.0.year() as u32,
+                Into::<u8>::into(value.0.month()) as i32 - 1,
+                value.0.day() as i32,
+                value.0.hour() as i32 + 1,
+                value.0.minute() as i32,
+                value.0.second() as i32,
             );
 
-            let milliseconds = value.millisecond();
+            let milliseconds = value.0.millisecond();
             if milliseconds > 0 {
                 date.set_utc_milliseconds(milliseconds as u32);
             }

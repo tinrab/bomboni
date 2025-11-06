@@ -16,35 +16,6 @@ use syn::{
 use super::field_type_info::{FieldTypeInfo, get_field_type_info};
 
 /// Main options for the Parse derive macro.
-///
-/// This struct controls the overall behavior of the Parse derive macro and can be
-/// configured using the `#[parse(...)]` attribute on structs and enums.
-///
-/// The Parse macro generates code for converting between different data representations,
-/// typically from protobuf messages to domain models or vice versa.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// #[derive(Parse)]
-/// #[parse(source = "proto::UserMessage", write = true)]
-/// struct User {
-///     #[parse(source = "user_name")]
-///     name: String,
-///     
-///     #[parse(timestamp)]
-///     created_at: OffsetDateTime,
-/// }
-/// ```
-///
-/// # Attributes
-///
-/// - `source`: The source type to parse from (required)
-/// - `write`: Generate write/conversion code back to source type
-/// - `serde_as`: Generate Serialize/Deserialize implementations
-/// - `request`: Mark as request message for error handling
-/// - `tagged_union`: Create tagged union from oneof field
-/// - `*_crate`: Custom crate paths for dependencies
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse), supports(struct_any, enum_any))]
 pub struct ParseOptions {
@@ -58,40 +29,12 @@ pub struct ParseOptions {
     pub data: Data<ParseVariant, ParseField>,
 
     /// Source type to parse from.
-    ///
-    /// Specifies the type that this struct/enum should be parsed from.
-    /// This is typically a protobuf message type or another data structure.
-    ///
-    /// The source type must be in scope and accessible from the current module.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source = "proto::user::User")]
-    /// struct User { /* fields */ }
-    ///
-    /// #[parse(source = "crate::models::DbUser")]
-    /// struct User { /* fields */ }
-    /// ```
     pub source: Path,
 
     /// Generate `From` trait implementation for converting back to source type.
     ///
     /// When set to `true`, generates code to convert the parsed type back into
     /// the source type. This enables bidirectional conversion between the types.
-    ///
-    /// This is useful when you need to serialize data back to the original format,
-    /// such as sending updated protobuf messages back to a service.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source = "proto::User", write = true)]
-    /// struct User { /* fields */ }
-    ///
-    /// // Now you can do:
-    /// let proto_user: proto::User = user.into();
-    /// ```
     #[darling(default)]
     pub write: bool,
 
@@ -100,13 +43,6 @@ pub struct ParseOptions {
     /// When set to `true`, generates a `Serialize` implementation that serializes
     /// the source type instead of the parsed type. This is useful when you want
     /// to serialize data in the original format.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source = "proto::User", serialize_as = true)]
-    /// struct User { /* fields */ }
-    /// ```
     #[darling(default)]
     pub serialize_as: bool,
 
@@ -115,13 +51,6 @@ pub struct ParseOptions {
     /// When set to `true`, generates a `Deserialize` implementation that deserializes
     /// directly into the source type. This is useful when you want to deserialize
     /// data into the original format.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source = "proto::User", deserialize_as = true)]
-    /// struct User { /* fields */ }
-    /// ```
     #[darling(default)]
     pub deserialize_as: bool,
 
@@ -131,13 +60,6 @@ pub struct ParseOptions {
     /// `deserialize_as` to `true`. This generates complete serde support for the source type.
     ///
     /// This is commonly used when you want full serde compatibility with the original format.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source = "proto::User", serde_as = true)]
-    /// struct User { /* fields */ }
-    /// ```
     #[darling(default)]
     pub serde_as: bool,
 
@@ -146,146 +68,42 @@ pub struct ParseOptions {
     /// Specifies that this struct should be treated as a tagged union, where the
     /// specific variant is determined by a oneof field. This is commonly used for
     /// protobuf messages that contain oneof fields representing different message types.
-    ///
-    /// The `ParseTaggedUnion` specifies which oneof field to use and which field
-    /// contains the tag/variant identifier.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(tagged_union = ParseTaggedUnion {
-    ///     oneof: parse_quote!(proto::Message::data),
-    ///     field: parse_quote!(message_type),
-    /// })]
-    /// struct Message { /* fields */ }
-    /// ```
     #[darling(default)]
     pub tagged_union: Option<ParseTaggedUnion>,
 
     /// Mark this message as a request message for enhanced error handling.
-    ///
-    /// When specified, errors that occur during parsing will be wrapped with the
-    /// request's name, providing better context for error messages. This is particularly
-    /// useful in API contexts where you want to identify which request failed.
-    ///
-    /// The `ParseRequest` can optionally specify a custom name for the request.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(request = ParseRequest { name: None })]
-    /// struct CreateUserRequest { /* fields */ }
-    ///
-    /// #[parse(request = ParseRequest { name: Some(parse_quote!("UserCreation")) })]
-    /// struct UserRequest { /* fields */ }
-    /// ```
+    /// Errors will be wrapped within `BadRequest` with [`RequestError::bad_request`].
     #[darling(default)]
     pub request: Option<ParseRequest>,
 
+    /// Custom `prost` crate path.
+    #[darling(default)]
+    pub prost_crate: Option<Path>,
+
     /// Custom `bomboni` crate path.
-    ///
-    /// Specifies a custom path to the bomboni crate if it's not available under
-    /// the default name. This is useful in monorepos or when using custom crate names.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(bomboni_crate = parse_quote!(crate::internal::bomboni))]
-    /// struct MyStruct { /* fields */ }
-    /// ```
     #[darling(default)]
     pub bomboni_crate: Option<Path>,
 
     /// Custom `bomboni_proto` crate path.
-    ///
-    /// Specifies a custom path to the `bomboni_proto` crate if it's not available
-    /// under the default name.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(bomboni_proto_crate = parse_quote!(crate::proto))]
-    /// struct MyStruct { /* fields */ }
-    /// ```
     #[darling(default)]
     pub bomboni_proto_crate: Option<Path>,
 
     /// Custom `bomboni_request` crate path.
-    ///
-    /// Specifies a custom path to the `bomboni_request` crate if it's not available
-    /// under the default name.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(bomboni_request_crate = parse_quote!(crate::request))]
-    /// struct MyStruct { /* fields */ }
-    /// ```
     #[darling(default)]
     pub bomboni_request_crate: Option<Path>,
 
     /// Custom `serde` crate path.
-    ///
-    /// Specifies a custom path to the serde crate if it's not available under
-    /// the default name. This is useful when using a custom serde implementation
-    /// or in complex dependency scenarios.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(serde_crate = parse_quote!(crate::serde))]
-    /// struct MyStruct { /* fields */ }
-    /// ```
     #[darling(default)]
     pub serde_crate: Option<Path>,
 }
 
 /// Configuration for creating tagged unions from oneof fields.
-///
-/// This is used to create Rust enums that map to protobuf oneof fields,
-/// allowing for type-safe handling of different message variants.
-///
-/// The tagged union pattern is commonly used in APIs where a single field
-/// can contain different types of data, and the specific type is indicated
-/// by a tag field.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// #[parse(tagged_union = ParseTaggedUnion {
-///     oneof: parse_quote!(proto::Message::data),
-///     field: parse_quote!(message_type),
-/// })]
-/// enum Message {
-///     User(UserData),
-///     Post(PostData),
-///     Comment(CommentData),
-/// }
-/// ```
 #[derive(Debug, FromMeta)]
 pub struct ParseTaggedUnion {
     /// The oneof field that contains the variant data.
-    ///
-    /// This should be a path to the oneof field in the source protobuf message.
-    /// The oneof field contains the actual data for each variant.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// oneof: parse_quote!(proto::Message::data),
-    /// ```
     pub oneof: Path,
 
     /// The field that contains the tag/variant identifier.
-    ///
-    /// This should be the name of the field that indicates which variant
-    /// is stored in the oneof field. This is typically an enum or string field.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// field: parse_quote!(message_type),
-    /// ```
     pub field: Ident,
 }
 
@@ -293,173 +111,43 @@ pub struct ParseTaggedUnion {
 ///
 /// When a struct is marked as a request message, parsing errors will be
 /// wrapped with additional context to make debugging and error reporting easier.
-///
-/// This is particularly useful in API contexts where you want to identify
-/// which specific request failed during processing.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// #[parse(request = ParseRequest { name: None })]
-/// struct CreateUserRequest { /* fields */ }
-///
-/// #[parse(request = ParseRequest {
-///     name: Some(parse_quote!("UserCreation"))
-/// })]
-/// struct UserRequest { /* fields */ }
-/// ```
 #[derive(Debug)]
 pub struct ParseRequest {
     /// Optional custom name for the request.
-    ///
-    /// If provided, this name will be used in error messages instead of
-    /// the struct name. This is useful for creating more user-friendly
-    /// error messages or when the struct name doesn't match the API name.
-    ///
-    /// If `None`, the struct's identifier will be used.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// name: Some(parse_quote!("CreateUser")),  // Custom name
-    /// name: None,                              // Use struct name
-    /// ```
     pub name: Option<Expr>,
 }
 
 /// Represents a field in a struct that can be parsed.
-///
-/// This structure contains information about a struct field and how it should
-/// be parsed from the source type. It combines the field's basic information
-/// with parsing options and special-purpose parsing configurations.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// #[derive(Parse)]
-/// struct User {
-///     #[parse(source = "user_name")]
-///     name: String,  // Becomes a ParseField
-///     
-///     #[parse(resource = ParseResource { /* ... */ })]
-///     resource_info: ParsedResource,  // Special resource parsing
-///     
-///     #[parse(list_query = ParseQuery { /* ... */ })]
-///     query: ListQuery,  // Query parsing
-/// }
-/// ```
 #[derive(Debug, Clone, FromField)]
 #[darling(attributes(parse))]
 pub struct ParseField {
     /// The identifier of the field.
-    ///
-    /// This is `None` for tuple struct fields and `Some` for named struct fields.
     pub ident: Option<Ident>,
 
     /// The type of the field.
     pub ty: Type,
 
     /// Parsing options for this field.
-    ///
-    /// These options control how the field is parsed from the source type.
-    /// See `ParseFieldOptions` for detailed documentation of all available options.
     #[darling(flatten)]
     pub options: ParseFieldOptions,
 
     /// Parse resource fields into this field.
-    ///
-    /// Special purpose configuration for parsing resource fields into a
-    /// `ParsedResource` field. This is used for handling standard resource
-    /// patterns like name, timestamps, etag, etc.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(resource = ParseResource {
-    ///     name: ParseResourceField { parse: true, write: false, source: parse_quote!(name) },
-    ///     create_time: ParseResourceField { parse: true, write: false, source: parse_quote!(create_time) },
-    ///     update_time: ParseResourceField { parse: true, write: false, source: parse_quote!(update_time) },
-    ///     delete_time: ParseResourceField { parse: false, write: false, source: parse_quote!(delete_time) },
-    ///     deleted: ParseResourceField { parse: false, write: false, source: parse_quote!(deleted) },
-    ///     etag: ParseResourceField { parse: false, write: false, source: parse_quote!(etag) },
-    /// })]
-    /// resource: ParsedResource,
-    /// ```
     pub resource: Option<ParseResource>,
 
     /// Parse list query fields.
-    ///
-    /// Configuration for parsing list query parameters such as pagination,
-    /// filtering, and ordering. This is used for implementing standard list APIs.
-    ///
-    /// Only one of `list_query` or `search_query` can be used per struct.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(list_query = ParseQuery {
-    ///     query: ParseQueryField { parse: true, write: false, source: parse_quote!(query) },
-    ///     page_size: ParseQueryField { parse: true, write: false, source: parse_quote!(page_size) },
-    ///     page_token: ParseQueryField { parse: true, write: false, source: parse_quote!(page_token) },
-    ///     filter: ParseQueryField { parse: true, write: false, source: parse_quote!(filter) },
-    ///     order_by: ParseQueryField { parse: true, write: false, source: parse_quote!(order_by) },
-    /// })]
-    /// list_params: ListQuery,
-    /// ```
     #[darling(default)]
     pub list_query: Option<ParseQuery>,
 
     /// Parse search query fields.
-    ///
-    /// Configuration for parsing search query parameters. Similar to `list_query`
-    /// but specifically designed for search operations.
-    ///
-    /// Only one of `list_query` or `search_query` can be used per struct.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(search_query = ParseQuery {
-    ///     query: ParseQueryField { parse: true, write: false, source: parse_quote!(q) },
-    ///     page_size: ParseQueryField { parse: true, write: false, source: parse_quote!(size) },
-    ///     page_token: ParseQueryField { parse: true, write: false, source: parse_quote!(token) },
-    ///     filter: ParseQueryField { parse: false, write: false, source: parse_quote!(filter) },
-    ///     order_by: ParseQueryField { parse: false, write: false, source: parse_quote!(sort) },
-    /// })]
-    /// search_params: SearchQuery,
-    /// ```
     #[darling(default)]
     pub search_query: Option<ParseQuery>,
 
     /// Type information for the field (internal use).
-    ///
-    /// This field is populated during macro processing and contains
-    /// information about the field's type that's used for code generation.
     #[darling(skip)]
     pub type_info: Option<FieldTypeInfo>,
 }
 
 /// Represents a variant in an enum that can be parsed.
-///
-/// This structure contains information about an enum variant and how it should
-/// be parsed from the source type. It combines the variant's basic information
-/// with parsing options.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// #[derive(Parse)]
-/// enum Status {
-///     #[parse(source = "ACTIVE")]
-///     Active,
-///     
-///     #[parse(source = "INACTIVE")]
-///     Inactive { reason: String },
-///     
-///     #[parse(source_unit = true)]
-///     Unknown,
-/// }
-/// ```
 #[derive(Debug, Clone, FromVariant)]
 #[darling(attributes(parse))]
 pub struct ParseVariant {
@@ -467,68 +155,22 @@ pub struct ParseVariant {
     pub ident: Ident,
 
     /// The fields of the variant.
-    ///
-    /// For tuple variants, this contains the field types.
-    /// For struct variants, this contains named fields.
-    /// For unit variants, this is empty.
     pub fields: Fields<Type>,
 
     /// Parsing options for this variant.
-    ///
-    /// These options control how the variant is parsed from the source type.
-    /// See `ParseFieldOptions` for detailed documentation of all available options.
     #[darling(flatten)]
     pub options: ParseFieldOptions,
 
     /// True if the source is an empty unit variant.
-    ///
-    /// When set to `true`, indicates that this variant should be parsed from
-    /// an empty/unit variant in the source type. This is useful for handling
-    /// default or unknown cases.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source_unit = true)]
-    /// Unknown,  // Parsed from empty unit variant
-    /// ```
     #[darling(default)]
     pub source_unit: bool,
 
     /// Type information for the variant (internal use).
-    ///
-    /// This field is populated during macro processing and contains
-    /// information about the variant's type that's used for code generation.
     #[darling(skip)]
     pub type_info: Option<FieldTypeInfo>,
 }
 
 /// Options for controlling how individual fields are parsed.
-///
-/// These options provide fine-grained control over field parsing behavior
-/// and can be applied to struct fields using the `#[parse(...)]` attribute.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// #[derive(Parse)]
-/// struct UserProfile {
-///     #[parse(source = "user_name")]
-///     name: String,
-///     
-///     #[parse(skip)]
-///     internal_id: String,
-///     
-///     #[parse(keep)]
-///     metadata: HashMap<String, String>,
-///     
-///     #[parse(wrapper)]
-///     optional_field: Option<String>,
-///     
-///     #[parse(timestamp)]
-///     created_at: OffsetDateTime,
-/// }
-/// ```
 #[derive(Debug, Clone, FromMeta)]
 pub struct ParseFieldOptions {
     /// Source field name to parse from.
@@ -552,14 +194,8 @@ pub struct ParseFieldOptions {
     ///
     /// When set to `true`, this is a shorthand for `source = "<field_name>"`.
     /// This is useful when you want to explicitly indicate that a field should
-    /// be parsed from a source field with the same name.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(source_field)]
-    /// name: String,  // Equivalent to: #[parse(source = "name")]
-    /// ```
+    /// be parsed from a source field with the same name. This is commonly used
+    /// with `derive` attribute.
     #[darling(default)]
     pub source_field: bool,
 
@@ -567,39 +203,10 @@ pub struct ParseFieldOptions {
     ///
     /// When set to `true`, this field will be completely ignored during parsing.
     /// The field will not be read from the input and will not be included in the output.
-    ///
-    /// This is useful for fields that should be excluded from parsing entirely,
-    /// such as internal fields, computed fields, or fields that are handled elsewhere.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(skip)]
-    /// internal_id: String,
-    ///
-    /// #[parse(skip)]
-    /// computed_hash: u64,
-    /// ```
     #[darling(default)]
     pub skip: bool,
 
     /// Keep the source and target fields the same without any parsing.
-    ///
-    /// When set to `true`, the field will be preserved in the output without any
-    /// transformation or parsing. The field is copied as-is from source to target.
-    ///
-    /// This is useful when you want to pass through certain fields unchanged,
-    /// such as metadata, configuration, or when the types are already compatible.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(keep)]
-    /// metadata: HashMap<String, String>,
-    ///
-    /// #[parse(keep)]
-    /// raw_data: Vec<u8>,
-    /// ```
     #[darling(default)]
     pub keep: bool,
 
@@ -624,30 +231,6 @@ pub struct ParseFieldOptions {
     ///
     /// When set to `true`, the field will not be treated as required and will accept
     /// unspecified enum values (typically 0) and empty strings without generating errors.
-    ///
-    /// This is particularly useful for protobuf enums where the first value (0) is
-    /// typically the "unspecified" variant.
-    ///
-    /// # Examples
-    ///
-    /// Given the following protobuf enum:
-    ///
-    /// ```proto
-    /// message Item {
-    ///     enum ItemKind {
-    ///         ITEM_KIND_UNSPECIFIED = 0;
-    ///         ITEM_KIND_BOOK = 1;
-    ///         ITEM_KIND_MOVIE = 2;
-    ///     }
-    ///     
-    ///     ItemKind kind = 1;
-    /// }
-    /// ```
-    ///
-    /// ```rust,ignore
-    /// #[parse(unspecified)]
-    /// kind: ItemKind,  // 0 values become Unspecified variant, no error
-    /// ```
     #[darling(default)]
     pub unspecified: bool,
 
@@ -657,17 +240,6 @@ pub struct ParseFieldOptions {
     /// This provides fine-grained control over how values are extracted and processed.
     ///
     /// The extraction plan consists of multiple steps that are applied in sequence.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(extract = FieldExtract::new()
-    ///     .field("user")
-    ///     .unwrap()
-    ///     .field("profile")
-    ///     .unwrap_or_default())]
-    /// user_profile: UserProfile,
-    /// ```
     #[darling(default)]
     pub extract: Option<FieldExtract>,
 
@@ -706,13 +278,6 @@ pub struct ParseFieldOptions {
     /// oneof fields in protobuf messages.
     ///
     /// The field will be extracted from the oneof and converted to the appropriate type.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(oneof)]
-    /// user_data: UserInfo,  // Extracted from a oneof field
-    /// ```
     #[darling(default)]
     pub oneof: bool,
 
@@ -721,15 +286,6 @@ pub struct ParseFieldOptions {
     /// When set to `true`, indicates that this field should be parsed as an enum
     /// from an `i32` value. This is a special-purpose parse option for enum fields
     /// that are represented as integers in the source data.
-    ///
-    /// This is commonly used for protobuf enums where the enum values are stored as integers.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(enumeration)]
-    /// status: Status,  // Parsed from i32 enum value
-    /// ```
     #[darling(default)]
     pub enumeration: bool,
 
@@ -737,19 +293,6 @@ pub struct ParseFieldOptions {
     ///
     /// Specifies a regular expression that the field value must match.
     /// The field will be parsed only if the string matches the regex pattern.
-    ///
-    /// This is useful for validating and extracting structured data from string fields,
-    /// such as dates, phone numbers, email addresses, etc.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(regex = r"\d{4}-\d{2}-\d{2}")]
-    /// date: NaiveDate,  // Must match YYYY-MM-DD format
-    ///
-    /// #[parse(regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")]
-    /// email: String,    // Must match email pattern
-    /// ```
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,
 
@@ -758,16 +301,6 @@ pub struct ParseFieldOptions {
     /// When set to `true`, automatically converts protobuf timestamp fields
     /// into `OffsetDateTime` instances. This handles the conversion from the
     /// protobuf timestamp format to Rust's date/time representation.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(timestamp)]
-    /// created_at: OffsetDateTime,
-    ///
-    /// #[parse(timestamp)]
-    /// updated_at: OffsetDateTime,
-    /// ```
     #[darling(default)]
     pub timestamp: bool,
 
@@ -778,16 +311,6 @@ pub struct ParseFieldOptions {
     ///
     /// This is useful for custom conversion logic that doesn't fit into other
     /// categories, such as domain-specific types, validation, or complex transformations.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(try_from = UserId::from_str)]
-    /// user_id: UserId,
-    ///
-    /// #[parse(try_from = EmailAddress::parse)]
-    /// email: EmailAddress,
-    /// ```
     #[darling(with = parse_type_path, map = Some)]
     pub try_from: Option<TypePath>,
 
@@ -795,20 +318,6 @@ pub struct ParseFieldOptions {
     ///
     /// Specifies custom conversion functions for both parsing (reading) and writing.
     /// This provides maximum flexibility for complex field transformations.
-    ///
-    /// The `ParseConvert` struct contains separate functions for parsing and writing,
-    /// allowing for asymmetric conversions if needed.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(convert = ParseConvert {
-    ///     parse: Some(MyType::from_input),
-    ///     write: Some(MyType::to_output),
-    ///     module: None,
-    /// })]
-    /// custom_field: MyType,
-    /// ```
     #[darling(default)]
     pub convert: Option<ParseConvert>,
 
@@ -817,22 +326,6 @@ pub struct ParseFieldOptions {
     /// When set, indicates that this field should use a custom derived parsing
     /// implementation. This is useful for custom, non-opinionated parsing where
     /// you have full control over the parsing logic.
-    ///
-    /// The `ParseDerive` struct can specify custom parse and write functions,
-    /// module paths, and borrowing behavior.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// #[parse(derive = ParseDerive {
-    ///     parse: Some(MyType::custom_parse),
-    ///     write: Some(MyType::custom_write),
-    ///     module: Some(my_types::parsing),
-    ///     source_borrow: false,
-    ///     target_borrow: true,
-    /// })]
-    /// nested_struct: MyType,
-    /// ```
     #[darling(default)]
     pub derive: Option<ParseDerive>,
 }

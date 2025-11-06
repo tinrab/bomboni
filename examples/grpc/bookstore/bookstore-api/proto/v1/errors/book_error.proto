@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package bookstore.v1.errors;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/tinrab/bomboni/bookstore/v1/errors;errors";
+
+message BookError {
+  enum BookErrorReason {
+    BOOK_ERROR_REASON_UNSPECIFIED = 0;
+  }
+}

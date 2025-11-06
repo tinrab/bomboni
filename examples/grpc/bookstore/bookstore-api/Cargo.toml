@@ -1,0 +1,32 @@
+[package]
+name = "bookstore-api"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[lib]
+name = "bookstore_api"
+path = "src/lib.rs"
+
+[features]
+server = []
+client = []
+
+[dependencies]
+bomboni_common = { path = "../../../../bomboni_common" }
+bomboni_proto = { path = "../../../../bomboni_proto", features = ["tonic"] }
+bomboni_request = { path = "../../../../bomboni_request", features = ["tonic", "derive"] }
+bomboni_macros = { path = "../../../../bomboni_macros" }
+
+thiserror.workspace = true
+prost.workspace = true
+tonic.workspace = true
+serde = { workspace = true, features = ["derive"] }
+tokio.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+tonic-prost.workspace = true
+
+[build-dependencies]
+tonic-prost-build.workspace = true
+prost-build.workspace = true

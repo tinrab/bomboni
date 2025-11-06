@@ -1,13 +1,13 @@
 [package]
 name = "bomboni_core"
-version = "0.2.0"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Internal part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "README.md"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "bomboni_core"
@@ -15,6 +15,4 @@ path = "src/lib.rs"
 
 [dependencies]
 convert_case.workspace = true
-proc-macro2.workspace = true
 syn = { workspace = true, features = ["full"] }
-quote.workspace = true

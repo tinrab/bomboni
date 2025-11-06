@@ -1,4 +1,8 @@
 cwd := `pwd`
+root-features := "derive,prost,proto,request,template,serde,chrono,tokio,tonic,fs,postgres,mysql"
+
+workspace-excludes := "bookstore-api,bookstore-service,bookstore-cli"
+exclude-flags := "--exclude " + replace(workspace-excludes, ",", " --exclude ")
 
 format:
     just --fmt --unstable
@@ -6,6 +10,37 @@ format:
     cargo fmt
 
     find ./ -iname *.proto | xargs clang-format -style=Google -i
+
+check:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+
+    cargo check --workspace --no-default-features {{exclude-flags}}
+    cargo check --workspace --features "{{ root-features }}" {{exclude-flags}}
+
+    cargo check --workspace --features wasm --exclude bomboni_fs {{exclude-flags}}
+    cargo check --target wasm32-unknown-unknown -p bomboni_wasm_core
+    cargo check --target wasm32-unknown-unknown -p bomboni_wasm --features derive,js
+    cargo check --target wasm32-unknown-unknown -p bomboni_wasm_derive
+    cargo check --target wasm32-unknown-unknown -p bomboni_common --features wasm,js
+
+    examples=(
+        grpc/bookstore/bookstore-api
+        grpc/bookstore/bookstore-service
+    )
+    for example in "${examples[@]}"; do
+        cd "{{cwd}}/examples/${example}"
+        cargo check
+    done
+
+    integrations=(
+        request-individual-crates
+        request-root-crate
+    )
+    for integration in "${integrations[@]}"; do
+        cd "{{cwd}}/integrations/${integration}"
+        cargo check
+    done
 
 lint:
     #!/usr/bin/env bash
@@ -47,23 +82,34 @@ lint:
         clippy::struct_field_names
     )
 
+    # Exclude examples from lint due to generated gRPC code with lint violations
     cargo clippy --workspace --no-default-features \
         -- ${disallow[@]/#/-D } ${allow[@]/#/-A }
     cargo clippy --workspace --all-features \
         -- ${disallow[@]/#/-D } ${allow[@]/#/-A }
 
 test:
-    cargo test --workspace --all-features -- --nocapture
-    cargo test --workspace --doc --all-features -- --nocapture
+    # TODO: Figure out the best way to test feature matrix
 
-    cargo test --workspace --no-default-features --features testing -- --nocapture
-    cargo test --workspace --doc --no-default-features --features testing -- --nocapture
+    cargo test --workspace --features "{{ root-features }},testing" {{exclude-flags}} -- --nocapture
+    cargo test --workspace --doc --features "{{ root-features }},testing" {{exclude-flags}} -- --nocapture
+
+    cargo test --workspace --no-default-features --features testing {{exclude-flags}} -- --nocapture
+    cargo test --workspace --doc --no-default-features --features testing {{exclude-flags}} -- --nocapture
+
+    cd "{{cwd}}/integration/request-individual-crates"
+    cargo test
+    cd "{{cwd}}/integration/request-root-crate"
+    cargo test
 
 docs:
     cargo doc --workspace --all-features --no-deps
 
 docs-open:
     cargo doc --workspace --all-features --no-deps --open
+
+clean:
+    cargo clean
 
 publish:
     #!/usr/bin/env bash

@@ -1,20 +1,19 @@
 [package]
 name = "bomboni_request"
-version = "0.2.0"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Utilities for working with API requests. Part of Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
 readme = "README.md"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "bomboni_request"
 path = "src/lib.rs"
 
 [features]
-default = ["testing"]
 root-crate = ["bomboni_request_derive/root-crate"]
 testing = []
 derive = []
@@ -31,17 +30,15 @@ postgres = ["dep:postgres-types", "dep:bytes", "bomboni_common/postgres"]
 mysql = ["dep:mysql_common"]
 
 [dependencies]
-bomboni_common = { workspace = true }
-bomboni_proto = { workspace = true }
-bomboni_request_derive = { workspace = true }
-bomboni_macros = { workspace = true }
-bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
+bomboni_common = { path = "../bomboni_common" }
+bomboni_proto = { path = "../bomboni_proto" }
+bomboni_request_derive = { path = "../bomboni_request_derive" }
+bomboni_macros = { path = "../bomboni_macros" }
+bomboni_wasm = { path = "../bomboni_wasm", features = ["derive"], optional = true }
 
 thiserror.workspace = true
 prost.workspace = true
-prost-types.workspace = true
-rand = "0.9.2"
-rand_core = "0.6.4"
+rand_core = "0.6.4" # must be older version due to incompatibility
 regex.workspace = true
 itertools.workspace = true
 time.workspace = true

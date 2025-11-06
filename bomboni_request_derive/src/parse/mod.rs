@@ -52,6 +52,12 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
         }
     });
 
+    let use_prost = if let Some(path) = options.prost_crate.as_ref() {
+        quote!(#path)
+    } else {
+        quote!(::prost::Name)
+    };
+
     let (mut use_proto, mut use_request) = if let Some(path) = options.bomboni_crate.as_ref() {
         (quote!(#path::proto), quote!(#path::request))
     } else if cfg!(feature = "root-crate") {
@@ -68,6 +74,7 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
     }
 
     result.extend(quote! {
+        use #use_prost;
         use #use_proto::google::protobuf::{
             BoolValue, DoubleValue, FloatValue, Int32Value, Int64Value, StringValue, Timestamp,
             UInt32Value, UInt64Value,
