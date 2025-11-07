@@ -1,7 +1,6 @@
 cwd := `pwd`
 root-features := "derive,prost,proto,request,template,serde,chrono,tokio,tonic,fs,postgres,mysql"
-
-workspace-excludes := "bookstore-api,bookstore-service,bookstore-cli"
+workspace-excludes := "bookstore-api,bookstore-service"
 exclude-flags := "--exclude " + replace(workspace-excludes, ",", " --exclude ")
 
 format:
@@ -15,10 +14,10 @@ check:
     #!/usr/bin/env bash
     set -euxo pipefail
 
-    cargo check --workspace --no-default-features {{exclude-flags}}
-    cargo check --workspace --features "{{ root-features }}" {{exclude-flags}}
+    cargo check --workspace --no-default-features {{ exclude-flags }}
+    cargo check --workspace --features "{{ root-features }}" {{ exclude-flags }}
 
-    cargo check --workspace --features wasm --exclude bomboni_fs {{exclude-flags}}
+    cargo check --workspace --features wasm --exclude bomboni_fs {{ exclude-flags }}
     cargo check --target wasm32-unknown-unknown -p bomboni_wasm_core
     cargo check --target wasm32-unknown-unknown -p bomboni_wasm --features derive,js
     cargo check --target wasm32-unknown-unknown -p bomboni_wasm_derive
@@ -29,8 +28,12 @@ check:
         grpc/bookstore/bookstore-service
     )
     for example in "${examples[@]}"; do
-        cd "{{cwd}}/examples/${example}"
-        cargo check
+        cd "{{ cwd }}/examples/${example}"
+        if [[ "${example}" == *"api"* ]]; then
+            cargo check --features server
+        else
+            cargo check
+        fi
     done
 
     integrations=(
@@ -38,7 +41,7 @@ check:
         request-root-crate
     )
     for integration in "${integrations[@]}"; do
-        cd "{{cwd}}/integrations/${integration}"
+        cd "{{ cwd }}/integrations/${integration}"
         cargo check
     done
 
@@ -80,6 +83,7 @@ lint:
         clippy::needless_pass_by_value
         clippy::struct_excessive_bools
         clippy::struct_field_names
+        missing_docs # tmp
     )
 
     # Exclude examples from lint due to generated gRPC code with lint violations
@@ -91,15 +95,15 @@ lint:
 test:
     # TODO: Figure out the best way to test feature matrix
 
-    cargo test --workspace --features "{{ root-features }},testing" {{exclude-flags}} -- --nocapture
-    cargo test --workspace --doc --features "{{ root-features }},testing" {{exclude-flags}} -- --nocapture
+    cargo test --workspace --features "{{ root-features }},testing" {{ exclude-flags }} -- --nocapture
+    cargo test --workspace --doc --features "{{ root-features }},testing" {{ exclude-flags }} -- --nocapture
 
-    cargo test --workspace --no-default-features --features testing {{exclude-flags}} -- --nocapture
-    cargo test --workspace --doc --no-default-features --features testing {{exclude-flags}} -- --nocapture
+    cargo test --workspace --no-default-features --features testing {{ exclude-flags }} -- --nocapture
+    cargo test --workspace --doc --no-default-features --features testing {{ exclude-flags }} -- --nocapture
 
-    cd "{{cwd}}/integration/request-individual-crates"
+    cd "{{ cwd }}/integration/request-individual-crates"
     cargo test
-    cd "{{cwd}}/integration/request-root-crate"
+    cd "{{ cwd }}/integration/request-root-crate"
     cargo test
 
 docs:

@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package bookstore.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/tinrab/bomboni/bookstore/v1;bookstore";
+
+// User represents a user account in the bookstore.
+message User {
+  // The unique name of the user.
+  string name = 1;
+
+  google.protobuf.Timestamp create_time = 2;
+
+  google.protobuf.Timestamp update_time = 3;
+
+  google.protobuf.Timestamp delete_time = 4;
+
+  bool deleted = 5;
+
+  optional string etag = 6;
+
+  // The display name of the user.
+  string display_name = 7;
+
+  // The email address of the user.
+  string email = 8;
+
+  // Whether the user is active.
+  bool active = 9;
+}
+
+// Access token represents an authentication token.
+message AccessToken {
+  // Whether the token is active.
+  bool active = 1;
+
+  // The client ID.
+  string client_id = 2;
+
+  // Token expiration time.
+  google.protobuf.Timestamp expiration = 3;
+
+  // Token issued time.
+  google.protobuf.Timestamp issued_at = 4;
+
+  // The issuer.
+  string issuer = 5;
+
+  // The subject (user ID).
+  string subject = 6;
+
+  // User data.
+  AccessTokenData data = 7;
+
+  // The encoded JWT token string.
+  string encoded = 8;
+}
+
+// Access token data.
+message AccessTokenData {
+  // User identities.
+  repeated AccessTokenIdentity identities = 1;
+
+  // User accounts.
+  repeated AccessTokenAccount accounts = 2;
+}
+
+// Access token identity.
+message AccessTokenIdentity {
+  oneof type {
+    EmailIdentity email = 1;
+  }
+}
+
+// Email identity.
+message EmailIdentity {
+  // The user ID.
+  string id = 1;
+
+  // The email address.
+  string email = 2;
+}
+
+// Access token account.
+message AccessTokenAccount {
+  // The account ID.
+  string id = 1;
+}

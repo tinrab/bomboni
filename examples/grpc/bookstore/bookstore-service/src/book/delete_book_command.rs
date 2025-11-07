@@ -1,6 +1,12 @@
 use bomboni_common::date_time::UtcDateTime;
+use bomboni_request::error::CommonError;
+use bookstore_api::model::book::BookId;
+use grpc_common::auth::context::Context;
 
-use super::repository::{BookRecordUpdate, BookRepositoryArc};
+use crate::{
+    book::repository::{BookRecordUpdate, BookRepositoryArc},
+    error::AppResult,
+};
 
 #[derive(Debug, Clone)]
 pub struct DeleteBookCommand {
@@ -9,32 +15,27 @@ pub struct DeleteBookCommand {
 
 impl DeleteBookCommand {
     pub fn new(book_repository: BookRepositoryArc) -> Self {
-        Self { book_repository }
+        DeleteBookCommand { book_repository }
     }
 
-    pub async fn execute(
-        &self,
-        id: bookstore_api::model::book::BookId,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let now = UtcDateTime::now();
-
-        let update = BookRecordUpdate {
+    #[tracing::instrument]
+    pub async fn execute(&self, _context: &Context, id: &BookId) -> AppResult<()> {
+        let delete_time = UtcDateTime::now();
+        let book_update = BookRecordUpdate {
             id,
-            update_time: Some(now),
-            delete_time: Some(now),
+            update_time: Some(delete_time),
+            delete_time: Some(delete_time),
             deleted: Some(true),
             display_name: None,
-            author: None,
+            author_id: None,
             isbn: None,
             description: None,
             price_cents: None,
             page_count: None,
         };
 
-        let updated = self.book_repository.update(update).await?;
-
-        if !updated {
-            return Err("Book not found".into());
+        if !self.book_repository.update(book_update).await? {
+            return Err(CommonError::ResourceNotFound.into());
         }
 
         Ok(())

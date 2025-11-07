@@ -17,6 +17,7 @@ bookstore-api = { path = "../bookstore-api", features = ["server"] }
 bomboni_common = { path = "../../../../bomboni_common" }
 bomboni_proto = { path = "../../../../bomboni_proto", features = ["tonic"] }
 bomboni_request = { path = "../../../../bomboni_request", features = ["tonic", "derive"] }
+grpc_common = { path = "../../grpc-common" }
 
 prost.workspace = true
 tonic.workspace = true
@@ -24,7 +25,11 @@ tonic-prost.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 time = { workspace = true, features = ["serde"] }
-tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros", "signal"] }
 async-trait.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+config = "0.15.18"
+chrono.workspace = true
+jsonwebtoken = "9.0"
+itertools.workspace = true

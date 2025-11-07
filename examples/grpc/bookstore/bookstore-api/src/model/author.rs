@@ -15,7 +15,7 @@ use bomboni_request::{
 
 use crate::v1::Author;
 
-#[derive(Debug, Clone, PartialEq, Parse)]
+#[derive(Debug, Clone, PartialEq, Eq, Parse)]
 #[parse(source = Author, write)]
 pub struct AuthorModel {
     #[parse(resource)]
@@ -29,7 +29,7 @@ pub struct AuthorModel {
 pub struct AuthorId(pub Id);
 
 impl AuthorModel {
-    pub const NAME_PATTERN: &str = "books/{book_id}";
+    pub const NAME_PATTERN: &str = "authors/{author_id}";
 
     pub fn get_schema() -> Schema {
         Schema {
@@ -88,6 +88,11 @@ pub mod author_id_convert {
 
     use crate::model::author::{AuthorId, AuthorModel};
 
+    /// Parse an author ID from a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the name format is invalid.
     pub fn parse<S: AsRef<str> + ToString>(name: S) -> RequestResult<AuthorId> {
         AuthorId::parse_name(name.as_ref()).ok_or_else(|| {
             CommonError::InvalidName {

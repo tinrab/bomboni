@@ -1,0 +1,19 @@
+[distribution]
+name = "bookstore"
+
+[node]
+host_ip = "127.0.0.1"
+
+[server]
+grpc_address = "127.0.0.1:9000"
+
+[auth]
+kind = "Memory"
+
+[database]
+kind = "memory"
+# kind = "postgres"
+# connection = "postgresql://bookstore:@localhost:26257/bookstore?sslmode=disable"
+
+[tracing]
+kind = "stdout"

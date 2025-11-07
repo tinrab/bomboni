@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package bookstore.v1.errors;
+
+option go_package = "github.com/tinrab/bomboni/bookstore/v1/errors;errors";
+
+message AuthorError {
+  enum AuthorErrorReason {
+    AUTHOR_ERROR_REASON_UNSPECIFIED = 0;
+
+    // Validation errors
+    AUTHOR_ERROR_REASON_INVALID_NAME = 1;
+    AUTHOR_ERROR_REASON_INVALID_EMAIL = 2;
+    AUTHOR_ERROR_REASON_INVALID_BIRTH_DATE = 3;
+
+    // Business logic errors
+    AUTHOR_ERROR_REASON_AUTHOR_NOT_FOUND = 4;
+    AUTHOR_ERROR_REASON_AUTHOR_ALREADY_EXISTS = 5;
+    AUTHOR_ERROR_REASON_AUTHOR_HAS_BOOKS = 6;
+  }
+}

@@ -34,7 +34,7 @@ service BookstoreService {
 // CreateBookRequest represents a request to create a new book.
 message CreateBookRequest {
   // The title of the book.
-  string title = 1;
+  string display_name = 1;
 
   // The author of the book.
   string author = 2;
@@ -93,9 +93,7 @@ message ListBooksRequest {
   // The order to apply to the list.
   optional string order_by = 4;
 
-  string book = 5;
-
-  optional bool show_deleted = 6;
+  optional bool show_deleted = 5;
 }
 
 // ListBooksResponse represents the response from listing books.
@@ -107,7 +105,7 @@ message ListBooksResponse {
   optional string next_page_token = 2;
 
   // The total number of books matching the request.
-  int32 total_size = 3;
+  int64 total_size = 3;
 }
 
 // SearchBooksRequest represents a request to search books.
@@ -137,5 +135,5 @@ message SearchBooksResponse {
   optional string next_page_token = 2;
 
   // The total number of books matching the search query.
-  int32 total_size = 3;
+  int64 total_size = 3;
 }

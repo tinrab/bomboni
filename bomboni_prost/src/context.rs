@@ -115,39 +115,90 @@ impl Context<'_> {
         let type_path = if let Some((matcher, external_path)) =
             self.config.external_paths.get_first(type_name_reference)
         {
+            let remaining_parts: Vec<&str> = type_name_reference
+                .trim_start_matches(matcher)
+                .trim_matches('.')
+                .split('.')
+                .collect();
+            
+            let mut remaining_path = String::new();
+            for (i, part) in remaining_parts.iter().enumerate() {
+                if i > 0 {
+                    remaining_path.push_str("::");
+                }
+                if i == remaining_parts.len() - 1 {
+                    // Last part - convert to PascalCase
+                    remaining_path.push_str(&str_to_case(part, Case::Pascal));
+                } else {
+                    // Intermediate part - convert to snake_case
+                    remaining_path.push_str(&str_to_case(part, Case::Snake));
+                }
+            }
+            
             format!(
                 "{}::{}",
                 external_path,
-                type_name_reference
-                    .trim_start_matches(matcher)
-                    .trim_matches('.')
-                    .split('.')
-                    .collect::<Vec<_>>()
-                    .join("::")
+                remaining_path
             )
         } else {
-            let mut type_name_reference = type_name_reference
-                .trim_start_matches('.')
-                .split('.')
-                .peekable();
-            let mut type_path = String::new();
-            while let Some(part) = type_name_reference.next() {
-                type_path.push_str("::");
-                if type_name_reference.peek().is_none() {
-                    type_path.push_str(&str_to_case(part, Case::Pascal));
-                    break;
-                }
-                type_path.push_str(&str_to_case(part, Case::Snake));
-            }
-            format!(
-                "{}{}",
-                self.package_name
+            // Check if this is a reference to the same package
+            let type_name_reference = type_name_reference.trim_start_matches('.');
+
+            if type_name_reference.starts_with(&self.package_name) {
+                // Same package reference - use relative path
+                let relative_path = type_name_reference
+                    .trim_start_matches(&self.package_name)
+                    .trim_matches('.')
                     .split('.')
-                    .map(|_| "super")
-                    .collect::<Vec<_>>()
-                    .join("::"),
-                type_path
-            )
+                    .collect::<Vec<_>>();
+
+                if relative_path.len() == 1 {
+                    // Direct type in same package, just use the type name
+                    format!("{}", str_to_case(relative_path[0], Case::Pascal))
+                } else {
+                    // Nested type, include module path
+                    let mut path = String::new();
+                    for (i, part) in relative_path.iter().enumerate() {
+                        if i > 0 {
+                            path.push_str("::");
+                        }
+                        if i == relative_path.len() - 1 {
+                            path.push_str(&str_to_case(part, Case::Pascal));
+                        } else {
+                            path.push_str(&str_to_case(part, Case::Snake));
+                        }
+                    }
+                    path
+                }
+            } else {
+                // Different package - use super path
+                let type_parts: Vec<&str> = type_name_reference.split('.').collect();
+                let mut type_path = String::new();
+                for (i, part) in type_parts.iter().enumerate() {
+                    type_path.push_str("::");
+                    if i == type_parts.len() - 1 {
+                        // Last part - convert to PascalCase
+                        type_path.push_str(&str_to_case(part, Case::Pascal));
+                    } else {
+                        // Intermediate part - convert to snake_case
+                        type_path.push_str(&str_to_case(part, Case::Snake));
+                    }
+                }
+
+                // Calculate the number of super keywords needed
+                let package_depth = self.package_name.split('.').count();
+                let nesting_depth = self.path.len();
+                let super_count = package_depth + nesting_depth;
+
+                format!(
+                    "{}{}",
+                    (0..super_count)
+                        .map(|_| "super")
+                        .collect::<Vec<_>>()
+                        .join("::"),
+                    type_path
+                )
+            }
         };
 
         syn::parse_str::<ExprPath>(&type_path).unwrap()

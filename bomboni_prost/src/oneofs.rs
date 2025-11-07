@@ -8,7 +8,7 @@ use prost_types::{DescriptorProto, OneofDescriptorProto, field_descriptor_proto}
 use quote::{format_ident, quote};
 use syn::TypePath;
 
-use crate::context::Context;
+use crate::{context::Context, utility::is_rust_keyword};
 
 /// Writes utility functions for oneof fields in a message.
 ///
@@ -212,12 +212,18 @@ fn write_variant_from(
         {
             let message_ident = context.get_type_expr_path(message.name());
             let variant_ident = format_ident!("{}", str_to_case(oneof.name(), Case::Snake));
+            let variant_ident_str = variant_ident.to_string();
+            let escaped_variant_ident = if is_rust_keyword(&variant_ident_str) {
+                format_ident!("r#{}", variant_ident_str)
+            } else {
+                variant_ident
+            };
             s.extend(quote! {
                 /// From source variant type to owner message type.
                 impl From<#source_type> for #message_ident {
                     fn from(value: #source_type) -> Self {
                         Self {
-                            #variant_ident: Some(value.into()),
+                            #escaped_variant_ident: Some(value.into()),
                         }
                     }
                 }
@@ -274,12 +280,18 @@ fn write_into_owner(context: &Context, s: &mut TokenStream, message: &Descriptor
     let oneof = message.oneof_decl.first().unwrap();
     let oneof_ident = context.get_oneof_ident(message, oneof);
     let variant_ident = format_ident!("{}", str_to_case(oneof.name(), Case::Snake));
+    let variant_ident_str = variant_ident.to_string();
+    let escaped_variant_ident = if is_rust_keyword(&variant_ident_str) {
+        format_ident!("r#{}", variant_ident_str)
+    } else {
+        variant_ident
+    };
 
     s.extend(quote! {
         impl From<#oneof_ident> for #message_ident {
             fn from(value: #oneof_ident) -> Self {
                 Self {
-                    #variant_ident: Some(value),
+                    #escaped_variant_ident: Some(value),
                 }
             }
         }

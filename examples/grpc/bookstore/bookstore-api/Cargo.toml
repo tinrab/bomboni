@@ -15,18 +15,28 @@ client = []
 [dependencies]
 bomboni_common = { path = "../../../../bomboni_common" }
 bomboni_proto = { path = "../../../../bomboni_proto", features = ["tonic"] }
+bomboni_prost = { path = "../../../../bomboni_prost" }
 bomboni_request = { path = "../../../../bomboni_request", features = ["tonic", "derive"] }
 bomboni_macros = { path = "../../../../bomboni_macros" }
+
+grpc_common = { path = "../../grpc-common" }
 
 thiserror.workspace = true
 prost.workspace = true
 tonic.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
 tonic-prost.workspace = true
+paste.workspace = true
+jsonwebtoken.workspace = true
+chrono.workspace = true
+cookie.workspace = true
+http.workspace = true
 
 [build-dependencies]
+bomboni_prost = { path = "../../../../bomboni_prost" }
 tonic-prost-build.workspace = true
 prost-build.workspace = true

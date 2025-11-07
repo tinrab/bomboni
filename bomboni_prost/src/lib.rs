@@ -9,7 +9,7 @@ use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
 use quote::quote;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     error::Error,
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -22,6 +22,8 @@ mod enums;
 mod helpers;
 mod messages;
 mod oneofs;
+mod utility;
+
 /// Path mapping utilities for external protobuf references.
 pub mod path_map;
 
@@ -89,12 +91,24 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
             path: Vec::default(),
         };
 
+        // Collect unique messages and enums from all files in this package
+        let mut seen_messages = HashSet::new();
+        let mut seen_enums = HashSet::new();
+
         for file in &files {
             for message in &file.message_type {
-                write_message(&context, &mut src, message);
+                let message_name = message.name();
+                if seen_messages.insert(message_name.to_string()) {
+                    write_message(&context, &mut src, message);
+                    src.extend(quote! {});
+                }
             }
             for enum_type in &file.enum_type {
-                write_enum(&context, &mut src, enum_type);
+                let enum_name = enum_type.name();
+                if seen_enums.insert(enum_name.to_string()) {
+                    write_enum(&context, &mut src, enum_type);
+                    src.extend(quote! {});
+                }
             }
         }
 
@@ -114,7 +128,8 @@ pub fn compile(config: CompileConfig) -> Result<(), Box<dyn Error>> {
             .open(output_path)
             .unwrap();
         if config.format {
-            let file = syn::parse_file(&src.to_string())?;
+            let src_str = src.to_string();
+            let file = syn::parse_file(&src_str)?;
             let formatted = prettyplease::unparse(&file);
             output_file.write_all(formatted.as_bytes())?;
         } else {

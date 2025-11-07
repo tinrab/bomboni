@@ -1,24 +1,35 @@
-use super::{BookRecordInsert, BookRecordList, BookRecordOwned, BookRecordUpdate, BookRepository};
+use std::{collections::HashMap, sync::Arc};
+
 use async_trait::async_trait;
-use bomboni_request::{query::list::ListQuery, value::Value as FilterValue};
-use std::collections::HashMap;
-use std::sync::Arc;
+use bomboni_request::{
+    query::list::ListQuery,
+    value::Value,
+};
+use bookstore_api::model::book::BookId;
+use itertools::Itertools;
 use tokio::sync::RwLock;
+
+use crate::{
+    book::repository::{
+        BookRecordInsert, BookRecordList, BookRecordOwned, BookRecordUpdate, BookRepository,
+    },
+    error::AppResult,
+};
 
 #[derive(Debug)]
 pub struct MemoryBookRepository {
-    books: Arc<RwLock<HashMap<super::BookId, BookRecordOwned>>>,
+    books: Arc<RwLock<HashMap<BookId, BookRecordOwned>>>,
 }
 
 impl MemoryBookRepository {
     pub fn new() -> Self {
-        Self {
+        MemoryBookRepository {
             books: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     pub fn with_data(books: Vec<BookRecordOwned>) -> Self {
-        Self {
+        MemoryBookRepository {
             books: Arc::new(RwLock::new(
                 books.into_iter().map(|book| (book.id, book)).collect(),
             )),
@@ -26,31 +37,22 @@ impl MemoryBookRepository {
     }
 }
 
-impl Default for MemoryBookRepository {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait]
 impl BookRepository for MemoryBookRepository {
-    async fn insert(
-        &self,
-        record: BookRecordInsert<'_>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn insert(&self, record: BookRecordInsert) -> AppResult<()> {
         let mut books = self.books.write().await;
         books.insert(
-            record.id,
+            record.id.clone(),
             BookRecordOwned {
                 id: record.id,
                 create_time: record.create_time,
                 update_time: None,
                 delete_time: None,
                 deleted: false,
-                display_name: record.display_name.to_string(),
-                author: record.author.to_string(),
-                isbn: record.isbn.to_string(),
-                description: record.description.to_string(),
+                display_name: record.display_name,
+                author_id: record.author_id,
+                isbn: record.isbn,
+                description: record.description,
                 price_cents: record.price_cents,
                 page_count: record.page_count,
             },
@@ -58,26 +60,14 @@ impl BookRepository for MemoryBookRepository {
         Ok(())
     }
 
-    async fn update(
-        &self,
-        update: BookRecordUpdate<'_>,
-    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    async fn update(&self, update: BookRecordUpdate<'_>) -> AppResult<bool> {
         let mut books = self.books.write().await;
         if let Some(book) = books.get_mut(&update.id) {
-            if let Some(update_time) = update.update_time {
-                book.update_time = Some(update_time);
-            }
-            if let Some(delete_time) = update.delete_time {
-                book.delete_time = Some(delete_time);
-            }
-            if let Some(deleted) = update.deleted {
-                book.deleted = deleted;
-            }
             if let Some(display_name) = update.display_name {
                 book.display_name = display_name.to_string();
             }
-            if let Some(author) = update.author {
-                book.author = author.to_string();
+            if let Some(author_id) = update.author_id {
+                book.author_id = author_id;
             }
             if let Some(isbn) = update.isbn {
                 book.isbn = isbn.to_string();
@@ -91,34 +81,48 @@ impl BookRepository for MemoryBookRepository {
             if let Some(page_count) = update.page_count {
                 book.page_count = page_count;
             }
+            if let Some(update_time) = update.update_time {
+                book.update_time = Some(update_time);
+            }
+            if let Some(delete_time) = update.delete_time {
+                book.delete_time = Some(delete_time);
+            }
+            if let Some(deleted) = update.deleted {
+                book.deleted = deleted;
+            }
             Ok(true)
         } else {
             Ok(false)
         }
     }
 
-    async fn select(
-        &self,
-        id: super::BookId,
-    ) -> Result<Option<BookRecordOwned>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn select(&self, id: &BookId) -> AppResult<Option<BookRecordOwned>> {
         let books = self.books.read().await;
-        Ok(books.get(&id).cloned())
+        Ok(books.get(id).cloned())
+    }
+
+    async fn select_multiple(&self, ids: &[BookId]) -> AppResult<Vec<BookRecordOwned>> {
+        let books = self.books.read().await;
+        Ok(books
+            .values()
+            .filter(|book| ids.contains(&book.id))
+            .cloned()
+            .collect())
     }
 
     async fn select_filtered(
         &self,
         query: &ListQuery,
         show_deleted: bool,
-    ) -> Result<BookRecordList, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> AppResult<BookRecordList> {
         let books = self.books.read().await;
 
-        let mut matched_books: Vec<BookRecordOwned> = books
+        let mut matched_books: Vec<_> = books
             .values()
-            .cloned()
             .filter(|book| {
                 (!book.deleted || show_deleted)
                     && if !query.filter.is_empty() {
-                        if let Some(FilterValue::Boolean(value)) = query.filter.evaluate(book) {
+                        if let Some(Value::Boolean(value)) = query.filter.evaluate(*book) {
                             value
                         } else {
                             false
@@ -127,17 +131,11 @@ impl BookRepository for MemoryBookRepository {
                         true
                     }
             })
+            .sorted_unstable_by(|a, b| query.ordering.evaluate(*a, *b).unwrap())
+            .take(query.page_size as usize + 1)
+            .cloned()
             .collect();
 
-        // Sort the results
-        matched_books.sort_by(|a, b| {
-            query
-                .ordering
-                .evaluate(a, b)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        // Apply pagination
         let next_item = if matched_books.len() > query.page_size as usize {
             Some(matched_books.remove(matched_books.len() - 1))
         } else {
@@ -147,6 +145,7 @@ impl BookRepository for MemoryBookRepository {
         Ok(BookRecordList {
             items: matched_books,
             next_item,
+            total_size: books.len() as i64,
         })
     }
 }

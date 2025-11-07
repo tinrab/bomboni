@@ -8,32 +8,34 @@ use bomboni_request::{
     },
     schema::FunctionSchemaMap,
 };
-use bookstore_api::model::book::{BookId, BookModel};
-use bookstore_api::v1::Book;
+use bookstore_api::{
+    model::author::{AuthorId, AuthorModel},
+    v1::Author,
+};
 
 use crate::{
-    book::repository::BookRepositoryArc,
+    author::repository::AuthorRepositoryArc,
     error::AppResult,
 };
 
 #[derive(Debug)]
-pub struct BookQueryManager {
-    book_repository: BookRepositoryArc,
+pub struct AuthorQueryManager {
+    author_repository: AuthorRepositoryArc,
     list_query_builder: PlainListQueryBuilder,
 }
 
-pub struct BookListResult {
-    pub books: Vec<Book>,
+pub struct AuthorListResult {
+    pub authors: Vec<Author>,
     pub next_page_token: Option<String>,
     pub total_size: i64,
 }
 
-impl BookQueryManager {
-    pub fn new(book_repository: BookRepositoryArc) -> Self {
-        BookQueryManager {
-            book_repository,
+impl AuthorQueryManager {
+    pub fn new(author_repository: AuthorRepositoryArc) -> Self {
+        AuthorQueryManager {
+            author_repository,
             list_query_builder: PlainListQueryBuilder::new(
-                BookModel::get_schema(),
+                AuthorModel::get_schema(),
                 FunctionSchemaMap::new(),
                 ListQueryConfig {
                     max_page_size: Some(20),
@@ -50,15 +52,15 @@ impl BookQueryManager {
         }
     }
 
-    pub async fn query_batch(&self, ids: &[BookId]) -> AppResult<Vec<Book>> {
-        let books = self.book_repository.select_multiple(ids).await?;
-        if books.len() != ids.len() {
+    pub async fn query_batch(&self, ids: &[AuthorId]) -> AppResult<Vec<Author>> {
+        let authors = self.author_repository.select_multiple(ids).await?;
+        if authors.len() != ids.len() {
             return Err(CommonError::ResourceNotFound.into());
         }
 
-        Ok(books
+        Ok(authors
             .into_iter()
-            .map(|record| BookModel::from(record).into())
+            .map(|record| AuthorModel::from(record).into())
             .collect())
     }
 
@@ -66,12 +68,12 @@ impl BookQueryManager {
         &self,
         query: ListQuery,
         show_deleted: bool,
-    ) -> AppResult<BookListResult> {
-        let book_list = self
-            .book_repository
+    ) -> AppResult<AuthorListResult> {
+        let author_list = self
+            .author_repository
             .select_filtered(&query, show_deleted)
             .await?;
-        let next_page_token = if let Some(next_item) = &book_list.next_item {
+        let next_page_token = if let Some(next_item) = &author_list.next_item {
             Some(
                 self.list_query_builder
                     .build_next_page_token(&query, next_item)
@@ -81,14 +83,14 @@ impl BookQueryManager {
             None
         };
 
-        Ok(BookListResult {
-            books: book_list
+        Ok(AuthorListResult {
+            authors: author_list
                 .items
                 .into_iter()
-                .map(|record| BookModel::from(record).into())
+                .map(|record| AuthorModel::from(record).into())
                 .collect(),
             next_page_token,
-            total_size: book_list.total_size,
+            total_size: author_list.total_size,
         })
     }
 

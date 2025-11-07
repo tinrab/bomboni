@@ -1,7 +1,12 @@
 //! Build script for bookstore-api crate.
 
-use prost_build::Config;
 use std::path::PathBuf;
+
+use bomboni_prost::{
+    compile,
+    config::{ApiConfig, CompileConfig},
+};
+use prost_build::Config;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=build.rs");
@@ -14,12 +19,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "book_resources.proto",
         "book_service.proto",
         "author_resources.proto",
+        "author_service.proto",
+        "auth_resources.proto",
+        "auth_service.proto",
         "errors/book_error.proto",
+        "errors/author_error.proto",
+        "errors/bookstore_error.proto",
     ]
     .into_iter()
     .map(|proto_path| root_path.join(proto_path))
     .collect();
-
     for proto_path in &proto_paths {
         println!("cargo:rerun-if-changed={}", proto_path.display());
     }
@@ -29,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .protoc_arg("--experimental_allow_proto3_optional")
         .file_descriptor_set_path(&fd_path)
         .enable_type_names()
-        // .type_name_domain(&[".bookstore"], "bookstore.com")
+        .type_name_domain(&[".bookstore"], "bookstore.rabzelj.com")
         .extern_path(
             ".google.protobuf.Timestamp",
             "::bomboni_proto::google::protobuf::Timestamp",
@@ -38,6 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".google.protobuf.FieldMask",
             "::bomboni_proto::google::protobuf::FieldMask",
         )
+        .extern_path(".common", "::grpc_common::common")
         .btree_map(["."]);
 
     tonic_prost_build::configure()
@@ -45,7 +55,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_client(true)
         .client_mod_attribute("bookstore.v1", r#"#[cfg(feature = "client")]"#)
         .server_mod_attribute("bookstore.v1", r#"#[cfg(feature = "server")]"#)
-        .compile_with_config(config, &proto_paths, &["./proto".into()])?;
+        .compile_with_config(
+            config,
+            &proto_paths,
+            &["./proto".into(), "../../grpc-common/proto".into()],
+        )?;
+
+    compile(CompileConfig {
+        api: ApiConfig {
+            helpers_mod: Some("helpers".into()),
+            ..Default::default()
+        },
+        file_descriptor_set_path: fd_path,
+        external_paths: [
+            (".google", "::bomboni_proto::google"),
+            (".common", "::grpc_common::common"),
+        ]
+        .into(),
+        ..Default::default()
+    })?;
 
     Ok(())
 }

@@ -1,20 +1,57 @@
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tonic::transport::Server;
+use tracing::info;
 
-use bookstore_api::v1::bookstore_service_server::BookstoreServiceServer;
-use bookstore_service::create_book_service;
+use bomboni_common::id::worker::WorkerIdGenerator;
+use bookstore_api::v1::author_service_server::AuthorServiceServer;
+use bookstore_service::{
+    author::{
+        adapter::AuthorAdapter, query_manager::AuthorQueryManager, repository::AuthorRepositoryArc,
+        repository::memory::MemoryAuthorRepository,
+    },
+    config::AppConfig,
+    error::AppResult,
+};
+use grpc_common::auth::{context::ContextBuilder, memory::MemoryAuthenticator};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
+async fn main() -> AppResult<()> {
+    let config = AppConfig::get();
 
-    let book_service = create_book_service();
+    // TODO: Set up tracing based on config
 
-    println!("Bookstore service listening on {}", addr);
+    start(&config).await?;
 
-    Server::builder()
-        .add_service(BookstoreServiceServer::new(book_service))
-        .serve(addr)
-        .await?;
+    Ok(())
+}
+
+async fn start(config: &AppConfig) -> AppResult<()> {
+    let context_builder = ContextBuilder::new(Arc::new(MemoryAuthenticator::default()));
+
+    let id_generator = Arc::new(Mutex::new(WorkerIdGenerator::new(
+        config.node.worker_number,
+    )));
+
+    // Initialize repositories
+    let author_repository: AuthorRepositoryArc = Arc::new(MemoryAuthorRepository::new());
+
+    // Initialize query managers
+    let author_query_manager = AuthorQueryManager::new(author_repository.clone());
+
+    // Initialize adapters
+    let author_adapter = AuthorAdapter::new(
+        id_generator.clone(),
+        context_builder.clone(),
+        author_query_manager,
+        author_repository.clone(),
+    );
+
+    let grpc_server = Server::builder().add_service(AuthorServiceServer::new(author_adapter));
+
+    info!("gRPC server started at {}", config.server.grpc_address);
+
+    grpc_server.serve(config.server.grpc_address).await?;
 
     Ok(())
 }
