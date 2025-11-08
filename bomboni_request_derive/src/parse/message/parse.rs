@@ -32,6 +32,13 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     }
 
+    // Parse field mask fields
+    for field in fields.iter().filter(|field| !field.options.skip) {
+        if let Some(field_mask) = &field.options.field_mask {
+            parse_fields.extend(expand_parse_field_mask(field, field_mask)?);
+        }
+    }
+
     // Parse regular fields
     for field in fields.iter().filter(|field| {
         !field.options.skip
@@ -39,6 +46,7 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
             && field.resource.is_none()
             && field.list_query.is_none()
             && field.search_query.is_none()
+            && field.options.field_mask.is_none()
             && !type_is_phantom(&field.ty)
     }) {
         parse_fields.extend(expand_parse_field(field, &field_clone_set)?);
@@ -50,7 +58,9 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         .iter()
         .filter(|field| field.options.skip || type_is_phantom(&field.ty))
     {
-        let target_ident = field.ident.as_ref().unwrap();
+        let target_ident = field.ident.as_ref().ok_or_else(|| {
+            syn::Error::new(proc_macro2::Span::call_site(), "field missing ident")
+        })?;
         skipped_fields.extend(quote! {
             #target_ident: Default::default(),
         });
@@ -71,7 +81,9 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         }
     }) {
         list_or_search = Some(field.list_query.is_some());
-        let target_ident = field.ident.as_ref().unwrap();
+        let target_ident = field.ident.as_ref().ok_or_else(|| {
+            syn::Error::new(proc_macro2::Span::call_site(), "field missing ident")
+        })?;
         let parse_query_impl = expand_parse_query(query, field.search_query.is_some());
         query_token_type = if let Some(token_type) = get_query_field_token_type(&field.ty) {
             quote! {
@@ -161,7 +173,10 @@ fn expand_parse_field(
     field: &ParseField,
     field_clone_set: &BTreeSet<String>,
 ) -> syn::Result<TokenStream> {
-    let target_ident = field.ident.as_ref().unwrap();
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
     let extract = get_field_extract(field)?;
 
     if let Some(ParseDerive {
@@ -215,7 +230,9 @@ fn expand_parse_field(
         ));
     }
 
-    let field_type_info = field.type_info.as_ref().unwrap();
+    let field_type_info = field.type_info.as_ref().ok_or_else(|| {
+        syn::Error::new(proc_macro2::Span::call_site(), "field missing type info")
+    })?;
     let (extract_impl, get_impl, field_path) = expand_field_extract(
         &extract,
         field_clone_set,
@@ -367,5 +384,132 @@ fn expand_parse_query(options: &ParseQuery, search: bool) -> TokenStream {
             #parse_impl
             let query = query_builder.build(page_size, page_token, filter, order_by)?;
         }
+    }
+}
+
+fn expand_parse_field_mask(
+    field: &ParseField,
+    field_mask: &crate::parse::options::ParseFieldMask,
+) -> syn::Result<TokenStream> {
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
+
+    // Extract container and field from source option
+    let (container_ident, field_path, field_optional) =
+        if let Some(source) = field.options.source.as_ref() {
+            // For source like "book?.display_name?", we want container="book", field="display_name", and track if field is optional
+            let parts: Vec<&str> = source.split('.').collect();
+            if parts.len() >= 2 {
+                let container_name = parts[0].trim_end_matches('?');
+                let field_name_raw = parts[1];
+                let field_optional = field_name_raw.ends_with('?');
+                let field_name = field_name_raw.trim_end_matches('?');
+                let container_ident = format_ident!("{}", container_name);
+                let field_path = field_name.to_string();
+                (Some(container_ident), field_path, field_optional)
+            } else {
+                (None, target_ident.to_string(), false)
+            }
+        } else {
+            (None, target_ident.to_string(), false)
+        };
+
+    // Determine container field for field mask
+    let _container_field = if let Some(field) = &field_mask.field {
+        field.clone()
+    } else if let Some(container_ident) = &container_ident {
+        container_ident.clone()
+    } else {
+        format_ident!("book") // Default fallback
+    };
+
+    let mask_field = &field_mask.mask;
+
+    // Generate the field extraction logic
+    let extract_logic = if let Some(container_ident) = &container_ident {
+        let field_ident = format_ident!("{}", field_path);
+        if field_optional {
+            quote! {
+                {
+                    let target = source.#container_ident.clone();
+                    if let Some(target) = target {
+                        target.#field_ident
+                    } else {
+                        None
+                    }
+                }
+            }
+        } else {
+            quote! {
+                {
+                    let target = source.#container_ident.clone();
+                    if let Some(target) = target {
+                        Some(target.#field_ident)
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {
+            {
+                let target = source.#target_ident;
+                Some(target)
+            }
+        }
+    };
+
+    // Generate field error path
+    let field_error_path = make_field_error_path(&field_path, None);
+
+    // Generate the complete parsing logic with field mask check
+    if let Some(convert) = field.options.convert.as_ref() {
+        let convert_impl = convert
+            .parse
+            .as_ref()
+            .map(ToTokens::to_token_stream)
+            .or_else(|| convert.module.as_ref().map(|module| quote!(#module::parse)))
+            .unwrap();
+
+        Ok(quote! {
+            #target_ident: {
+                // Check if field mask allows this field
+                if let Some(mask) = source.#mask_field.as_ref() {
+                    if mask.paths.contains(&#field_path.to_string()) {
+                        let target = #extract_logic;
+                        let target = if let Some(target) = target {
+                            Some(#convert_impl(target).map_err(|err: RequestError| err.wrap_path(#field_error_path))?)
+                        } else {
+                            None
+                        };
+                        target
+                    } else {
+                        None
+                    }
+                } else {
+                    // No field mask provided, don't parse this field
+                    None
+                }
+            },
+        })
+    } else {
+        Ok(quote! {
+            #target_ident: {
+                // Check if field mask allows this field
+                if let Some(mask) = source.#mask_field.as_ref() {
+                    if mask.paths.contains(&#field_path.to_string()) {
+                        #extract_logic
+                    } else {
+                        None
+                    }
+                } else {
+                    // No field mask provided, don't parse this field
+                    None
+                }
+            },
+        })
     }
 }

@@ -165,6 +165,7 @@ mod tests {
             try_from: None,
             convert: None,
             derive: None,
+            field_mask: None,
         };
 
         macro_rules! parse_type_info {

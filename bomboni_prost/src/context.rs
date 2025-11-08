@@ -120,7 +120,7 @@ impl Context<'_> {
                 .trim_matches('.')
                 .split('.')
                 .collect();
-            
+
             let mut remaining_path = String::new();
             for (i, part) in remaining_parts.iter().enumerate() {
                 if i > 0 {
@@ -134,12 +134,8 @@ impl Context<'_> {
                     remaining_path.push_str(&str_to_case(part, Case::Snake));
                 }
             }
-            
-            format!(
-                "{}::{}",
-                external_path,
-                remaining_path
-            )
+
+            format!("{}::{}", external_path, remaining_path)
         } else {
             // Check if this is a reference to the same package
             let type_name_reference = type_name_reference.trim_start_matches('.');

@@ -34,7 +34,13 @@ pub fn expand_field_extract(
         };
         let field_ident = format_ident!("{field_name}");
 
-        if field_clone_set.contains(&field_path) {
+        // Check if this field will be unwrapped later (has Unwrap step)
+        let will_unwrap = extract
+            .steps
+            .iter()
+            .any(|step| matches!(step, FieldExtractStep::Unwrap));
+
+        if field_clone_set.contains(&field_path) || will_unwrap {
             extract_impl.extend(quote! {
                 // TODO: Avoid cloning in some cases
                 let target = #source_ident.#field_ident.clone();
@@ -270,7 +276,9 @@ pub fn expand_parse_field_type(
         }
 
         if primitive_ident == "String" {
-            if !field_options.unspecified {
+            // Only validate non-empty string if the field is not wrapped in Option
+            // and is not marked as unspecified
+            if !field_options.unspecified && field_type_info.container_ident.is_none() {
                 parse_impl.extend(quote! {
                     if target.is_empty() {
                         return Err(RequestError::path(

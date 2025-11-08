@@ -88,6 +88,7 @@ pub fn derived_map(input: TokenStream) -> TokenStream {
 /// - `resource = {...}` - Parse resource fields
 /// - `list_query = {...}` - Parse list query
 /// - `search_query = {...}` - Parse search query
+/// - `field_mask = {...}` - Parse field only if field mask allows it
 ///
 /// # Examples
 ///
@@ -136,6 +137,19 @@ pub fn derived_map(input: TokenStream) -> TokenStream {
 ///
 ///     #[parse(source = "profile_data", keep)]
 ///     metadata: HashMap<String, String>,
+/// }
+/// ```
+///
+/// Field mask example for update operations:
+///
+/// ```rust,ignore
+/// #[derive(Parse)]
+/// #[parse(source = "UpdateBookRequest", write = true)]
+/// struct ParsedUpdateBookRequest {
+///     #[parse(source = "book?.name", convert = book_id_convert)]
+///     id: BookId,
+///     #[parse(source = "book?.display_name", field_mask { field = book, mask = update_mask })]
+///     display_name: Option<String>,
 /// }
 /// ```
 #[proc_macro_derive(Parse, attributes(parse))]

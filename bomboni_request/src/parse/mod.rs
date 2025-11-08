@@ -94,7 +94,8 @@ mod tests {
     };
     use bomboni_macros::{btree_map, btree_map_into, hash_map_into};
     use bomboni_proto::google::protobuf::{
-        FloatValue, Int32Value, Int64Value, StringValue, Timestamp, UInt32Value, UInt64Value,
+        FieldMask, FloatValue, Int32Value, Int64Value, StringValue, Timestamp, UInt32Value,
+        UInt64Value,
     };
     use bomboni_request_derive::{Parse, derived_map, parse_resource_name};
 
@@ -216,14 +217,14 @@ mod tests {
             }
         }
 
-        #[derive(Debug, PartialEq, Default)]
+        #[derive(Debug, Clone, PartialEq, Default)]
         struct NestedItem {}
 
         #[derive(Parse, Debug, Default, PartialEq)]
         #[parse(source = NestedItem, write, bomboni_request_crate = crate)]
         struct ParsedNestedItem {}
 
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, Clone, PartialEq)]
         #[allow(dead_code)]
         enum OneofKind {
             String(String),
@@ -430,12 +431,12 @@ mod tests {
             description: Option<String>,
         }
 
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, Clone, PartialEq)]
         struct Oneof {
             kind: Option<OneofKind>,
         }
 
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, Clone, PartialEq)]
         enum OneofKind {
             Value(i32),
         }
@@ -2498,5 +2499,62 @@ mod tests {
                 CommonError::DuplicateValue
             )
         ));
+    }
+
+    #[test]
+    fn parse_field_mask() {
+        #[derive(Debug, Default, Clone)]
+        struct Book {
+            display_name: Option<String>,
+        }
+
+        #[derive(Debug, Default, Clone)]
+        struct UpdateBookRequest {
+            book: Option<Book>,
+            update_mask: Option<FieldMask>,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Parse)]
+        #[parse(source = UpdateBookRequest, bomboni_request_crate = crate)]
+        struct ParsedUpdateBookRequest {
+            // Which one is correct?
+            #[parse(source = "book?.display_name?", field_mask)]
+            // #[parse(source = "book?.display_name", field_mask)]
+            pub display_name: Option<String>,
+        }
+
+        let request_with_mask = UpdateBookRequest {
+            book: Some(Book {
+                display_name: Some("Test Book".to_string()),
+            }),
+            update_mask: Some(FieldMask {
+                paths: vec!["display_name".to_string()],
+            }),
+        };
+
+        let parsed = ParsedUpdateBookRequest::parse(request_with_mask.clone()).unwrap();
+        assert_eq!(parsed.display_name, Some("Test Book".to_string()));
+
+        let request_without_mask = UpdateBookRequest {
+            book: Some(Book {
+                display_name: Some("Test Book".to_string()),
+            }),
+            update_mask: Some(FieldMask {
+                paths: vec!["other_field".to_string()],
+            }),
+        };
+
+        let parsed_without = ParsedUpdateBookRequest::parse(request_without_mask.clone()).unwrap();
+        assert_eq!(parsed_without.display_name, None);
+
+        let request_no_mask = UpdateBookRequest {
+            book: Some(Book {
+                display_name: Some("Test Book".to_string()),
+            }),
+            update_mask: None,
+        };
+
+        let parsed_no_mask = ParsedUpdateBookRequest::parse(request_no_mask.clone()).unwrap();
+        assert_eq!(parsed_no_mask.display_name, None);
     }
 }

@@ -1,6 +1,6 @@
 use bomboni_core::syn::type_is_phantom;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 
 use crate::parse::{
     message::utility::get_field_extract,
@@ -19,8 +19,18 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
         write_fields.extend(expand_write_field(field)?);
     }
 
+    // Write field mask fields
+    for field in fields.iter().filter(|field| !field.options.skip) {
+        if let Some(field_mask) = &field.options.field_mask {
+            write_fields.extend(expand_write_field_mask(field, field_mask)?);
+        }
+    }
+
     for field in fields.iter().filter(|field| {
-        !field.options.skip && !type_is_phantom(&field.ty) && field.options.derive.is_none()
+        !field.options.skip
+            && !type_is_phantom(&field.ty)
+            && field.options.derive.is_none()
+            && field.options.field_mask.is_none()
     }) {
         if let Some(resource) = field.resource.as_ref() {
             write_fields.extend(expand_write_resource(resource, field));
@@ -53,7 +63,10 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
 }
 
 fn expand_write_field(field: &ParseField) -> syn::Result<TokenStream> {
-    let target_ident = field.ident.as_ref().unwrap();
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
     let extract = get_field_extract(field)?;
 
     if let Some(ParseDerive {
@@ -90,7 +103,9 @@ fn expand_write_field(field: &ParseField) -> syn::Result<TokenStream> {
         }});
     }
 
-    let field_type_info = field.type_info.as_ref().unwrap();
+    let field_type_info = field.type_info.as_ref().ok_or_else(|| {
+        syn::Error::new(proc_macro2::Span::call_site(), "field missing type info")
+    })?;
     let inject_impl = expand_field_inject(&extract, &field.options, Some(field_type_info));
     let write_field_impl = expand_write_field_type(&field.options, field_type_info, inject_impl);
 
@@ -100,8 +115,11 @@ fn expand_write_field(field: &ParseField) -> syn::Result<TokenStream> {
     }})
 }
 
-fn expand_write_resource(options: &ParseResource, field: &ParseField) -> TokenStream {
-    let target_ident = field.ident.as_ref().unwrap();
+fn expand_write_resource(options: &ParseResource, field: &ParseField) -> syn::Result<TokenStream> {
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
     let mut write_impl = quote!();
 
     if options.name.write {
@@ -141,11 +159,83 @@ fn expand_write_resource(options: &ParseResource, field: &ParseField) -> TokenSt
         });
     }
 
-    write_impl
+    Ok(write_impl)
 }
 
-fn expand_write_query(query: &ParseQuery, field: &ParseField, search: bool) -> TokenStream {
-    let target_ident = field.ident.as_ref().unwrap();
+fn expand_write_field_mask(
+    field: &ParseField,
+    field_mask: &crate::parse::options::ParseFieldMask,
+) -> syn::Result<TokenStream> {
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
+    let _field_name = target_ident.to_string();
+
+    // Extract container and field from source option
+    let (container_ident, field_path) = if let Some(source) = field.options.source.as_ref() {
+        // For source like "book?.display_name", we want container="book", field="display_name"
+        // For source like "book?.author?.name", we want container="book", field="name"
+        let parts: Vec<&str> = source.split('.').collect();
+        if parts.len() >= 2 {
+            let container_name = parts[0].trim_end_matches('?');
+            let field_name = parts.last().unwrap().trim_end_matches('?');
+            let container_ident = format_ident!("{}", container_name);
+            let field_path = field_name.to_string();
+            (Some(container_ident), field_path)
+        } else {
+            (None, source.clone()) // Use the actual source string when no container
+        }
+    } else {
+        (None, target_ident.to_string())
+    };
+
+    // Determine container field for field mask
+    let _container_field = if let Some(field) = &field_mask.field {
+        field.clone()
+    } else if let Some(container_ident) = &container_ident {
+        container_ident.clone()
+    } else {
+        format_ident!("book") // Default fallback
+    };
+
+    let mask_field = &field_mask.mask;
+
+    // Extract the container field (e.g., book) once
+    let container_access = if let Some(container_ident) = &container_ident {
+        quote! { source.#container_ident }
+    } else {
+        quote! { source }
+    };
+
+    // Generate the nested field access (e.g., display_name)
+    let nested_field = format_ident!("{}", field_path);
+
+    // Generate the complete writing logic
+    Ok(quote! {{
+        if let Some(value) = target.#target_ident {
+            // Update the field mask to include this field path
+            let mask = source.#mask_field.get_or_insert_with(|| Default::default());
+            if !mask.paths.contains(&#field_path.to_string()) {
+                mask.paths.push(#field_path.to_string());
+            }
+
+            // Update the container field with the new value
+            let container = #container_access.get_or_insert_with(|| Default::default());
+            container.#nested_field = value;
+        }
+    }})
+}
+
+fn expand_write_query(
+    query: &ParseQuery,
+    field: &ParseField,
+    search: bool,
+) -> syn::Result<TokenStream> {
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
     let mut write_impl = quote!();
 
     if query.query.write && search {
@@ -187,5 +277,5 @@ fn expand_write_query(query: &ParseQuery, field: &ParseField, search: bool) -> T
         });
     }
 
-    write_impl
+    Ok(write_impl)
 }

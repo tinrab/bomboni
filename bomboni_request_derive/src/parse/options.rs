@@ -171,7 +171,7 @@ pub struct ParseVariant {
 }
 
 /// Options for controlling how individual fields are parsed.
-#[derive(Debug, Clone, FromMeta)]
+#[derive(Debug, Clone, FromMeta, Default)]
 pub struct ParseFieldOptions {
     /// Source field name to parse from.
     ///
@@ -328,6 +328,14 @@ pub struct ParseFieldOptions {
     /// you have full control over the parsing logic.
     #[darling(default)]
     pub derive: Option<ParseDerive>,
+
+    /// Parse field only if field mask allows it.
+    ///
+    /// When set, indicates that this field should only be parsed if the specified
+    /// field mask contains the field path. This is commonly used for update
+    /// operations where only certain fields should be modified.
+    #[darling(default)]
+    pub field_mask: Option<ParseFieldMask>,
 }
 
 #[derive(Debug, Clone)]
@@ -393,6 +401,16 @@ pub struct ParseQueryField {
     pub parse: bool,
     pub write: bool,
     pub source: Ident,
+}
+
+/// Configuration for parsing fields with field mask validation.
+#[derive(Debug, Clone)]
+pub struct ParseFieldMask {
+    /// The field containing the field mask.
+    pub mask: Ident,
+
+    /// The field containing the data to parse (optional, inferred from source if not provided).
+    pub field: Option<Ident>,
 }
 
 impl ParseOptions {
@@ -483,7 +501,8 @@ impl ParseOptions {
                             || field.options.convert.is_some()
                             || field.resource.is_some()
                             || field.list_query.is_some()
-                            || field.search_query.is_some())
+                            || field.search_query.is_some()
+                            || field.options.field_mask.is_some())
                     {
                         return Err(syn::Error::new_spanned(
                             &field.ident,
@@ -492,7 +511,18 @@ impl ParseOptions {
                     }
 
                     if field.options.source_field {
-                        field.options.source = Some(field.ident.as_ref().unwrap().to_string());
+                        field.options.source = Some(
+                            field
+                                .ident
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    syn::Error::new(
+                                        proc_macro2::Span::call_site(),
+                                        "field missing ident",
+                                    )
+                                })?
+                                .to_string(),
+                        );
                     }
 
                     if field.options.skip
@@ -994,6 +1024,54 @@ impl FromMeta for ParseQueryField {
             }
             _ => Err(darling::Error::custom("invalid query field").with_span(item)),
         }
+    }
+}
+
+impl FromMeta for ParseFieldMask {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        // Handle empty field_mask: field_mask()
+        if items.is_empty() {
+            return Ok(Self {
+                mask: format_ident!("update_mask"), // Default to update_mask
+                field: None,                        // Will be inferred from source
+            });
+        }
+
+        // Handle field_mask with single parameter: field_mask(mask_field_name)
+        if items.len() == 1 {
+            match &items[0] {
+                NestedMeta::Meta(Meta::Path(path)) => {
+                    if path.segments.len() == 1 {
+                        let mask_ident = &path.segments[0].ident;
+                        return Ok(Self {
+                            mask: mask_ident.clone(),
+                            field: None, // Will be inferred from source
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Handle field_mask with parameters: field_mask { field = container, mask = mask_field }
+        #[derive(FromMeta)]
+        struct Options {
+            field: Option<Ident>,
+            mask: Ident,
+        }
+
+        let options = Options::from_list(items)?;
+        Ok(Self {
+            field: options.field,
+            mask: options.mask,
+        })
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Self {
+            mask: format_ident!("update_mask"), // Default to update_mask
+            field: None,                        // Will be inferred from source
+        })
     }
 }
 

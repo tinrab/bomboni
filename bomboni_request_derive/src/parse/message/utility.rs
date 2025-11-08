@@ -8,7 +8,10 @@ use crate::parse::{
 };
 
 pub fn get_field_extract(field: &ParseField) -> syn::Result<FieldExtract> {
-    let target_ident = field.ident.as_ref().unwrap();
+    let target_ident = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "field missing ident"))?;
 
     let mut steps = if let Some(source) = field.options.source.as_ref() {
         let source_extract = parse_field_source_extract(source)
