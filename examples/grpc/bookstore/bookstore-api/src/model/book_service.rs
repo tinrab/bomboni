@@ -39,12 +39,26 @@ pub struct ParsedCreateBookRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Parse)]
-#[parse(source = UpdateBookRequest, request, write)]
+#[parse(source = UpdateBookRequest, request)]
 pub struct ParsedUpdateBookRequest {
     #[parse(source = "book?.name", convert = book_id_convert)]
     pub id: BookId,
-    // #[parse(derive = update_display_name_derive)]
-    // pub display_name: Option<String>,
+    #[parse(source = "book?.display_name", field_mask)]
+    pub display_name: Option<String>,
+    #[parse(
+        source = "book?.author",
+        convert = author_id_convert,
+        field_mask
+    )]
+    pub author_id: Option<AuthorId>,
+    #[parse(source = "book?.isbn", field_mask)]
+    pub isbn: Option<String>,
+    #[parse(source = "book?.description", field_mask)]
+    pub description: Option<String>,
+    #[parse(source = "book?.price_cents", field_mask)]
+    pub price_cents: Option<i64>,
+    #[parse(source = "book?.page_count", field_mask)]
+    pub page_count: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Parse)]
@@ -53,78 +67,3 @@ pub struct ParsedDeleteBookRequest {
     #[parse(source = "name", convert = book_id_convert)]
     pub id: BookId,
 }
-
-// mod update_display_name_derive {
-//     use super::*;
-
-//     pub fn parse(request: &UpdateModuleRequest) -> RequestResult<Option<String>> {
-//         let module = request.module.as_ref().ok_or_else(|| {
-//             RequestError::field(
-//                 UpdateModuleRequest::MODULE_FIELD_NAME,
-//                 CommonError::RequiredFieldMissing,
-//             )
-//         })?;
-//         Ok(
-//             if matches!(request.update_mask.as_ref(), Some(mask) if mask.masks(Module::DISPLAY_NAME_FIELD_NAME))
-//             {
-//                 Some(module.display_name.clone())
-//             } else {
-//                 None
-//             },
-//         )
-//     }
-
-//     pub fn write(request: &ParsedUpdateModuleRequest, source: &mut UpdateModuleRequest) {
-//         if let Some(display_name) = &request.display_name {
-//             source
-//                 .module
-//                 .get_or_insert_with(|| Module::default())
-//                 .display_name = display_name.clone();
-//         }
-//     }
-// }
-
-// mod update_graph_derive {
-//     use super::*;
-
-//     pub fn parse(request: &UpdateModuleRequest) -> RequestResult<Option<ParsedGraph>> {
-//         let module = request.module.as_ref().ok_or_else(|| {
-//             RequestError::field(
-//                 UpdateModuleRequest::MODULE_FIELD_NAME,
-//                 CommonError::RequiredFieldMissing,
-//             )
-//         })?;
-//         Ok(
-//             if matches!(request.update_mask.as_ref(), Some(mask) if mask.masks(Module::GRAPH_FIELD_NAME))
-//             {
-//                 Some(
-//                     module
-//                         .graph
-//                         .as_ref()
-//                         .ok_or_else(|| {
-//                             RequestError::field(
-//                                 Module::GRAPH_FIELD_NAME,
-//                                 CommonError::RequiredFieldMissing,
-//                             )
-//                             .wrap_field(UpdateModuleRequest::MODULE_FIELD_NAME)
-//                         })?
-//                         .clone()
-//                         .parse_into()
-//                         .map_err(|err: RequestError| {
-//                             err.wrap_field(Module::GRAPH_FIELD_NAME)
-//                                 .wrap_field(UpdateModuleRequest::MODULE_FIELD_NAME)
-//                         })?,
-//                 )
-//             } else {
-//                 None
-//             },
-//         )
-//     }
-
-//     pub fn write(request: &ParsedUpdateModuleRequest, source: &mut UpdateModuleRequest) {
-//         if let Some(graph) = &request.graph {
-//             source.module.get_or_insert_with(|| Module::default()).graph =
-//                 Some(graph.clone().into());
-//         }
-//     }
-// }

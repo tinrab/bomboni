@@ -46,6 +46,7 @@ impl UpdateAuthorCommand {
             .into();
 
         let update_time = UtcDateTime::now();
+
         let mut record = AuthorRecordUpdate {
             id: input.id,
             update_time: Some(update_time),
@@ -53,7 +54,6 @@ impl UpdateAuthorCommand {
             deleted: None,
             display_name: None,
         };
-        updated_author.resource.update_time = Some(update_time);
 
         if let Some(display_name) = input.display_name {
             let display_name = display_name.trim();
@@ -67,6 +67,8 @@ impl UpdateAuthorCommand {
             record.display_name = Some(display_name);
             updated_author.display_name = display_name.to_string();
         }
+
+        updated_author.resource.update_time = Some(update_time);
 
         if !self.author_repository.update(record).await? {
             return Err(CommonError::ResourceNotFound.into());

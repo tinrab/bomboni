@@ -54,7 +54,6 @@ impl UpdateBookCommand {
             .into();
 
         let update_time = UtcDateTime::now();
-        let mut updated = false;
 
         let mut record = BookRecordUpdate {
             id: &input.id,
@@ -80,45 +79,37 @@ impl UpdateBookCommand {
             }
             record.display_name = Some(display_name);
             updated_book.display_name = display_name.to_string();
-            updated = true;
         }
 
         if let Some(author_id) = input.author_id {
             record.author_id = Some(author_id);
             updated_book.author_id = author_id;
-            updated = true;
         }
 
         if let Some(isbn) = input.isbn {
             record.isbn = Some(isbn);
             updated_book.isbn = isbn.to_string();
-            updated = true;
         }
 
         if let Some(description) = input.description {
             record.description = Some(description);
             updated_book.description = description.to_string();
-            updated = true;
         }
 
         if let Some(price_cents) = input.price_cents {
             record.price_cents = Some(price_cents);
             updated_book.price_cents = price_cents;
-            updated = true;
         }
 
         if let Some(page_count) = input.page_count {
             record.page_count = Some(page_count);
             updated_book.page_count = page_count;
-            updated = true;
         }
 
-        if updated {
-            updated_book.resource.update_time = Some(update_time);
+        updated_book.resource.update_time = Some(update_time);
 
-            if !self.book_repository.update(record).await? {
-                return Err(CommonError::ResourceNotFound.into());
-            }
+        if !self.book_repository.update(record).await? {
+            return Err(CommonError::ResourceNotFound.into());
         }
 
         Ok(UpdateBookCommandOutput { book: updated_book })

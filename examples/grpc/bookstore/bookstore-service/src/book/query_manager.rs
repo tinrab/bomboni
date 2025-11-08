@@ -1,4 +1,3 @@
-
 use bomboni_request::{
     error::CommonError,
     ordering::{OrderingDirection, OrderingTerm},
@@ -11,10 +10,7 @@ use bomboni_request::{
 use bookstore_api::model::book::{BookId, BookModel};
 use bookstore_api::v1::Book;
 
-use crate::{
-    book::repository::BookRepositoryArc,
-    error::AppResult,
-};
+use crate::{book::repository::BookRepositoryArc, error::AppResult};
 
 #[derive(Debug)]
 pub struct BookQueryManager {

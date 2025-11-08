@@ -1,8 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use bomboni_request::value::Value;
-use bomboni_request::query::list::ListQuery;
+use bomboni_request::{query::list::ListQuery, value::Value};
 use bookstore_api::model::author::AuthorId;
 use itertools::Itertools;
 use tokio::sync::RwLock;

@@ -22,7 +22,7 @@ use crate::book::{
     delete_book_command::DeleteBookCommand,
     query_manager::BookQueryManager,
     repository::BookRepositoryArc,
-    update_book_command::UpdateBookCommand,
+    update_book_command::{UpdateBookCommand, UpdateBookCommandInput},
 };
 
 #[derive(Debug)]
@@ -124,29 +124,28 @@ impl BookstoreService for BookAdapter {
         &self,
         request: Request<UpdateBookRequest>,
     ) -> Result<Response<Book>, Status> {
-        let _context = self.context_builder.build_from_metadata(request.metadata());
+        let context = self.context_builder.build_from_metadata(request.metadata());
 
         let request = ParsedUpdateBookRequest::parse(request.into_inner())?;
 
-        todo!()
-        // let book = self
-        //     .update_book_command
-        //     .execute(
-        //         &context,
-        //         UpdateBookCommandInput {
-        //             id: request.id,
-        //             title: &request.title,
-        //             author_id: request.author_id,
-        //             isbn: &request.isbn,
-        //             description: &request.description,
-        //             price_cents: request.price_cents,
-        //             page_count: request.page_count,
-        //         },
-        //     )
-        //     .await?
-        //     .book;
+        let book = self
+            .update_book_command
+            .execute(
+                &context,
+                UpdateBookCommandInput {
+                    id: request.id,
+                    display_name: request.display_name.as_deref(),
+                    author_id: request.author_id,
+                    isbn: request.isbn.as_deref(),
+                    description: request.description.as_deref(),
+                    price_cents: request.price_cents,
+                    page_count: request.page_count,
+                },
+            )
+            .await?
+            .book;
 
-        // Ok(Response::new(book.into()))
+        Ok(Response::new(book.into()))
     }
 
     #[tracing::instrument]

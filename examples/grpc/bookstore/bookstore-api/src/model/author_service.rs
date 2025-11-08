@@ -2,7 +2,10 @@ use bomboni_request::{derive::Parse, query::list::ListQuery};
 
 use crate::{
     model::author::{AuthorId, author_id_convert},
-    v1::{CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest},
+    v1::{
+        CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest,
+        UpdateAuthorRequest,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Parse)]
@@ -25,6 +28,15 @@ pub struct ParsedListAuthorsRequest {
 #[parse(source = CreateAuthorRequest, request, write)]
 pub struct ParsedCreateAuthorRequest {
     pub display_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Parse)]
+#[parse(source = UpdateAuthorRequest, request)]
+pub struct ParsedUpdateAuthorRequest {
+    #[parse(source = "author?.name", convert = author_id_convert)]
+    pub id: AuthorId,
+    #[parse(source = "author?.display_name", field_mask)]
+    pub display_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Parse)]

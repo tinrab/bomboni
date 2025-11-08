@@ -5,7 +5,7 @@ use bomboni_request::parse::RequestParse;
 use bookstore_api::{
     model::author_service::{
         ParsedCreateAuthorRequest, ParsedDeleteAuthorRequest, ParsedGetAuthorRequest,
-        ParsedListAuthorsRequest,
+        ParsedListAuthorsRequest, ParsedUpdateAuthorRequest,
     },
     v1::{
         Author, CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest,
@@ -22,7 +22,7 @@ use crate::author::{
     delete_author_command::DeleteAuthorCommand,
     query_manager::AuthorQueryManager,
     repository::AuthorRepositoryArc,
-    update_author_command::UpdateAuthorCommand,
+    update_author_command::{UpdateAuthorCommand, UpdateAuthorCommandInput},
 };
 
 #[derive(Debug)]
@@ -119,9 +119,25 @@ impl AuthorService for AuthorAdapter {
     #[tracing::instrument]
     async fn update_author(
         &self,
-        _request: Request<UpdateAuthorRequest>,
+        request: Request<UpdateAuthorRequest>,
     ) -> Result<Response<Author>, Status> {
-        Err(Status::unimplemented("Update author not yet implemented"))
+        let context = self.context_builder.build_from_metadata(request.metadata());
+
+        let request = ParsedUpdateAuthorRequest::parse(request.into_inner())?;
+
+        let author = self
+            .update_author_command
+            .execute(
+                &context,
+                UpdateAuthorCommandInput {
+                    id: request.id,
+                    display_name: request.display_name.as_deref(),
+                },
+            )
+            .await?
+            .author;
+
+        Ok(Response::new(author.into()))
     }
 
     #[tracing::instrument]

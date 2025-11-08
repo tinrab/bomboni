@@ -1,4 +1,3 @@
-
 use bomboni_request::{
     error::CommonError,
     ordering::{OrderingDirection, OrderingTerm},
@@ -13,10 +12,7 @@ use bookstore_api::{
     v1::Author,
 };
 
-use crate::{
-    author::repository::AuthorRepositoryArc,
-    error::AppResult,
-};
+use crate::{author::repository::AuthorRepositoryArc, error::AppResult};
 
 #[derive(Debug)]
 pub struct AuthorQueryManager {
