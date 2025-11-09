@@ -1,27 +1,50 @@
+//! Common utilities and types for gRPC services.
+//!
+//! This crate provides shared functionality for authentication, error handling,
+//! and protocol buffer definitions used across gRPC services.
+
 pub mod auth;
 
-#[allow(unused_qualifications, clippy::all, clippy::pedantic)]
-pub mod common {
-    pub const COMMON_DOMAIN: &str = "common.rabzelj.com";
+/// The common domain used across services.
+pub const COMMON_DOMAIN: &str = "common.rabzelj.com";
 
-    pub mod errors {
-        use bomboni_proto::include_proto;
-        include_proto!("common.errors");
-        include_proto!("common.errors.plus");
-    }
+#[allow(
+    unused_qualifications,
+    missing_docs,
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::invalid_html_tags
+)]
+pub mod proto {
+    use bomboni_proto::{include_proto, serde::helpers as serde_helpers};
+
+    include_proto!("common");
+    include_proto!("common.plus");
 }
 
 use bomboni_request::error::CommonError;
 
-use common::errors::common_error::CommonErrorReason;
+use proto::common_error::CommonErrorReason;
 
-pub fn get_common_error_reason(error: &CommonError) -> CommonErrorReason {
+/// Converts a common error to its corresponding protobuf reason.
+///
+/// # Arguments
+///
+/// * `error` - The common error to convert
+///
+/// # Returns
+///
+/// The corresponding protobuf error reason.
+pub const fn get_common_error_reason(error: &CommonError) -> CommonErrorReason {
     match error {
         CommonError::ResourceNotFound => CommonErrorReason::ResourceNotFound,
         CommonError::Unauthorized => CommonErrorReason::Unauthorized,
         CommonError::RequiredFieldMissing => CommonErrorReason::RequiredFieldMissing,
-        CommonError::InvalidName { .. } => CommonErrorReason::InvalidName,
-        CommonError::InvalidNameAlternative { .. } => CommonErrorReason::InvalidName,
+        CommonError::InvalidName { .. } | CommonError::InvalidNameAlternative { .. } => {
+            CommonErrorReason::InvalidName
+        }
         CommonError::InvalidParent { .. } => CommonErrorReason::InvalidParent,
         CommonError::InvalidStringFormat { .. } => CommonErrorReason::InvalidStringFormat,
         CommonError::InvalidId => CommonErrorReason::InvalidId,

@@ -20,7 +20,8 @@ pub trait Wasm {
     /// Converts this value to a JavaScript value.
     ///
     /// # Errors
-    /// Returns an error if serialization fails.
+    ///
+    /// Will return [`serde_wasm_bindgen::Error`] if serialization fails.
     fn to_js(&self) -> Result<Self::JsType, serde_wasm_bindgen::Error>
     where
         Self: serde::Serialize,
@@ -32,7 +33,8 @@ pub trait Wasm {
     /// Converts a JavaScript value to this Rust type.
     ///
     /// # Errors
-    /// Returns an error if deserialization fails.
+    ///
+    /// Will return [`serde_wasm_bindgen::Error`] if deserialization fails.
     fn from_js<T: Into<JsValue>>(js: T) -> Result<Self, serde_wasm_bindgen::Error>
     where
         Self: serde::de::DeserializeOwned,

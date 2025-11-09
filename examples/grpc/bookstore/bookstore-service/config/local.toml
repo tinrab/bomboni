@@ -1,0 +1,4 @@
+[auth]
+kind = "Jwt"
+secret = "bookstore_secret_key_change_in_production"
+validate_expiration = false

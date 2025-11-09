@@ -13,12 +13,7 @@ server = []
 client = []
 
 [dependencies]
-bomboni_common = { path = "../../../../bomboni_common" }
-bomboni_proto = { path = "../../../../bomboni_proto", features = ["tonic"] }
-bomboni_prost = { path = "../../../../bomboni_prost" }
-bomboni_request = { path = "../../../../bomboni_request", features = ["tonic", "derive"] }
-bomboni_macros = { path = "../../../../bomboni_macros" }
-
+bomboni = { path = "../../../..", features = ["derive", "prost", "proto", "request", "serde", "tonic"] }
 grpc_common = { path = "../../grpc-common" }
 
 thiserror.workspace = true

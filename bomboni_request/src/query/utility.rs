@@ -9,7 +9,8 @@ use crate::{
 ///
 /// # Errors
 ///
-/// Returns an error if the filter is invalid or too long.
+/// Will return [`QueryError::FilterTooLong`] if filter exceeds maximum length.
+/// Will return [`QueryError::FilterError`] if filter cannot be parsed or validated.
 pub fn parse_query_filter(
     filter: Option<&str>,
     schema: &Schema,
@@ -33,7 +34,8 @@ pub fn parse_query_filter(
 ///
 /// # Errors
 ///
-/// Returns an error if the ordering is invalid or too long.
+/// Will return [`QueryError::OrderingTooLong`] if ordering exceeds maximum length.
+/// Will return [`QueryError::OrderingError`] if ordering cannot be parsed or validated.
 pub fn parse_query_ordering(
     ordering: Option<&str>,
     schema: &Schema,

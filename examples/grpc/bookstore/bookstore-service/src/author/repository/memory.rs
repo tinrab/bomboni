@@ -14,20 +14,33 @@ use crate::{
     error::AppResult,
 };
 
+/// In-memory implementation of the author repository.
 #[derive(Debug)]
 pub struct MemoryAuthorRepository {
     authors: Arc<RwLock<HashMap<AuthorId, AuthorRecordOwned>>>,
 }
 
+impl Default for MemoryAuthorRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryAuthorRepository {
+    /// Creates a new empty memory repository.
     pub fn new() -> Self {
-        MemoryAuthorRepository {
+        Self {
             authors: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
+    /// Creates a new memory repository with initial data.
+    ///
+    /// # Arguments
+    ///
+    /// * `authors` - Initial list of authors to populate the repository
     pub fn with_data(authors: Vec<AuthorRecordOwned>) -> Self {
-        MemoryAuthorRepository {
+        Self {
             authors: Arc::new(RwLock::new(
                 authors
                     .into_iter()
@@ -41,9 +54,8 @@ impl MemoryAuthorRepository {
 #[async_trait]
 impl AuthorRepository for MemoryAuthorRepository {
     async fn insert(&self, record: AuthorRecordInsert) -> AppResult<()> {
-        let mut authors = self.authors.write().await;
-        authors.insert(
-            record.id.clone(),
+        self.authors.write().await.insert(
+            record.id,
             AuthorRecordOwned {
                 id: record.id,
                 create_time: record.create_time,
@@ -77,18 +89,12 @@ impl AuthorRepository for MemoryAuthorRepository {
         }
     }
 
-    async fn select(
-        &self,
-        id: &bookstore_api::model::author::AuthorId,
-    ) -> AppResult<Option<AuthorRecordOwned>> {
+    async fn select(&self, id: &AuthorId) -> AppResult<Option<AuthorRecordOwned>> {
         let authors = self.authors.read().await;
         Ok(authors.get(id).cloned())
     }
 
-    async fn select_multiple(
-        &self,
-        ids: &[bookstore_api::model::author::AuthorId],
-    ) -> AppResult<Vec<AuthorRecordOwned>> {
+    async fn select_multiple(&self, ids: &[AuthorId]) -> AppResult<Vec<AuthorRecordOwned>> {
         let authors = self.authors.read().await;
         Ok(authors
             .values()
@@ -108,14 +114,12 @@ impl AuthorRepository for MemoryAuthorRepository {
             .values()
             .filter(|author| {
                 (!author.deleted || show_deleted)
-                    && if !query.filter.is_empty() {
-                        if let Some(Value::Boolean(value)) = query.filter.evaluate(*author) {
-                            value
-                        } else {
-                            false
-                        }
-                    } else {
+                    && if query.filter.is_empty() {
                         true
+                    } else if let Some(Value::Boolean(value)) = query.filter.evaluate(*author) {
+                        value
+                    } else {
+                        false
                     }
             })
             .sorted_unstable_by(|a, b| query.ordering.evaluate(*a, *b).unwrap())

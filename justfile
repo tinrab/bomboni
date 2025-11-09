@@ -31,6 +31,7 @@ check:
         cd "{{ cwd }}/examples/${example}"
         if [[ "${example}" == *"api"* ]]; then
             cargo check --features server
+            cargo check --features client
         else
             cargo check
         fi
@@ -83,7 +84,8 @@ lint:
         clippy::needless_pass_by_value
         clippy::struct_excessive_bools
         clippy::struct_field_names
-        missing_docs # tmp
+        unused_imports
+        # missing_docs # tmp
     )
 
     # Exclude examples from lint due to generated gRPC code with lint violations
@@ -101,9 +103,9 @@ test:
     cargo test --workspace --no-default-features --features testing {{ exclude-flags }} -- --nocapture
     cargo test --workspace --doc --no-default-features --features testing {{ exclude-flags }} -- --nocapture
 
-    cd "{{ cwd }}/integration/request-individual-crates"
+    cd "{{ cwd }}/integrations/request-individual-crates"
     cargo test
-    cd "{{ cwd }}/integration/request-root-crate"
+    cd "{{ cwd }}/integrations/request-root-crate"
     cargo test
 
 docs:

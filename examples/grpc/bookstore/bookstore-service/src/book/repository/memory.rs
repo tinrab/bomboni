@@ -13,20 +13,33 @@ use crate::{
     error::AppResult,
 };
 
+/// In-memory implementation of the book repository.
 #[derive(Debug)]
 pub struct MemoryBookRepository {
     books: Arc<RwLock<HashMap<BookId, BookRecordOwned>>>,
 }
 
+impl Default for MemoryBookRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryBookRepository {
+    /// Creates a new empty memory book repository.
     pub fn new() -> Self {
-        MemoryBookRepository {
+        Self {
             books: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
+    /// Creates a new memory book repository with initial data.
+    ///
+    /// # Arguments
+    ///
+    /// * `books` - Initial books to populate the repository with
     pub fn with_data(books: Vec<BookRecordOwned>) -> Self {
-        MemoryBookRepository {
+        Self {
             books: Arc::new(RwLock::new(
                 books.into_iter().map(|book| (book.id, book)).collect(),
             )),
@@ -37,9 +50,8 @@ impl MemoryBookRepository {
 #[async_trait]
 impl BookRepository for MemoryBookRepository {
     async fn insert(&self, record: BookRecordInsert) -> AppResult<()> {
-        let mut books = self.books.write().await;
-        books.insert(
-            record.id.clone(),
+        self.books.write().await.insert(
+            record.id,
             BookRecordOwned {
                 id: record.id,
                 create_time: record.create_time,
@@ -59,7 +71,7 @@ impl BookRepository for MemoryBookRepository {
 
     async fn update(&self, update: BookRecordUpdate<'_>) -> AppResult<bool> {
         let mut books = self.books.write().await;
-        if let Some(book) = books.get_mut(&update.id) {
+        if let Some(book) = books.get_mut(update.id) {
             if let Some(display_name) = update.display_name {
                 book.display_name = display_name.to_string();
             }
@@ -118,14 +130,12 @@ impl BookRepository for MemoryBookRepository {
             .values()
             .filter(|book| {
                 (!book.deleted || show_deleted)
-                    && if !query.filter.is_empty() {
-                        if let Some(Value::Boolean(value)) = query.filter.evaluate(*book) {
-                            value
-                        } else {
-                            false
-                        }
-                    } else {
+                    && if query.filter.is_empty() {
                         true
+                    } else if let Some(Value::Boolean(value)) = query.filter.evaluate(*book) {
+                        value
+                    } else {
+                        false
                     }
             })
             .sorted_unstable_by(|a, b| query.ordering.evaluate(*a, *b).unwrap())

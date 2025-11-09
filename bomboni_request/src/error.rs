@@ -298,7 +298,7 @@ impl RequestError {
     ///
     /// # Panics
     ///
-    /// Panics if trying to wrap a path for an error type that doesn't support it.
+    /// Will panic if trying to wrap error path for error types that don't support path wrapping.
     pub fn wrap_path<P>(self, path: P) -> Self
     where
         P: IntoIterator<Item = PathErrorStep>,
@@ -323,7 +323,7 @@ impl RequestError {
     ///
     /// # Panics
     ///
-    /// Panics if trying to insert a path for an error type that doesn't support it.
+    /// Will panic if trying to insert error path for error types that don't support path insertion.
     pub fn insert_path<P>(self, path: P, index: usize) -> Self
     where
         P: IntoIterator<Item = PathErrorStep>,
@@ -424,7 +424,7 @@ impl RequestError {
     ///
     /// # Panics
     ///
-    /// Panics if the bad request violations cannot be converted to protobuf format.
+    /// Will panic if unable to convert bad request details to protobuf Any type.
     pub fn details(&self) -> Vec<Any> {
         match self {
             Self::BadRequest { violations, .. } => vec![
@@ -514,7 +514,7 @@ impl PathError {
     ///
     /// # Panics
     ///
-    /// Panics if the path contains invalid index syntax.
+    /// Will panic if unable to parse index from path string format.
     pub fn parse_path<P: AsRef<str>>(path: P) -> Vec<PathErrorStep> {
         let parts: Vec<_> = path.as_ref().split('.').collect();
         let mut steps = Vec::with_capacity(parts.len());

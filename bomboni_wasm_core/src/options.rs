@@ -202,7 +202,8 @@ impl<'a> WasmOptions<'a> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the derive input cannot be parsed.
+    /// Will return an error if the input is not a valid struct or enum for WASM,
+    /// if serde attributes are invalid, or if incompatible attribute combinations are used.
     pub fn from_derive_input(input: &'a DeriveInput) -> syn::Result<Self> {
         let ctx = Ctxt::new();
         let serde_container = match SerdeContainer::from_ast(

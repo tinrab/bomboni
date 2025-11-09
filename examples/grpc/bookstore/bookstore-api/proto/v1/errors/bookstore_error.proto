@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package bookstore.v1.errors;
 
-import "errors/error.proto";
+import "common/error.proto";
 import "v1/errors/book_error.proto";
 import "v1/errors/author_error.proto";
 
@@ -13,7 +13,7 @@ option java_package = "com.tinrab.bookstore.v1.errors";
 
 message BookstoreErrorReason {
   oneof error_reason {
-    common.errors.CommonError.CommonErrorReason common = 1;
+    common.CommonError.CommonErrorReason common = 1;
     BookError.BookErrorReason book = 2;
     AuthorError.AuthorErrorReason author = 3;
   }

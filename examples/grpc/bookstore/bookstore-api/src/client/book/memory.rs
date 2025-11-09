@@ -4,10 +4,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tonic::{Response, Status, metadata::MetadataMap};
 
-use bomboni_common::date_time::UtcDateTime;
-use bomboni_request::parse::RequestParse;
+use bomboni::common::date_time::UtcDateTime;
+use bomboni::request::parse::RequestParse;
 
-use crate::client::book_client::BookClient;
+use crate::client::book::BookClient;
 use crate::model::book::BookId;
 use crate::model::book_service::{
     ParsedCreateBookRequest, ParsedDeleteBookRequest, ParsedGetBookRequest, ParsedUpdateBookRequest,
@@ -18,6 +18,7 @@ use crate::v1::{
     UpdateBookRequest,
 };
 
+/// In-memory implementation of the book client.
 #[derive(Debug, Clone)]
 pub struct MemoryBookClient {
     books: Arc<RwLock<HashMap<BookId, Book>>>,
@@ -30,12 +31,22 @@ impl Default for MemoryBookClient {
 }
 
 impl MemoryBookClient {
+    /// Creates a new empty memory book client.
     pub fn new() -> Self {
-        MemoryBookClient {
+        Self {
             books: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
+    /// Creates a new memory book client with initial data.
+    ///
+    /// # Arguments
+    ///
+    /// * `books` - Vector of books to initialize the client with
+    ///
+    /// # Notes
+    ///
+    /// Books with invalid names will be filtered out during initialization.
     pub fn with_data(books: Vec<Book>) -> Self {
         let book_map = books
             .into_iter()
@@ -44,11 +55,16 @@ impl MemoryBookClient {
                 Some((id, book))
             })
             .collect();
-        MemoryBookClient {
+        Self {
             books: Arc::new(RwLock::new(book_map)),
         }
     }
 
+    /// Retrieves all books stored in memory.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing all stored books
     pub async fn get_books(&self) -> Vec<Book> {
         self.books.read().await.values().cloned().collect()
     }
@@ -62,11 +78,10 @@ impl BookClient for MemoryBookClient {
         _metadata: MetadataMap,
     ) -> Result<Response<Book>, Status> {
         let request = ParsedGetBookRequest::parse(request)?;
-        let books = self.books.read().await;
-        match books.get(&request.id) {
-            Some(book) => Ok(Response::new(book.clone())),
-            None => Err(Status::not_found("Book not found")),
-        }
+        self.books.read().await.get(&request.id).map_or_else(
+            || Err(Status::not_found("Book not found")),
+            |book| Ok(Response::new(book.clone())),
+        )
     }
 
     async fn list_books(
@@ -74,8 +89,7 @@ impl BookClient for MemoryBookClient {
         _request: ListBooksRequest,
         _metadata: MetadataMap,
     ) -> Result<Response<ListBooksResponse>, Status> {
-        let books = self.books.read().await;
-        let books_vec: Vec<Book> = books.values().cloned().collect();
+        let books_vec: Vec<Book> = self.books.read().await.values().cloned().collect();
         let total_size = books_vec.len() as i64;
         Ok(Response::new(ListBooksResponse {
             books: books_vec,
@@ -90,14 +104,14 @@ impl BookClient for MemoryBookClient {
         _metadata: MetadataMap,
     ) -> Result<Response<Book>, Status> {
         let request = ParsedCreateBookRequest::parse(request)?;
-        let id = BookId::new(bomboni_common::id::Id::generate());
+        let id = BookId::new(bomboni::common::id::Id::generate());
         let now = UtcDateTime::now();
-        let timestamp: bomboni_proto::google::protobuf::Timestamp = now.into();
+        let timestamp: bomboni::proto::google::protobuf::Timestamp = now.into();
 
         let book = Book {
             name: id.to_name(),
-            create_time: Some(timestamp.clone()),
-            update_time: Some(timestamp.clone()),
+            create_time: Some(timestamp),
+            update_time: Some(timestamp),
             delete_time: None,
             deleted: false,
             etag: None,
@@ -109,8 +123,7 @@ impl BookClient for MemoryBookClient {
             page_count: request.page_count,
         };
 
-        let mut books = self.books.write().await;
-        books.insert(id, book.clone());
+        self.books.write().await.insert(id, book.clone());
         Ok(Response::new(book))
     }
 

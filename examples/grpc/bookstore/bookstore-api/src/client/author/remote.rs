@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{self, Debug, Formatter};
 
 use tonic::{
     Request, Response, Status,
@@ -7,20 +6,30 @@ use tonic::{
     transport::{self, Channel},
 };
 
-use crate::client::author_client::AuthorClient;
-use crate::v1::Author;
-use crate::v1::{
-    CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest,
-    ListAuthorsResponse, UpdateAuthorRequest, author_service_client::AuthorServiceClient,
+use crate::{
+    client::author::AuthorClient,
+    v1::{
+        Author, CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest,
+        ListAuthorsResponse, UpdateAuthorRequest, author_service_client::AuthorServiceClient,
+    },
 };
 
+/// Remote implementation of the author client.
+///
+/// This implementation connects to a remote gRPC author service,
+/// allowing interaction with authors over the network.
 pub struct RemoteAuthorClient {
     client: AuthorServiceClient<Channel>,
 }
 
 impl RemoteAuthorClient {
+    /// Connects to a remote author service.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`transport::Error`] if the connection to the remote service fails.
     pub async fn connect(address: String) -> Result<Self, transport::Error> {
-        Ok(RemoteAuthorClient {
+        Ok(Self {
             client: AuthorServiceClient::connect(address).await?,
         })
     }

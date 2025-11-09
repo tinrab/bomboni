@@ -85,7 +85,8 @@ impl QuerySqlBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if query building fails.
+    /// Will return filter building errors if the filter cannot be converted to SQL.
+    /// Will return ordering building errors if the ordering cannot be converted to SQL.
     pub fn build_list(&self, query: &ListQuery) -> QueryResult<QuerySqlStatement> {
         self.build(
             query.page_size,
@@ -102,7 +103,8 @@ impl QuerySqlBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if query building fails.
+    /// Will return filter building errors if the filter cannot be converted to SQL.
+    /// Will return ordering building errors if the ordering cannot be converted to SQL.
     pub fn build_search(&self, query: &SearchQuery) -> QueryResult<QuerySqlStatement> {
         self.build(
             query.page_size,
@@ -119,7 +121,8 @@ impl QuerySqlBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if query building fails.
+    /// Will return filter building errors if the filter cannot be converted to SQL.
+    /// Will return ordering building errors if the ordering cannot be converted to SQL.
     pub fn build(
         &self,
         page_size: i32,

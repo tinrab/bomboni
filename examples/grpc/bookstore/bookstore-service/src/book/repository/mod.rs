@@ -15,61 +15,151 @@ use bookstore_api::{
 
 use crate::error::AppResult;
 
+/// In-memory repository implementation.
 pub mod memory;
 
+/// Book record for insertion operations.
+///
+/// Contains all required fields for creating a new book record.
+/// Used when inserting new books into the repository.
 #[derive(Debug)]
 pub struct BookRecordInsert {
+    /// Unique identifier for the book
     pub id: BookId,
+    /// Timestamp when the book was created
     pub create_time: UtcDateTime,
+    /// Display name of the book
     pub display_name: String,
+    /// Unique identifier for the author
     pub author_id: AuthorId,
+    /// International Standard Book Number
     pub isbn: String,
+    /// Description of the book
     pub description: String,
+    /// Price in cents
     pub price_cents: i64,
+    /// Number of pages in the book
     pub page_count: i32,
 }
 
+/// Complete book record with ownership.
+///
+/// Contains all book fields including timestamps and deletion status.
+/// Represents a fully owned book record stored in the repository.
 #[derive(Debug, Clone)]
 pub struct BookRecordOwned {
+    /// Unique identifier for the book
     pub id: BookId,
+    /// Timestamp when the book was created
     pub create_time: UtcDateTime,
+    /// Timestamp when the book was last updated
     pub update_time: Option<UtcDateTime>,
+    /// Timestamp when the book was soft deleted
     pub delete_time: Option<UtcDateTime>,
+    /// Whether the book has been soft deleted
     pub deleted: bool,
+    /// Display name of the book
     pub display_name: String,
+    /// Unique identifier for the author
     pub author_id: AuthorId,
+    /// International Standard Book Number
     pub isbn: String,
+    /// Description of the book
     pub description: String,
+    /// Price in cents
     pub price_cents: i64,
+    /// Number of pages in the book
     pub page_count: i32,
 }
 
+/// Paginated list of book records.
+///
+/// Contains a page of book records along with pagination metadata
+/// for retrieving subsequent pages.
 #[derive(Debug, Clone)]
 pub struct BookRecordList {
+    /// List of book records in the current page
     pub items: Vec<BookRecordOwned>,
+    /// First item of the next page, if any
     pub next_item: Option<BookRecordOwned>,
+    /// Total number of records matching the query
     pub total_size: i64,
 }
 
+/// Book record for update operations.
+///
+/// Contains optional fields for updating an existing book record.
+/// Only provided fields will be updated during the operation.
 pub struct BookRecordUpdate<'a> {
+    /// Unique identifier for the book to update
     pub id: &'a BookId,
+    /// New update timestamp
     pub update_time: Option<UtcDateTime>,
+    /// New delete timestamp
     pub delete_time: Option<UtcDateTime>,
+    /// New deletion status
     pub deleted: Option<bool>,
+    /// New display name
     pub display_name: Option<&'a str>,
+    /// New author identifier
     pub author_id: Option<AuthorId>,
+    /// New ISBN
     pub isbn: Option<&'a str>,
+    /// New description
     pub description: Option<&'a str>,
+    /// New price in cents
     pub price_cents: Option<i64>,
+    /// New page count
     pub page_count: Option<i32>,
 }
 
+/// Repository trait for book data operations.
+///
+/// Defines the interface for book persistence operations including
+/// CRUD operations and querying with filtering and pagination.
 #[async_trait]
 pub trait BookRepository: Debug {
+    /// Inserts a new book record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the insertion fails.
     async fn insert(&self, record: BookRecordInsert) -> AppResult<()>;
+
+    /// Updates an existing book record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the update fails.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if a record was updated, `false` if not found.
     async fn update(&self, update: BookRecordUpdate<'_>) -> AppResult<bool>;
+
+    /// Selects a book record by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selection fails.
+    ///
+    /// # Returns
+    ///
+    /// Returns the book record if found, `None` otherwise.
     async fn select(&self, id: &BookId) -> AppResult<Option<BookRecordOwned>>;
+
+    /// Selects multiple book records by their IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selection fails.
     async fn select_multiple(&self, ids: &[BookId]) -> AppResult<Vec<BookRecordOwned>>;
+
+    /// Selects book records with filtering and pagination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selection fails.
     async fn select_filtered(
         &self,
         query: &ListQuery,
@@ -77,6 +167,10 @@ pub trait BookRepository: Debug {
     ) -> AppResult<BookRecordList>;
 }
 
+/// Thread-safe shared reference to a book repository.
+///
+/// Type alias for an Arc-wrapped book repository that can be shared
+/// across threads and used in async contexts.
 pub type BookRepositoryArc = Arc<dyn BookRepository + Send + Sync>;
 
 impl SchemaMapped for BookRecordOwned {
@@ -96,12 +190,9 @@ impl SchemaMapped for BookRecordOwned {
 
 impl From<BookModel> for BookRecordOwned {
     fn from(book: BookModel) -> Self {
-        BookRecordOwned {
+        Self {
             id: book.id,
-            create_time: book
-                .resource
-                .create_time
-                .unwrap_or_else(|| UtcDateTime::now()),
+            create_time: book.resource.create_time.unwrap_or_else(UtcDateTime::now),
             update_time: book.resource.update_time,
             delete_time: book.resource.delete_time,
             deleted: book.resource.deleted,
@@ -117,12 +208,12 @@ impl From<BookModel> for BookRecordOwned {
 
 impl From<BookRecordOwned> for BookModel {
     fn from(record: BookRecordOwned) -> Self {
-        BookModel {
+        Self {
             resource: ParsedResource {
                 name: record.id.to_name(),
-                create_time: Some(record.create_time.into()),
-                update_time: record.update_time.map(Into::into),
-                delete_time: record.delete_time.map(Into::into),
+                create_time: Some(record.create_time),
+                update_time: record.update_time,
+                delete_time: record.delete_time,
                 deleted: record.deleted,
                 etag: None,
                 revision_id: None,

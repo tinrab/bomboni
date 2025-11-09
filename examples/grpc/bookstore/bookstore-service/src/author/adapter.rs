@@ -25,6 +25,10 @@ use crate::author::{
     update_author_command::{UpdateAuthorCommand, UpdateAuthorCommandInput},
 };
 
+/// gRPC service adapter for author operations.
+///
+/// Implements the `AuthorService` trait to handle gRPC requests for authors.
+/// Uses command pattern for operations and query manager for data retrieval.
 #[derive(Debug)]
 pub struct AuthorAdapter {
     context_builder: ContextBuilder,
@@ -35,20 +39,28 @@ pub struct AuthorAdapter {
 }
 
 impl AuthorAdapter {
+    /// Creates a new author adapter.
+    ///
+    /// # Arguments
+    ///
+    /// * `id_generator` - Worker ID generator for creating unique IDs
+    /// * `context_builder` - Authentication context builder
+    /// * `author_query_manager` - Query manager for author data
+    /// * `author_repository` - Repository for author persistence
     pub fn new(
         id_generator: Arc<Mutex<WorkerIdGenerator>>,
         context_builder: ContextBuilder,
         author_query_manager: AuthorQueryManager,
         author_repository: AuthorRepositoryArc,
     ) -> Self {
-        AuthorAdapter {
+        Self {
             context_builder,
             author_query_manager,
             create_author_command: CreateAuthorCommand::new(
                 id_generator,
-                author_repository.clone(),
+                Arc::clone(&author_repository),
             ),
-            update_author_command: UpdateAuthorCommand::new(author_repository.clone()),
+            update_author_command: UpdateAuthorCommand::new(Arc::clone(&author_repository)),
             delete_author_command: DeleteAuthorCommand::new(author_repository),
         }
     }
@@ -56,6 +68,11 @@ impl AuthorAdapter {
 
 #[tonic::async_trait]
 impl AuthorService for AuthorAdapter {
+    /// Retrieves a specific author by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the author is not found or the request is invalid.
     #[tracing::instrument]
     async fn get_author(
         &self,
@@ -70,6 +87,11 @@ impl AuthorService for AuthorAdapter {
         Ok(Response::new(authors.remove(0)))
     }
 
+    /// Lists authors with pagination and filtering support.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request parameters are invalid.
     #[tracing::instrument]
     async fn list_authors(
         &self,
@@ -79,7 +101,7 @@ impl AuthorService for AuthorAdapter {
 
         let request = ParsedListAuthorsRequest::parse_list_query(
             request.into_inner(),
-            &self.author_query_manager.list_query_builder(),
+            self.author_query_manager.list_query_builder(),
         )?;
 
         let author_list = self
@@ -94,6 +116,11 @@ impl AuthorService for AuthorAdapter {
         }))
     }
 
+    /// Creates a new author.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the author data is invalid or creation fails.
     #[tracing::instrument]
     async fn create_author(
         &self,
@@ -116,6 +143,11 @@ impl AuthorService for AuthorAdapter {
         Ok(Response::new(result.author.into()))
     }
 
+    /// Updates an existing author.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the author is not found or update fails.
     #[tracing::instrument]
     async fn update_author(
         &self,
@@ -140,6 +172,11 @@ impl AuthorService for AuthorAdapter {
         Ok(Response::new(author.into()))
     }
 
+    /// Deletes an author.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the author is not found or deletion fails.
     #[tracing::instrument]
     async fn delete_author(
         &self,
@@ -156,11 +193,16 @@ impl AuthorService for AuthorAdapter {
         Ok(Response::new(()))
     }
 
+    /// Searches for authors (not yet implemented).
+    ///
+    /// # Errors
+    ///
+    /// Always returns an unimplemented error.
     #[tracing::instrument]
     async fn search_authors(
         &self,
-        _request: tonic::Request<SearchAuthorsRequest>,
-    ) -> Result<tonic::Response<SearchAuthorsResponse>, Status> {
+        _request: Request<SearchAuthorsRequest>,
+    ) -> Result<Response<SearchAuthorsResponse>, Status> {
         Err(Status::unimplemented("search_authors not yet implemented"))
     }
 }

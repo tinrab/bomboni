@@ -16,6 +16,7 @@ members = [
   "examples/grpc/grpc-common",
   "examples/grpc/bookstore/bookstore-api",
   "examples/grpc/bookstore/bookstore-service",
+  "examples/grpc/bookstore/bookstore-cli",
 ]
 exclude = ["integrations"]
 
@@ -53,24 +54,25 @@ prost-build = "0.14.1"
 tonic = "0.14.2"
 tonic-prost = "0.14.2"
 tonic-prost-build = "0.14.2"
+tonic-reflection = "0.14.2"
 tokio = "1.48.0"
 async-trait = "0.1.89"
 postgres-types = "0.2.11"
 mysql_common = "0.35.5"
+jsonwebtoken = "9.3"
+cookie = "0.18"
+
+tracing = "0.1.41"
+tracing-subscriber = "0.3.20"
+opentelemetry = "0.31.0"
+opentelemetry_sdk = "0.31.0"
+opentelemetry-stdout = "0.31.0"
 
 proc-macro2 = "1.0.103"
 syn = "2.0.109"
 quote = "1.0.42"
 prettyplease = "0.2.37"
 darling = "0.21.3"
-
-uuid = "1.18"
-tracing = "0.1"
-tracing-subscriber = "0.3"
-clap = "4.5"
-anyhow = "1.0"
-jsonwebtoken = "9.3"
-cookie = "0.18"
 
 [package]
 name = "bomboni"
@@ -110,6 +112,7 @@ mysql = ["bomboni_common/mysql", "bomboni_request/mysql"]
 
 [dependencies]
 bomboni_common = { path = "bomboni_common" }
+bomboni_macros = { path = "bomboni_macros" }
 
 bomboni_prost = { path = "bomboni_prost", optional = true }
 bomboni_proto = { path = "bomboni_proto", optional = true }

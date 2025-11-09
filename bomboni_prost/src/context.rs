@@ -135,7 +135,7 @@ impl Context<'_> {
                 }
             }
 
-            format!("{}::{}", external_path, remaining_path)
+            format!("{external_path}::{remaining_path}")
         } else {
             // Check if this is a reference to the same package
             let type_name_reference = type_name_reference.trim_start_matches('.');
@@ -150,7 +150,7 @@ impl Context<'_> {
 
                 if relative_path.len() == 1 {
                     // Direct type in same package, just use the type name
-                    format!("{}", str_to_case(relative_path[0], Case::Pascal))
+                    str_to_case(relative_path[0], Case::Pascal)
                 } else {
                     // Nested type, include module path
                     let mut path = String::new();

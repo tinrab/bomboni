@@ -5,6 +5,11 @@ pub mod common {
     pub use bomboni_common::*;
 }
 
+/// Common macros.
+pub mod macros {
+    pub use bomboni_macros::*;
+}
+
 #[cfg(feature = "prost")]
 /// Protocol Buffers utilities and extensions.
 pub mod prost {

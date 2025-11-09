@@ -45,13 +45,9 @@ pub trait PageTokenBuilder {
 
     /// Parse a page token.
     ///
-    /// Returns [`crate::query::error::QueryError::InvalidPageToken`] if page token is invalid for any reason.
-    ///
     /// # Errors
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the page token is invalid.
+    /// Will return an error if the page token cannot be parsed or is invalid.
     fn parse(
         &self,
         filter: &Filter,
@@ -68,7 +64,7 @@ pub trait PageTokenBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if token building fails.
+    /// Will return an error if the page token cannot be built.
     fn build_next<T: SchemaMapped>(
         &self,
         filter: &Filter,

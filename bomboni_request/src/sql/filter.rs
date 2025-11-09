@@ -77,7 +77,11 @@ impl<'a> SqlFilterBuilder<'a> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the filter is invalid.
+    /// Will return [`FilterError::InvalidType`] if filter parts have incompatible types.
+    /// Will return [`FilterError::UnknownFunction`] if the filter contains an unknown function name.
+    /// Will return [`FilterError::UnknownMember`] if the filter contains an unknown field name.
+    /// Will return [`FilterError::IncomparableType`] if trying to compare incomparable types.
+    /// Will return [`FilterError::UnsuitableComparator`] if an unsuitable comparator is used.
     pub fn build(&mut self, filter: &Filter) -> FilterResult<(String, Vec<Value>)> {
         self.build_tree(filter)?;
 

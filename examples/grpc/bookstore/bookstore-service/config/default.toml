@@ -8,12 +8,14 @@ host_ip = "127.0.0.1"
 grpc_address = "127.0.0.1:9000"
 
 [auth]
-kind = "Memory"
+kind = "Jwt"
+secret = "test_secret_key"
+validate_expiration = false
 
 [database]
-kind = "memory"
+kind = "Memory"
 # kind = "postgres"
 # connection = "postgresql://bookstore:@localhost:26257/bookstore?sslmode=disable"
 
 [tracing]
-kind = "stdout"
+kind = "Stdout"

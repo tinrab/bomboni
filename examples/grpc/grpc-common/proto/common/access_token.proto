@@ -1,35 +1,13 @@
 syntax = "proto3";
 
-package bookstore.v1;
+package common;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/tinrab/bomboni/bookstore/v1;bookstore";
-
-// User represents a user account in the bookstore.
-message User {
-  // The unique name of the user.
-  string name = 1;
-
-  google.protobuf.Timestamp create_time = 2;
-
-  google.protobuf.Timestamp update_time = 3;
-
-  google.protobuf.Timestamp delete_time = 4;
-
-  bool deleted = 5;
-
-  optional string etag = 6;
-
-  // The display name of the user.
-  string display_name = 7;
-
-  // The email address of the user.
-  string email = 8;
-
-  // Whether the user is active.
-  bool active = 9;
-}
+option go_package = "github.com/rabzelj/auth;auth";
+option java_multiple_files = true;
+option java_outer_classname = "CommonAcessToken";
+option java_package = "com.rabzelj.common";
 
 // Access token represents an authentication token.
 message AccessToken {
@@ -53,9 +31,6 @@ message AccessToken {
 
   // User data.
   AccessTokenData data = 7;
-
-  // The encoded JWT token string.
-  string encoded = 8;
 }
 
 // Access token data.
@@ -69,7 +44,7 @@ message AccessTokenData {
 
 // Access token identity.
 message AccessTokenIdentity {
-  oneof type {
+  oneof kind {
     EmailIdentity email = 1;
   }
 }

@@ -11,7 +11,8 @@ impl Any {
     /// Converts a protobuf message to an `Any` message.
     ///
     /// # Errors
-    /// Returns an error if the message cannot be encoded.
+    ///
+    /// Will return [`EncodeError`] if the message fails to encode.
     pub fn from_msg<T>(message: &T) -> Result<Self, EncodeError>
     where
         T: Name,
@@ -25,7 +26,8 @@ impl Any {
     /// Converts an `Any` message back to the original protobuf message.
     ///
     /// # Errors
-    /// Returns an error if the type URL doesn't match or decoding fails.
+    ///
+    /// Will return [`DecodeError`] if the type URL doesn't match or decoding fails.
     pub fn to_msg<T>(self) -> Result<T, DecodeError>
     where
         T: Default + Name,

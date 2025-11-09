@@ -4,18 +4,34 @@ use thiserror::Error;
 use tonic::{Code, Status, transport};
 use tracing::error;
 
+/// Application error types.
+///
+/// Represents all possible errors that can occur in the bookstore service.
 #[derive(Debug, Error)]
 pub enum AppError {
+    /// Internal application error.
+    ///
+    /// Represents unexpected internal errors that occur during service operation.
     #[error("internal error: {0}")]
     Internal(#[from] Box<dyn std::error::Error + Send + Sync>),
 
+    /// Request processing error.
+    ///
+    /// Represents errors that occur during request validation and processing.
     #[error("request error: {0}")]
     Request(#[from] RequestError),
 
+    /// gRPC status error.
+    ///
+    /// Represents gRPC protocol-level errors.
     #[error("status error: {0}")]
     Status(#[from] Status),
 }
 
+/// Application result type.
+///
+/// Type alias for Result with `AppError` as the error type.
+/// Used throughout the application for consistent error handling.
 pub type AppResult<T> = Result<T, AppError>;
 
 macro_rules! impl_internal_errors {
@@ -45,13 +61,16 @@ macro_rules! impl_request_errors {
 impl_request_errors!(BookstoreError, BookError, AuthorError, CommonError);
 
 impl From<AppError> for Status {
+    /// Converts application errors to gRPC status codes.
+    ///
+    /// Maps internal errors to appropriate gRPC status codes for client responses.
     fn from(err: AppError) -> Self {
         match err {
             AppError::Request(err) => err.into(),
             AppError::Status(status) => status,
-            _ => {
+            AppError::Internal(_) => {
                 error!("internal service error: {}", err);
-                Status::internal(Code::Internal.description())
+                Self::internal(Code::Internal.description())
             }
         }
     }

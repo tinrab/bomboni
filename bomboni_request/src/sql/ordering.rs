@@ -37,7 +37,7 @@ impl<'a> SqlOrderingBuilder<'a> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the ordering is invalid.
+    /// Will return [`OrderingError::UnknownMember`] if the ordering contains an unknown field name.
     pub fn build(&mut self, ordering: &Ordering) -> OrderingResult<String> {
         for (i, term) in ordering.iter().enumerate() {
             if self.schema.get_member(&term.name).is_none() {

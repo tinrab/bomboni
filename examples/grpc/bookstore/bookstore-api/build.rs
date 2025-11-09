@@ -20,8 +20,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "book_service.proto",
         "author_resources.proto",
         "author_service.proto",
-        "auth_resources.proto",
-        "auth_service.proto",
         "errors/book_error.proto",
         "errors/author_error.proto",
         "errors/bookstore_error.proto",
@@ -38,16 +36,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .protoc_arg("--experimental_allow_proto3_optional")
         .file_descriptor_set_path(&fd_path)
         .enable_type_names()
-        .type_name_domain(&[".bookstore"], "bookstore.rabzelj.com")
+        .type_name_domain([".bookstore"], "bookstore.rabzelj.com")
         .extern_path(
             ".google.protobuf.Timestamp",
-            "::bomboni_proto::google::protobuf::Timestamp",
+            "::bomboni::proto::google::protobuf::Timestamp",
         )
         .extern_path(
             ".google.protobuf.FieldMask",
-            "::bomboni_proto::google::protobuf::FieldMask",
+            "::bomboni::proto::google::protobuf::FieldMask",
         )
-        .extern_path(".common", "::grpc_common::common")
+        .extern_path(".common", "::grpc_common::proto")
         .btree_map(["."]);
 
     tonic_prost_build::configure()
@@ -68,8 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         file_descriptor_set_path: fd_path,
         external_paths: [
-            (".google", "::bomboni_proto::google"),
-            (".common", "::grpc_common::common"),
+            (".google", "::bomboni::proto::google"),
+            (".common", "::grpc_common::proto"),
         ]
         .into(),
         ..Default::default()

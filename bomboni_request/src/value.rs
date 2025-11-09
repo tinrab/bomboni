@@ -51,7 +51,8 @@ impl Value {
     ///
     /// # Errors
     ///
-    /// Returns an error if parsing fails.
+    /// Will return [`FilterError::InvalidNumber`] if the string cannot be parsed as a number.
+    /// Will return [`FilterError::ExpectedValue`] if the pair rule is not a valid value type.
     pub fn parse(pair: &Pair<'_, Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
             Rule::String => {

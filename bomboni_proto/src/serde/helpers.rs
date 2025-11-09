@@ -30,7 +30,8 @@ pub mod as_string {
     /// Serializes a value as a string.
     ///
     /// # Errors
-    /// Returns an error if serialization fails.
+    ///
+    /// Will return the serializer's error if string serialization fails.
     pub fn serialize<T, S>(
         value: &T,
         serializer: S,
@@ -45,7 +46,9 @@ pub mod as_string {
     /// Deserializes a string value.
     ///
     /// # Errors
-    /// Returns an error if deserialization fails or the string cannot be parsed.
+    ///
+    /// Will return the deserializer's error if string deserialization fails
+    /// or if the string cannot be parsed into the target type.
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
     where
         T: FromStr,
@@ -69,7 +72,8 @@ pub mod string_list {
     /// Serializes a slice of values as a comma-separated string.
     ///
     /// # Errors
-    /// Returns an error if serialization fails.
+    ///
+    /// Will return the serializer's error if string serialization fails.
     pub fn serialize<T, S>(
         value: &[T],
         serializer: S,
@@ -89,7 +93,9 @@ pub mod string_list {
     /// Deserializes a comma-separated string into a collection.
     ///
     /// # Errors
-    /// Returns an error if deserialization fails or string cannot be parsed.
+    ///
+    /// Will return the deserializer's error if string deserialization fails
+    /// or if any element cannot be parsed into the target type.
     pub fn deserialize<'de, V, T, D>(deserializer: D) -> Result<V, D::Error>
     where
         V: FromIterator<T>,
@@ -171,7 +177,9 @@ pub mod duration {
     /// Serializes a duration value.
     ///
     /// # Errors
-    /// Returns an error if serialization fails or duration conversion fails.
+    ///
+    /// Will return the serializer's error if string serialization fails
+    /// or if the value cannot be converted to a duration.
     pub fn serialize<T, S>(
         value: &T,
         serializer: S,
@@ -192,7 +200,10 @@ pub mod duration {
     /// Deserializes a duration value.
     ///
     /// # Errors
-    /// Returns an error if deserialization fails or duration conversion fails.
+    ///
+    /// Will return the deserializer's error if string deserialization fails,
+    /// if the string cannot be parsed as a duration, or if the duration
+    /// cannot be converted to the target type.
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
     where
         T: Clone + TryFrom<Duration>,
@@ -211,6 +222,90 @@ pub mod duration {
             .map_err(|err| {
                 <D as Deserializer<'de>>::Error::custom(format!("cannot convert duration: {err}"))
             })
+    }
+}
+
+/// Serialization utilities for timestamp values as seconds.
+pub mod timestamp_as_seconds {
+    use super::{Deserialize, Deserializer, Serializer};
+    use crate::google::protobuf::Timestamp;
+
+    /// Serializes a timestamp as seconds (f64).
+    ///
+    /// # Errors
+    ///
+    /// Will return the serializer's error if f64 serialization fails.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn serialize<S>(
+        value: &Timestamp,
+        serializer: S,
+    ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let seconds = value.seconds as f64 + f64::from(value.nanos) / 1_000_000_000.0;
+        serializer.serialize_f64(seconds)
+    }
+
+    /// Deserializes a timestamp from seconds (f64).
+    ///
+    /// # Errors
+    ///
+    /// Will return the deserializer's error if f64 deserialization fails.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Timestamp, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let seconds = f64::deserialize(deserializer)?;
+
+        let whole_seconds = seconds.trunc() as i64;
+        let nanos = ((seconds.fract() * 1_000_000_000.0).round() as i32).clamp(0, 999_999_999);
+
+        Ok(Timestamp::new(whole_seconds, nanos))
+    }
+
+    /// Serialization utilities for optional timestamp values as seconds.
+    pub mod option {
+        use super::{Deserializer, Serializer};
+        use crate::google::protobuf::Timestamp;
+
+        /// Serializes an optional timestamp as seconds (f64).
+        ///
+        /// # Errors
+        ///
+        /// Will return the serializer's error if f64 serialization fails.
+        pub fn serialize<S>(
+            value: &Option<Timestamp>,
+            serializer: S,
+        ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+        where
+            S: Serializer,
+        {
+            match value {
+                Some(timestamp) => super::serialize(timestamp, serializer),
+                None => serializer.serialize_none(),
+            }
+        }
+
+        /// Deserializes an optional timestamp from seconds (f64).
+        ///
+        /// # Errors
+        ///
+        /// Will return the deserializer's error if f64 deserialization fails.
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Timestamp>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            use serde::Deserialize;
+            Option::<f64>::deserialize(deserializer)?
+                .map(|seconds| {
+                    let whole_seconds = seconds.trunc() as i64;
+                    let nanos =
+                        ((seconds.fract() * 1_000_000_000.0).round() as i32).clamp(0, 999_999_999);
+                    Ok(Timestamp::new(whole_seconds, nanos))
+                })
+                .transpose()
+        }
     }
 }
 

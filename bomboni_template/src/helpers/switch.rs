@@ -30,7 +30,7 @@ pub fn register_switch_helper(handlebars_registry: &mut Handlebars) {
 ///
 /// # Errors
 ///
-/// Returns a render error if template rendering fails.
+/// Will return [`HelperResult`] if template rendering fails or parameter retrieval fails.
 pub fn switch_helper(
     h: &Helper,
     r: &Handlebars,

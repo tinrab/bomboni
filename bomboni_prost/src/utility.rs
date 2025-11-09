@@ -1,5 +1,5 @@
 /// Checks if a string is a Rust keyword that needs to be escaped.
-pub(crate) fn is_rust_keyword(s: &str) -> bool {
+pub fn is_rust_keyword(s: &str) -> bool {
     matches!(
         s,
         "as" | "break"

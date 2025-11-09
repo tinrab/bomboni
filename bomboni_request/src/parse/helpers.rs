@@ -8,7 +8,7 @@ pub mod id_convert {
     ///
     /// # Errors
     ///
-    /// Returns an error if the ID format is invalid.
+    /// Will return [`CommonError::InvalidId`] if the source string cannot be parsed as a valid ID.
     pub fn parse<S: AsRef<str>>(source: S) -> RequestResult<Id> {
         Ok(source
             .as_ref()

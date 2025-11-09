@@ -12,46 +12,101 @@ use bookstore_api::{
 
 use crate::error::AppResult;
 
+/// In-memory repository implementation.
 pub mod memory;
 
+/// Author record for insertion operations.
 #[derive(Debug)]
 pub struct AuthorRecordInsert {
+    /// Unique author identifier
     pub id: AuthorId,
+    /// Creation timestamp
     pub create_time: UtcDateTime,
+    /// Author display name
     pub display_name: String,
 }
 
+/// Author record with full ownership.
+///
+/// Represents an author with all fields including timestamps and deletion status.
 #[derive(Debug, Clone)]
 pub struct AuthorRecordOwned {
+    /// Unique author identifier
     pub id: AuthorId,
+    /// Creation timestamp
     pub create_time: UtcDateTime,
+    /// Last update timestamp
     pub update_time: Option<UtcDateTime>,
+    /// Deletion timestamp
     pub delete_time: Option<UtcDateTime>,
+    /// Whether the author is deleted
     pub deleted: bool,
+    /// Author display name
     pub display_name: String,
 }
 
+/// Result of an author list query from the repository.
 #[derive(Debug, Clone)]
 pub struct AuthorRecordList {
+    /// List of author records
     pub items: Vec<AuthorRecordOwned>,
+    /// Next item for pagination
     pub next_item: Option<AuthorRecordOwned>,
+    /// Total number of matching records
     pub total_size: i64,
 }
 
+/// Author record for update operations.
+///
+/// Contains only the fields that can be updated.
 pub struct AuthorRecordUpdate<'a> {
+    /// Unique author identifier
     pub id: AuthorId,
+    /// Update timestamp
     pub update_time: Option<UtcDateTime>,
+    /// Deletion timestamp
     pub delete_time: Option<UtcDateTime>,
+    /// Deletion status
     pub deleted: Option<bool>,
+    /// New display name
     pub display_name: Option<&'a str>,
 }
 
+/// Repository trait for author data persistence.
+///
+/// Defines the interface for author storage operations.
+/// Implementations can use different backends (memory, database, etc.).
 #[async_trait]
 pub trait AuthorRepository: Debug {
+    /// Inserts a new author record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the insertion fails.
     async fn insert(&self, record: AuthorRecordInsert) -> AppResult<()>;
+    /// Updates an existing author record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the update fails.
     async fn update(&self, update: AuthorRecordUpdate<'_>) -> AppResult<bool>;
+    /// Selects an author by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selection fails.
     async fn select(&self, id: &AuthorId) -> AppResult<Option<AuthorRecordOwned>>;
+    /// Selects multiple authors by their IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selection fails.
     async fn select_multiple(&self, ids: &[AuthorId]) -> AppResult<Vec<AuthorRecordOwned>>;
+    /// Selects authors with filtering and pagination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selection fails.
     async fn select_filtered(
         &self,
         query: &ListQuery,
@@ -59,6 +114,7 @@ pub trait AuthorRepository: Debug {
     ) -> AppResult<AuthorRecordList>;
 }
 
+/// Thread-safe shared reference to an author repository.
 pub type AuthorRepositoryArc = Arc<dyn AuthorRepository + Send + Sync>;
 
 impl SchemaMapped for AuthorRecordOwned {
@@ -73,12 +129,9 @@ impl SchemaMapped for AuthorRecordOwned {
 
 impl From<AuthorModel> for AuthorRecordOwned {
     fn from(author: AuthorModel) -> Self {
-        AuthorRecordOwned {
+        Self {
             id: author.id,
-            create_time: author
-                .resource
-                .create_time
-                .unwrap_or_else(|| UtcDateTime::now()),
+            create_time: author.resource.create_time.unwrap_or_else(UtcDateTime::now),
             update_time: author.resource.update_time,
             delete_time: author.resource.delete_time,
             deleted: author.resource.deleted,
@@ -89,12 +142,12 @@ impl From<AuthorModel> for AuthorRecordOwned {
 
 impl From<AuthorRecordOwned> for AuthorModel {
     fn from(record: AuthorRecordOwned) -> Self {
-        AuthorModel {
+        Self {
             resource: ParsedResource {
                 name: record.id.to_name(),
-                create_time: Some(record.create_time.into()),
-                update_time: record.update_time.map(Into::into),
-                delete_time: record.delete_time.map(Into::into),
+                create_time: Some(record.create_time),
+                update_time: record.update_time,
+                delete_time: record.delete_time,
                 deleted: record.deleted,
                 etag: None,
                 revision_id: None,

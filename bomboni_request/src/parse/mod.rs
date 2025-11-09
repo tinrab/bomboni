@@ -18,7 +18,7 @@ pub trait RequestParse<T>: Sized {
     ///
     /// # Errors
     ///
-    /// Returns an error if parsing fails.
+    /// Will return an error if the value cannot be parsed into the target type.
     fn parse(value: T) -> RequestResult<Self>;
 }
 
@@ -28,7 +28,7 @@ pub trait RequestParseInto<T>: Sized {
     ///
     /// # Errors
     ///
-    /// Returns an error if parsing fails.
+    /// Will return an error if the value cannot be parsed into the target type.
     fn parse_into(self) -> RequestResult<T>;
 }
 

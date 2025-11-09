@@ -74,11 +74,11 @@ impl Filter {
     ///
     /// # Errors
     ///
-    /// Returns a filter error if parsing fails.
+    /// Will return [`FilterError::Parse`] if the source string cannot be parsed as a valid filter.
     ///
     /// # Panics
     ///
-    /// Panics if the parser doesn't return any filter pairs.
+    /// Will panic if parsing fails to return a valid filter tree.
     pub fn parse(source: &str) -> FilterResult<Self> {
         let filter = FilterParser::parse(Rule::Filter, source)?.next().unwrap();
         Self::parse_tree(filter)
@@ -377,7 +377,9 @@ impl Filter {
     ///
     /// # Errors
     ///
-    /// Returns a filter error if the filter is invalid for the given schema.
+    /// Will return [`FilterError::UnknownFunction`] if the filter contains an unknown function name.
+    /// Will return [`FilterError::UnknownMember`] if the filter contains an unknown field name.
+    /// Will return [`FilterError::InvalidResultValueType`] if the filter value type cannot be determined.
     pub fn get_result_value_type(
         &self,
         schema: &Schema,
@@ -413,7 +415,11 @@ impl Filter {
     ///
     /// # Errors
     ///
-    /// Returns a filter error if filter is invalid for the given schema.
+    /// Will return [`FilterError::InvalidType`] if filter parts have incompatible types.
+    /// Will return [`FilterError::UnknownFunction`] if the filter contains an unknown function name.
+    /// Will return [`FilterError::FunctionInvalidArgumentCount`] if function argument count doesn't match schema.
+    /// Will return [`FilterError::UnknownMember`] if the filter contains an unknown field name.
+    /// Will return [`FilterError::UnsuitableComparator`] if an unsuitable comparator is used.
     pub fn validate(
         &self,
         schema: &Schema,

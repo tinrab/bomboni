@@ -1029,6 +1029,14 @@ impl FromMeta for ParseQueryField {
 
 impl FromMeta for ParseFieldMask {
     fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        // Handle field_mask with single parameter: field_mask(mask_field_name)
+        // Handle field_mask with parameters: field_mask { field = container, mask = mask_field }
+        #[derive(FromMeta)]
+        struct Options {
+            field: Option<Ident>,
+            mask: Ident,
+        }
+
         // Handle empty field_mask: field_mask()
         if items.is_empty() {
             return Ok(Self {
@@ -1037,27 +1045,15 @@ impl FromMeta for ParseFieldMask {
             });
         }
 
-        // Handle field_mask with single parameter: field_mask(mask_field_name)
-        if items.len() == 1 {
-            match &items[0] {
-                NestedMeta::Meta(Meta::Path(path)) => {
-                    if path.segments.len() == 1 {
-                        let mask_ident = &path.segments[0].ident;
-                        return Ok(Self {
-                            mask: mask_ident.clone(),
-                            field: None, // Will be inferred from source
-                        });
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        // Handle field_mask with parameters: field_mask { field = container, mask = mask_field }
-        #[derive(FromMeta)]
-        struct Options {
-            field: Option<Ident>,
-            mask: Ident,
+        if items.len() == 1
+            && let NestedMeta::Meta(Meta::Path(path)) = &items[0]
+            && path.segments.len() == 1
+        {
+            let mask_ident = &path.segments[0].ident;
+            return Ok(Self {
+                mask: mask_ident.clone(),
+                field: None, // Will be inferred from source
+            });
         }
 
         let options = Options::from_list(items)?;

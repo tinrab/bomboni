@@ -1,24 +1,26 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use bomboni::common::{date_time::UtcDateTime, id::Id};
+use bomboni::proto::google::protobuf::Timestamp;
+use bomboni::request::parse::RequestParse;
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::sync::RwLock;
 use tonic::{Response, Status, metadata::MetadataMap};
 
-use bomboni_common::date_time::UtcDateTime;
-use bomboni_request::parse::RequestParse;
-
-use crate::client::author_client::AuthorClient;
-use crate::model::author::AuthorId;
-use crate::model::author_service::{
-    ParsedCreateAuthorRequest, ParsedDeleteAuthorRequest, ParsedGetAuthorRequest,
-    ParsedUpdateAuthorRequest,
+use crate::{
+    client::author::AuthorClient,
+    model::{
+        author::AuthorId,
+        author_service::{
+            ParsedCreateAuthorRequest, ParsedDeleteAuthorRequest, ParsedGetAuthorRequest,
+            ParsedUpdateAuthorRequest,
+        },
+    },
+    v1::{
+        Author, CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest,
+        ListAuthorsResponse, UpdateAuthorRequest,
+    },
 };
-use crate::v1::Author;
-use crate::v1::{
-    CreateAuthorRequest, DeleteAuthorRequest, GetAuthorRequest, ListAuthorsRequest,
-    ListAuthorsResponse, UpdateAuthorRequest,
-};
 
+/// In-memory implementation of the author client.
 #[derive(Debug, Clone)]
 pub struct MemoryAuthorClient {
     authors: Arc<RwLock<HashMap<AuthorId, Author>>>,
@@ -31,12 +33,22 @@ impl Default for MemoryAuthorClient {
 }
 
 impl MemoryAuthorClient {
+    /// Creates a new empty memory author client.
     pub fn new() -> Self {
-        MemoryAuthorClient {
+        Self {
             authors: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
+    /// Creates a new memory author client with initial data.
+    ///
+    /// # Arguments
+    ///
+    /// * `authors` - Vector of authors to initialize the client with
+    ///
+    /// # Notes
+    ///
+    /// Authors with invalid names will be filtered out during initialization.
     pub fn with_data(authors: Vec<Author>) -> Self {
         let author_map = authors
             .into_iter()
@@ -45,11 +57,16 @@ impl MemoryAuthorClient {
                 Some((id, author))
             })
             .collect();
-        MemoryAuthorClient {
+        Self {
             authors: Arc::new(RwLock::new(author_map)),
         }
     }
 
+    /// Retrieves all authors stored in memory.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing all stored authors
     pub async fn get_authors(&self) -> Vec<Author> {
         self.authors.read().await.values().cloned().collect()
     }
@@ -63,11 +80,10 @@ impl AuthorClient for MemoryAuthorClient {
         _metadata: MetadataMap,
     ) -> Result<Response<Author>, Status> {
         let request = ParsedGetAuthorRequest::parse(request)?;
-        let authors = self.authors.read().await;
-        match authors.get(&request.id) {
-            Some(author) => Ok(Response::new(author.clone())),
-            None => Err(Status::not_found("Author not found")),
-        }
+        self.authors.read().await.get(&request.id).map_or_else(
+            || Err(Status::not_found("Author not found")),
+            |author| Ok(Response::new(author.clone())),
+        )
     }
 
     async fn list_authors(
@@ -75,8 +91,7 @@ impl AuthorClient for MemoryAuthorClient {
         _request: ListAuthorsRequest,
         _metadata: MetadataMap,
     ) -> Result<Response<ListAuthorsResponse>, Status> {
-        let authors = self.authors.read().await;
-        let authors_vec: Vec<Author> = authors.values().cloned().collect();
+        let authors_vec: Vec<Author> = self.authors.read().await.values().cloned().collect();
         let total_size = authors_vec.len() as i64;
         Ok(Response::new(ListAuthorsResponse {
             authors: authors_vec,
@@ -91,22 +106,20 @@ impl AuthorClient for MemoryAuthorClient {
         _metadata: MetadataMap,
     ) -> Result<Response<Author>, Status> {
         let request = ParsedCreateAuthorRequest::parse(request)?;
-        let id = AuthorId::new(bomboni_common::id::Id::generate());
-        let now = UtcDateTime::now();
-        let timestamp: bomboni_proto::google::protobuf::Timestamp = now.into();
+        let id = AuthorId::new(Id::generate());
+        let timestamp: Timestamp = UtcDateTime::now().into();
 
         let author = Author {
             name: id.to_name(),
-            create_time: Some(timestamp.clone()),
-            update_time: Some(timestamp.clone()),
+            create_time: Some(timestamp),
+            update_time: Some(timestamp),
             delete_time: None,
             deleted: false,
             etag: None,
             display_name: request.display_name,
         };
 
-        let mut authors = self.authors.write().await;
-        authors.insert(id, author.clone());
+        self.authors.write().await.insert(id, author.clone());
         Ok(Response::new(author))
     }
 

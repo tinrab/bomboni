@@ -45,7 +45,9 @@ impl Ordering {
     ///
     /// # Errors
     ///
-    /// Returns an error if the ordering string is invalid.
+    /// Will return [`OrderingError::InvalidTermFormat`] if ordering term format is invalid.
+    /// Will return [`OrderingError::DuplicateField`] if the same field appears multiple times.
+    /// Will return [`OrderingError::InvalidDirection`] if ordering direction is invalid.
     pub fn parse(source: &str) -> OrderingResult<Self> {
         let mut terms = Vec::new();
         let mut term_names = BTreeSet::<&str>::new();
@@ -120,7 +122,8 @@ impl Ordering {
     ///
     /// # Errors
     ///
-    /// Returns an error if the ordering is invalid for the schema.
+    /// Will return [`OrderingError::UnknownMember`] if the ordering contains an unknown field name.
+    /// Will return [`OrderingError::UnorderedField`] if the ordering contains a field that cannot be ordered.
     pub fn validate(&self, schema: &Schema) -> OrderingResult<()> {
         for term in self.iter() {
             let field_schema = schema

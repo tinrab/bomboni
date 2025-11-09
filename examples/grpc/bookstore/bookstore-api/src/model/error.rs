@@ -1,43 +1,57 @@
-use std::collections::BTreeMap;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::{
+    collections::BTreeMap,
+    fmt::{self, Debug, Display, Formatter},
+};
 
-use bomboni_proto::google::protobuf::Any;
-use bomboni_proto::google::rpc::ErrorInfo;
-use bomboni_request::error::{CommonError, GenericError};
-use grpc_common::common::COMMON_DOMAIN;
-use grpc_common::common::errors::common_error::CommonErrorReason;
-use grpc_common::get_common_error_reason;
+use bomboni::proto::google::{protobuf::Any, rpc::ErrorInfo};
+use bomboni::request::error::{CommonError, GenericError};
+use grpc_common::{COMMON_DOMAIN, get_common_error_reason, proto::common_error::CommonErrorReason};
 use paste::paste;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::model::{author::AuthorId, book::BookId};
-use crate::v1::errors::author_error::AuthorErrorReason;
-use crate::v1::errors::book_error::BookErrorReason;
-// use crate::v1::errors::{AuthorError as ProtoAuthorError, BookError as ProtoBookError};
+use crate::{
+    model::{author::AuthorId, book::BookId},
+    v1::errors::{author_error::AuthorErrorReason, book_error::BookErrorReason},
+};
 
-#[derive(Error, Debug, PartialEq)]
+/// Error types for the bookstore service.
+///
+/// This module defines comprehensive error handling for the bookstore API,
+/// including domain-specific errors, metadata, and conversion utilities.
+
+#[derive(Error, Debug, PartialEq, Eq)]
 #[error(transparent)]
 pub enum BookstoreError {
+    /// Book-related errors.
     Book(#[from] BookError),
+    /// Author-related errors.
     Author(#[from] AuthorError),
 }
 
-#[derive(Clone, PartialEq, Default, Serialize, Deserialize)]
+/// Metadata for bookstore errors.
+///
+/// This structure provides additional context for errors, including
+/// relevant IDs and identifiers that can help with debugging and
+/// error reporting.
+#[derive(Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BookstoreErrorMetadata {
+    /// The ID of the book associated with the error, if applicable.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         with = "metadata_field_serde"
     )]
     pub book_id: Option<BookId>,
+    /// The ID of the author associated with the error, if applicable.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         with = "metadata_field_serde"
     )]
     pub author_id: Option<AuthorId>,
+    /// The ISBN associated with the error, if applicable.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -46,8 +60,10 @@ pub struct BookstoreErrorMetadata {
     pub isbn: Option<String>,
 }
 
+/// Result type for bookstore operations.
 pub type BookstoreResult<T> = Result<T, BookstoreError>;
 
+/// The error domain for bookstore-specific errors.
 pub const BOOKSTORE_ERROR_DOMAIN: &str = "bookstore.rabzelj.com";
 
 impl GenericError for BookstoreError {
@@ -59,8 +75,9 @@ impl GenericError for BookstoreError {
 mod metadata_field_serde {
     use std::str::FromStr;
 
-    use super::*;
+    use super::Deserialize;
 
+    #[allow(clippy::ref_option)]
     pub fn serialize<F, S>(value: &Option<F>, serializer: S) -> Result<S::Ok, S::Error>
     where
         F: ToString,
@@ -81,22 +98,37 @@ mod metadata_field_serde {
         D: serde::Deserializer<'de>,
     {
         let value = Option::<String>::deserialize(deserializer)?;
-        if let Some(value) = value {
-            F::from_str(&value)
-                .map(Some)
-                .map_err(|_| serde::de::Error::custom("failed to parse metadata field"))
-        } else {
-            Ok(None)
-        }
+        value.map_or_else(
+            || Ok(None),
+            |value| {
+                F::from_str(&value)
+                    .map(Some)
+                    .map_err(|_| serde::de::Error::custom("failed to parse metadata field"))
+            },
+        )
     }
 }
 
 impl BookstoreErrorMetadata {
+    /// Converts the metadata to a map.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if JSON serialization or deserialization fails.
     pub fn to_map(&self) -> BTreeMap<String, String> {
         let value = serde_json::to_value(self).unwrap();
         serde_json::from_value(value).unwrap()
     }
 
+    /// Creates metadata from a map.
+    ///
+    /// # Arguments
+    ///
+    /// * `map` - The map containing metadata fields
+    ///
+    /// # Returns
+    ///
+    /// Some(BookstoreErrorMetadata) if parsing succeeds, None otherwise
     pub fn from_map(map: BTreeMap<String, String>) -> Option<Self> {
         let value = serde_json::to_value(map).ok()?;
         serde_json::from_value(value).ok()
@@ -110,7 +142,7 @@ impl Display for BookstoreErrorMetadata {
 }
 
 impl Debug for BookstoreErrorMetadata {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let mut d = f.debug_struct("BookstoreErrorMetadata");
 
         macro_rules! debug_fields {
@@ -129,9 +161,16 @@ impl Debug for BookstoreErrorMetadata {
     }
 }
 
+/// Parsed error reason for bookstore errors.
+///
+/// This enum combines common error reasons with domain-specific
+/// error reasons for books and authors.
 pub enum ParsedBookstoreErrorReason {
+    /// Common error reasons applicable to all domains.
     Common(CommonErrorReason),
+    /// Book-specific error reasons.
     Book(BookErrorReason),
+    /// Author-specific error reasons.
     Author(AuthorErrorReason),
 }
 
@@ -174,23 +213,31 @@ macro_rules! convert_bookstore_error_reason {
 macro_rules! impl_domain_error {
     ($name:ident) => {
         paste! {
-            #[derive(Error, Debug, Clone, PartialEq)]
+            /// Domain-specific error for the bookstore service.
+            #[derive(Error, Debug, Clone, PartialEq, Eq)]
             pub struct [<$name Error>] {
+                /// The specific error reason for this domain.
                 pub reason: [<$name ErrorReason>],
+                /// Optional error message providing additional context.
                 pub message: Option<String>,
+                /// The common error reason if applicable.
                 pub common_reason: CommonErrorReason,
+                /// The common error if applicable.
                 pub common_error: Option<CommonError>,
+                /// Optional metadata providing additional error context.
                 pub metadata: Option<BookstoreErrorMetadata>,
             }
         }
 
         paste! {
+            /// Result type for domain-specific operations.
             pub type [<$name Result>]<T> = Result<T, [<$name Error>]>;
         }
 
         paste! {
             #[allow(dead_code)]
             impl [<$name Error>] {
+                /// Creates a new error with the given reason.
                 pub fn new<R: Into<ParsedBookstoreErrorReason>>(reason: R) -> Self {
                     let (reason, common_reason) =
                         convert_bookstore_error_reason!(reason, [<$name ErrorReason>], $name);
@@ -203,7 +250,8 @@ macro_rules! impl_domain_error {
                     }
                 }
 
-                pub fn new_common(common_error: CommonError) -> Self {
+                /// Creates a new error from a common error.
+                pub const fn new_common(common_error: CommonError) -> Self {
                     [<$name Error>] {
                         reason: [<$name ErrorReason>]::Unspecified,
                         common_reason: get_common_error_reason(&common_error),
@@ -213,6 +261,7 @@ macro_rules! impl_domain_error {
                     }
                 }
 
+                /// Creates a new error with metadata.
                 pub fn new_with_metadata<R: Into<ParsedBookstoreErrorReason>>(
                     reason: R,
                     metadata: BookstoreErrorMetadata,
@@ -228,6 +277,7 @@ macro_rules! impl_domain_error {
                     }
                 }
 
+                /// Creates a new error with a custom message.
                 pub fn new_with_message<R: Into<ParsedBookstoreErrorReason>, S: ToString>(
                     reason: R,
                     message: S,
@@ -243,11 +293,15 @@ macro_rules! impl_domain_error {
                     }
                 }
 
-                pub fn with_reason(mut self, reason: [<$name ErrorReason>]) -> Self {
+                /// Sets the reason for the error.
+                #[must_use]
+                pub const fn with_reason(mut self, reason: [<$name ErrorReason>]) -> Self {
                     self.reason = reason;
                     self
                 }
 
+                /// Sets the message for the error.
+                #[must_use]
                 pub fn with_message<S: ToString>(mut self, message: S) -> Self {
                     self.message = Some(message.to_string());
                     self
@@ -343,6 +397,7 @@ impl_domain_error!(Author);
 macro_rules! impl_bookstore_metadata_field {
     ($ident:ident, $type:ty, $convert:ident) => {
         paste! {
+            /// Creates a new error with the specified metadata field.
             pub fn $ident<R: Into<ParsedBookstoreErrorReason>>(value: $type, reason: R) -> Self {
                 Self::new_with_metadata(
                     reason,
@@ -352,6 +407,7 @@ macro_rules! impl_bookstore_metadata_field {
                     },
                 )
             }
+            /// Adds or updates the specified metadata field.
             #[must_use]
             pub fn [<with_ $ident>] (self, value: $type) -> Self {
                 self.modify_metadata(|metadata| {

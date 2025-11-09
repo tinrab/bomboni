@@ -7,20 +7,29 @@ use tonic::{
     transport::{self, Channel},
 };
 
-use crate::client::book_client::BookClient;
+use crate::client::book::BookClient;
 use crate::v1::{
     Book, CreateBookRequest, DeleteBookRequest, GetBookRequest, ListBooksRequest,
     ListBooksResponse, UpdateBookRequest, bookstore_service_client::BookstoreServiceClient,
 };
 
+/// Remote implementation of the book client.
+///
+/// This implementation connects to a remote gRPC book service,
+/// allowing interaction with books over the network.
 #[derive(Clone)]
 pub struct RemoteBookClient {
     client: BookstoreServiceClient<Channel>,
 }
 
 impl RemoteBookClient {
+    /// Connects to a remote book service.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`transport::Error`] if the connection to the remote service fails.
     pub async fn connect(address: String) -> Result<Self, transport::Error> {
-        Ok(RemoteBookClient {
+        Ok(Self {
             client: BookstoreServiceClient::connect(address).await?,
         })
     }

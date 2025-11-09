@@ -3,9 +3,9 @@ use std::{
     str::FromStr,
 };
 
-use bomboni_common::id::Id;
-use bomboni_macros::btree_map_into;
-use bomboni_request::{
+use bomboni::common::id::Id;
+use bomboni::macros::btree_map_into;
+use bomboni::request::{
     derive::{Parse, parse_resource_name},
     error::RequestError,
     parse::ParsedResource,
@@ -18,28 +18,48 @@ use crate::{
     v1::Book,
 };
 
+/// Book model representing a book in the bookstore.
+///
+/// This struct provides a parsed representation of a book with
+/// resource metadata and typed fields.
 #[derive(Debug, Clone, PartialEq, Eq, Parse)]
 #[parse(source = Book, write)]
 pub struct BookModel {
+    /// Resource metadata including timestamps and deletion status.
     #[parse(resource)]
     pub resource: ParsedResource,
+    /// Unique identifier for the book.
     #[parse(source = "name", convert = book_id_convert)]
     pub id: BookId,
+    /// Display title of the book.
     pub display_name: String,
+    /// ID of the author who wrote the book.
     #[parse(source = "author", convert = author_id_convert)]
     pub author_id: AuthorId,
+    /// ISBN number of the book.
     pub isbn: String,
+    /// Description of the book.
     pub description: String,
+    /// Price in cents.
     pub price_cents: i64,
+    /// Number of pages in the book.
     pub page_count: i32,
 }
 
+/// Unique identifier for a book.
+///
+/// This wraps an internal ID and provides methods for parsing and formatting
+/// book resource names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BookId(pub Id);
 
 impl BookModel {
+    /// The name pattern for book resources.
     pub const NAME_PATTERN: &str = "books/{book_id}";
 
+    /// Returns the schema for book model fields.
+    ///
+    /// This defines the available fields for querying and filtering books.
     pub fn get_schema() -> Schema {
         Schema {
             members: btree_map_into! {
@@ -71,10 +91,24 @@ impl SchemaMapped for BookModel {
 }
 
 impl BookId {
+    /// Creates a new book ID from any type that can be converted to an Id.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID value to wrap
     pub fn new<T: Into<Id>>(id: T) -> Self {
         Self(id.into())
     }
 
+    /// Parses a book ID from a resource name string.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The resource name to parse (e.g., "books/123")
+    ///
+    /// # Returns
+    ///
+    /// Some(BookId) if parsing succeeds, None otherwise
     pub fn parse_name<S: AsRef<str>>(name: S) -> Option<Self> {
         let id = parse_resource_name!({
             "books": Id,
@@ -83,6 +117,11 @@ impl BookId {
         Some(Self(id))
     }
 
+    /// Converts the book ID to a resource name string.
+    ///
+    /// # Returns
+    ///
+    /// The formatted resource name (e.g., "books/123")
     pub fn to_name(&self) -> String {
         format!("books/{}", self.0)
     }
@@ -102,8 +141,9 @@ impl FromStr for BookId {
     }
 }
 
+/// Conversion utilities for book IDs.
 pub mod book_id_convert {
-    use bomboni_request::error::{CommonError, RequestResult};
+    use bomboni::request::error::{CommonError, RequestResult};
 
     use crate::model::book::{BookId, BookModel};
 
@@ -111,7 +151,7 @@ pub mod book_id_convert {
     ///
     /// # Errors
     ///
-    /// Returns an error if the name format is invalid.
+    /// Will return [`RequestError`] if the name format is invalid.
     pub fn parse<S: AsRef<str> + ToString>(name: S) -> RequestResult<BookId> {
         BookId::parse_name(name.as_ref()).ok_or_else(|| {
             CommonError::InvalidName {
@@ -122,6 +162,15 @@ pub mod book_id_convert {
         })
     }
 
+    /// Writes a book ID to its string representation.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The book ID to convert
+    ///
+    /// # Returns
+    ///
+    /// The formatted resource name string
     pub fn write(id: BookId) -> String {
         id.to_name()
     }

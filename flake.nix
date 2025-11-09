@@ -22,6 +22,7 @@
           buildInputs = with pkgs; [
             protobuf_33
             grpcurl
+            jq
           ];
         };
       }

@@ -1,32 +1,55 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::fmt::{Debug, Formatter};
-use std::str::FromStr;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Debug, Formatter},
+    str::FromStr,
+};
 
 use bomboni_common::id::Id;
-use http::header::{AUTHORIZATION, HeaderName};
-use http::{HeaderMap, HeaderValue};
+use http::{
+    HeaderMap, HeaderValue,
+    header::{AUTHORIZATION, HeaderName},
+};
 use tonic::metadata::{MetadataMap, MetadataValue};
 
-use crate::auth::access_token::AccessToken;
-use crate::auth::authenticator::{AuthenticatorArc, BEARER_PREFIX};
+use crate::auth::{
+    access_token::AccessTokenModel,
+    authenticator::{AuthenticatorArc, BEARER_PREFIX},
+};
 
+/// Builder for creating authentication contexts.
 #[derive(Debug, Clone)]
 pub struct ContextBuilder {
     authenticator: AuthenticatorArc,
 }
 
+/// Authentication context containing request ID and access token.
 #[derive(Clone)]
 pub struct Context {
+    /// Unique identifier for the request/context.
     pub id: Id,
-    pub access_token: Option<AccessToken>,
+    /// The authenticated access token, if any.
+    pub access_token: Option<AccessTokenModel>,
 }
 
 impl ContextBuilder {
+    /// Creates a new context builder.
+    ///
+    /// # Arguments
+    ///
+    /// * `authenticator` - The authenticator to use for token validation
     pub fn new(authenticator: AuthenticatorArc) -> Self {
-        ContextBuilder { authenticator }
+        Self { authenticator }
     }
 
+    /// Builds a context from gRPC metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The gRPC metadata containing authentication information
+    ///
+    /// # Returns
+    ///
+    /// A new `Context` with the extracted authentication information.
     pub fn build_from_metadata(&self, metadata: &MetadataMap) -> Context {
         let id = tracing::Span::current()
             .id()
@@ -35,6 +58,15 @@ impl ContextBuilder {
         Context::new(id, access_token)
     }
 
+    /// Builds a context from HTTP headers.
+    ///
+    /// # Arguments
+    ///
+    /// * `headers` - The HTTP headers containing authentication information
+    ///
+    /// # Returns
+    ///
+    /// A new `Context` with the extracted authentication information.
     pub fn build_from_headers(&self, headers: &HeaderMap) -> Context {
         let id = tracing::Span::current()
             .id()
@@ -43,6 +75,19 @@ impl ContextBuilder {
         Context::new(id, access_token)
     }
 
+    /// Builds a context from a header map.
+    ///
+    /// # Arguments
+    ///
+    /// * `headers` - A map of header names to sets of header values
+    ///
+    /// # Returns
+    ///
+    /// A new `Context` with the extracted authentication information.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if any header name is invalid.
     pub fn build_from_header_map(&self, headers: &HashMap<String, HashSet<String>>) -> Context {
         let header_map = headers
             .iter()
@@ -59,16 +104,36 @@ impl ContextBuilder {
 }
 
 impl Context {
-    pub fn new(id: Id, access_token: Option<AccessToken>) -> Self {
-        Context { id, access_token }
+    /// Creates a new context.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The unique identifier for the context
+    /// * `access_token` - Optional access token for authentication
+    pub const fn new(id: Id, access_token: Option<AccessTokenModel>) -> Self {
+        Self { id, access_token }
     }
 
+    /// Creates metadata map with authentication injected.
+    ///
+    /// # Returns
+    ///
+    /// A new `MetadataMap` containing the authentication information.
     pub fn inject(&self) -> MetadataMap {
         let mut metadata = MetadataMap::new();
         self.inject_metadata(&mut metadata);
         metadata
     }
 
+    /// Injects authentication metadata into the provided metadata map.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The metadata map to inject authentication into
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the access token contains invalid characters for metadata values.
     pub fn inject_metadata(&self, metadata: &mut MetadataMap) {
         if let Some(access_token) = self.access_token.as_ref() {
             metadata.insert(
@@ -79,12 +144,26 @@ impl Context {
         }
     }
 
+    /// Creates metadata map with authentication for authentication purposes.
+    ///
+    /// # Returns
+    ///
+    /// A new `MetadataMap` containing the authentication information.
     pub fn authenticate_metadata(&self) -> MetadataMap {
         let mut metadata = MetadataMap::new();
         self.authenticate_with_metadata(&mut metadata);
         metadata
     }
 
+    /// Authenticates the provided metadata map.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The metadata map to authenticate
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the access token contains invalid characters for metadata values.
     pub fn authenticate_with_metadata(&self, metadata: &mut MetadataMap) {
         if let Some(access_token) = self.access_token.as_ref() {
             metadata.insert(

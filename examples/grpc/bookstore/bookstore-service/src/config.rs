@@ -10,55 +10,100 @@ use serde::Deserialize;
 
 use crate::error::AppResult;
 
+/// Application configuration.
+///
+/// Contains all configuration settings for the bookstore service,
+/// including server, authentication, database, and tracing settings.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
+    /// Distribution metadata configuration
     pub distribution: DistributionConfig,
+    /// Node-specific configuration
     pub node: NodeConfig,
+    /// Server configuration settings
     pub server: ServerConfig,
+    /// Authentication configuration
     pub auth: AuthConfig,
+    /// Database configuration
     pub database: DatabaseConfig,
+    /// Tracing configuration
     pub tracing: TracingConfig,
 }
 
+/// Server configuration settings.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ServerConfig {
+    /// gRPC server bind address
     pub grpc_address: SocketAddr,
 }
 
+/// Authentication configuration.
+///
+/// Supports either memory-based authentication or JWT-based authentication.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
+#[serde(tag = "kind")]
 pub enum AuthConfig {
+    /// Memory-based authentication (no authentication)
     Memory,
+    /// JWT-based authentication
+    Jwt(JwtConfig),
 }
 
+/// JWT authentication configuration.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
+pub struct JwtConfig {
+    /// JWT secret key for token validation
+    pub secret: String,
+    /// Whether to validate token expiration
+    pub validate_expiration: Option<bool>,
+}
+
+/// Database configuration.
+///
+/// Supports either in-memory storage or `PostgreSQL` database.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind")]
 pub enum DatabaseConfig {
+    /// In-memory database storage
     Memory,
+    /// `PostgreSQL` database connection
     Postgres(PostgresConfig),
 }
 
+/// `PostgreSQL` database configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PostgresConfig {
+    /// `PostgreSQL` connection string
     pub connection: String,
 }
 
+/// Tracing configuration.
+///
+/// Controls how tracing data is output from the service.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
+#[serde(tag = "kind")]
 pub enum TracingConfig {
+    /// In-memory tracing (no output)
     Memory,
+    /// Standard output tracing
     Stdout,
 }
 
+/// Distribution metadata configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DistributionConfig {
+    /// Distribution name
     pub name: String,
+    /// Distribution version
     pub version: Option<String>,
 }
 
+/// Node-specific configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct NodeConfig {
+    /// Host IP address of the node
     pub host_ip: IpAddr,
+    /// Worker number for this node instance
     pub worker_number: u16,
 }
 
@@ -71,11 +116,27 @@ const NODE_HOST_IP_KEY: &str = "node.host_ip";
 const NODE_WORKER_NUMBER_KEY: &str = "node.worker_number";
 
 impl AppConfig {
+    /// Gets the global application configuration instance.
+    ///
+    /// Uses a static `OnceLock` to ensure the configuration is loaded only once.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the configuration cannot be loaded.
     pub fn get() -> &'static Self {
         static INSTANCE: OnceLock<AppConfig> = OnceLock::new();
         INSTANCE.get_or_init(|| Self::load().unwrap())
     }
 
+    /// Loads configuration from files and environment variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration files cannot be read or parsed.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the default config path cannot be converted to a string.
     pub fn load() -> AppResult<Self> {
         let config_path = env::var(CONFIG_PATH_ENV).unwrap_or_else(|_| "config".to_string());
 
@@ -118,6 +179,13 @@ impl AppConfig {
     }
 }
 
+/// Calculates worker number from IP address.
+///
+/// Uses the last two octets of an IPv4 address to generate a worker number.
+///
+/// # Panics
+///
+/// Will panic if IPv6 address is provided.
 fn get_worker_number(ip: IpAddr) -> u16 {
     let ip_v4 = match ip {
         IpAddr::V4(ip) => ip,

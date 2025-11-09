@@ -50,9 +50,6 @@ message CreateBookRequest {
 
   // The number of pages in the book.
   int32 page_count = 6;
-
-  // The publication date of the book.
-  google.protobuf.Timestamp published_at = 7;
 }
 
 // GetBookRequest represents a request to get a book by name.

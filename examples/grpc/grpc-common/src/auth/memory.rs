@@ -1,20 +1,28 @@
 use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 
-use crate::auth::access_token::AccessToken;
-use crate::auth::authenticator::Authenticator;
+use crate::auth::{access_token::AccessTokenModel, authenticator::Authenticator};
 
+/// In-memory authenticator for testing purposes.
+///
+/// This authenticator uses a fixed secret key and does not validate
+/// token expiration, making it suitable for development and testing.
 #[derive(Debug, Default)]
 pub struct MemoryAuthenticator {}
 
 impl MemoryAuthenticator {
-    pub fn new() -> Self {
-        MemoryAuthenticator {}
+    /// Creates a new memory authenticator.
+    ///
+    /// # Returns
+    ///
+    /// A new `MemoryAuthenticator` instance.
+    pub const fn new() -> Self {
+        Self {}
     }
 }
 
 impl Authenticator for MemoryAuthenticator {
-    fn authenticate(&self, authorization: &str) -> Option<AccessToken> {
-        let token = jsonwebtoken::decode::<AccessToken>(
+    fn authenticate(&self, authorization: &str) -> Option<AccessTokenModel> {
+        let token = jsonwebtoken::decode::<AccessTokenModel>(
             authorization,
             &DecodingKey::from_secret("testsecret".as_ref()),
             &{
@@ -35,27 +43,31 @@ mod tests {
     use bomboni_common::id::Id;
     use jsonwebtoken::{EncodingKey, Header};
 
-    use crate::auth::access_token::{AccessTokenAccount, AccessTokenData, AccessTokenIdentity};
+    use crate::auth::access_token::{
+        AccessTokenAccountModel, AccessTokenDataModel, AccessTokenIdentityModel, EmailIdentityModel,
+    };
 
     use super::*;
 
     #[test]
     fn generate_test_access_token() {
         let user_id = Id::new(2);
-        let access_token = AccessToken {
+        let access_token = AccessTokenModel {
             active: true,
             client_id: "test".to_string(),
-            expiration: 0,
-            issued_at: 0,
+            expiration: None,
+            issued_at: None,
             issuer: "bookstore".to_string(),
             subject: format!("users/{}", user_id),
-            data: AccessTokenData {
-                identities: vec![AccessTokenIdentity::Email {
-                    id: user_id,
+            data: Some(AccessTokenDataModel {
+                identities: vec![AccessTokenIdentityModel::Email(EmailIdentityModel {
+                    id: user_id.to_string(),
                     email: format!("tester+{}@bookstore.com", user_id),
+                })],
+                accounts: vec![AccessTokenAccountModel {
+                    id: user_id.to_string(),
                 }],
-                accounts: vec![AccessTokenAccount { id: user_id }],
-            },
+            }),
             encoded: String::new(),
         };
         let encoded = jsonwebtoken::encode(

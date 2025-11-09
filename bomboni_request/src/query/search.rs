@@ -110,7 +110,13 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the query parameters are invalid.
+    /// Will return [`QueryError::QueryTooLong`] if query exceeds maximum length.
+    /// Will return [`QueryError::FilterTooLong`] if filter exceeds maximum length.
+    /// Will return [`QueryError::FilterError`] if filter cannot be parsed or validated.
+    /// Will return [`QueryError::OrderingTooLong`] if ordering exceeds maximum length.
+    /// Will return [`QueryError::OrderingError`] if ordering cannot be parsed or validated.
+    /// Will return [`QueryError::InvalidPageSize`] if page size is negative.
+    /// Will return page token parsing errors from the underlying page token builder.
     pub fn build(
         &self,
         query: &str,
@@ -175,11 +181,11 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
         })
     }
 
-    /// Builds the next page token.
+    /// Builds the next page token from the given query and next item.
     ///
     /// # Errors
     ///
-    /// Returns an error if token building fails.
+    /// Will return page token building errors from the underlying page token builder.
     pub fn build_next_page_token<T: SchemaMapped>(
         &self,
         query: &SearchQuery<P::PageToken>,
