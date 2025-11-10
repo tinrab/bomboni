@@ -1,4 +1,4 @@
 [auth]
 kind = "Jwt"
-secret = "bookstore_secret_key_change_in_production"
+secret = "test_secret_key"
 validate_expiration = false

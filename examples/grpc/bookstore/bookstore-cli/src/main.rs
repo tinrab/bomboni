@@ -4,10 +4,16 @@
 //! It supports both JSON and text output formats and can authenticate using bearer tokens.
 
 use anyhow::Result;
+use bomboni_common::{date_time::UtcDateTime, id::Id};
 use clap::{Parser, Subcommand};
+use jsonwebtoken::{EncodingKey, Header};
+use time::{Duration, OffsetDateTime};
 use tonic::metadata::MetadataMap;
 
 use bookstore_api::client::BookstoreClient;
+use grpc_common::auth::access_token::{
+    AccessTokenAccountModel, AccessTokenDataModel, AccessTokenIdentityModel, EmailIdentityModel,
+};
 
 /// Command-line interface configuration.
 ///
@@ -19,7 +25,7 @@ use bookstore_api::client::BookstoreClient;
 #[command(version)]
 pub struct Cli {
     /// The gRPC server address
-    #[arg(long, short, default_value = "http://127.0.0.1:50051")]
+    #[arg(long, short, default_value = "http://127.0.0.1:9000")]
     pub address: String,
 
     /// Authentication token for API requests
@@ -37,7 +43,7 @@ pub struct Cli {
 
 /// Available CLI commands.
 ///
-/// Groups operations by resource type (authors or books).
+/// Groups operations by resource type (authors or books) and authentication.
 #[derive(Subcommand)]
 pub enum Commands {
     /// Author operations
@@ -51,6 +57,12 @@ pub enum Commands {
         /// The book subcommand to execute
         #[command(subcommand)]
         command: BookCommands,
+    },
+    /// Authentication operations
+    Auth {
+        /// The authentication subcommand to execute
+        #[command(subcommand)]
+        command: AuthCommands,
     },
 }
 
@@ -129,6 +141,26 @@ pub enum BookCommands {
     },
 }
 
+/// Authentication-related operations.
+#[derive(Subcommand)]
+pub enum AuthCommands {
+    /// Generate a JWT token for testing
+    GenerateToken {
+        /// User ID for the token
+        #[arg(long, default_value = "12345")]
+        user_id: String,
+        /// Email for the token
+        #[arg(long, default_value = "test@example.com")]
+        email: String,
+        /// Secret key for signing (defaults to test secret)
+        #[arg(long, default_value = "test_secret_key")]
+        secret: String,
+        /// Token expiration in hours (default: 1)
+        #[arg(long, default_value = "1")]
+        expires_in_hours: u64,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -150,6 +182,9 @@ async fn main() -> Result<()> {
         }
         Commands::Book { command } => {
             handle_book_command(client, command, metadata, cli.json).await?;
+        }
+        Commands::Auth { command } => {
+            handle_auth_command(command)?;
         }
     }
 
@@ -474,4 +509,58 @@ fn print_book_json(book: &bookstore_api::v1::Book) {
     println!("      \"create_time\": {:?},", book.create_time);
     println!("      \"update_time\": {:?}", book.update_time);
     println!("    }}");
+}
+
+/// Handles authentication-related CLI commands.
+///
+/// # Errors
+///
+/// Returns an error if token generation fails.
+fn handle_auth_command(command: AuthCommands) -> Result<()> {
+    use grpc_common::auth::access_token::AccessTokenModel;
+
+    match command {
+        AuthCommands::GenerateToken {
+            user_id,
+            email,
+            secret,
+            expires_in_hours,
+        } => {
+            let user_id_num = user_id.parse::<u128>().unwrap_or(12345);
+            let id = Id::new(user_id_num);
+
+            let access_token = AccessTokenModel {
+                active: true,
+                client_id: "bookstore-cli".to_string(),
+                expiration: Some(
+                    (OffsetDateTime::now_utc() + Duration::hours(expires_in_hours as i64)).into(),
+                ),
+                issued_at: Some(UtcDateTime::now()),
+                issuer: "bookstore".to_string(),
+                subject: format!("users/{id}"),
+                data: Some(AccessTokenDataModel {
+                    identities: vec![AccessTokenIdentityModel::Email(EmailIdentityModel {
+                        id: id.to_string(),
+                        email,
+                    })],
+                    accounts: vec![AccessTokenAccountModel { id: id.to_string() }],
+                }),
+                encoded: String::new(),
+            };
+
+            let encoded = jsonwebtoken::encode(
+                &Header::default(),
+                &access_token,
+                &EncodingKey::from_secret(secret.as_ref()),
+            )?;
+
+            println!("Generated JWT token:");
+            println!("{encoded}");
+            println!();
+            println!("Use this token with the CLI:");
+            println!("cargo run -- --token \"{encoded}\" author list");
+        }
+    }
+
+    Ok(())
 }

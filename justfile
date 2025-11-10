@@ -75,6 +75,8 @@ lint:
     )
     allow=(
         unused_braces
+        unused_imports
+        missing_docs
         clippy::module_name_repetitions
         clippy::cast_possible_truncation
         clippy::cast_possible_wrap
@@ -84,11 +86,9 @@ lint:
         clippy::needless_pass_by_value
         clippy::struct_excessive_bools
         clippy::struct_field_names
-        unused_imports
-        # missing_docs # tmp
+        clippy::doc_markdown
     )
 
-    # Exclude examples from lint due to generated gRPC code with lint violations
     cargo clippy --workspace --no-default-features \
         -- ${disallow[@]/#/-D } ${allow[@]/#/-A }
     cargo clippy --workspace --all-features \

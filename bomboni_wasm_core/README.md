@@ -1,3 +1,6 @@
-# bomboni: `wasm_core`
+# bomboni_wasm_core
 
-Based on <https://github.com/madonoharu/tsify> and <https://github.com/Aleph-Alpha/ts-rs>.
+Core utilities for WebAssembly integration in the Bomboni library.
+
+This crate provides internal utilities for WebAssembly integration, including TypeScript declaration generation, type mapping, and configuration options for procedural macros.
+This is primarily used by other Bomboni WASM crates.

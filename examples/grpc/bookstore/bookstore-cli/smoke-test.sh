@@ -7,9 +7,6 @@ SERVICE_ADDRESS="http://127.0.0.1:9000"
 CLI="cargo run --bin bookstore-cli --quiet -- --address $SERVICE_ADDRESS --json"
 CLI_WITH_TOKEN="cargo run --bin bookstore-cli --quiet -- --address $SERVICE_ADDRESS --token dummy-token --json"
 
-# Note: For full authenticated CRUD testing, a valid JWT token would need to be generated
-# with the correct secret matching the service configuration
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -47,45 +44,6 @@ test_connectivity() {
     fi
 }
 
-# Create test author
-create_author() {
-    log "Creating test author..."
-
-    local author_response
-    author_response=$($CLI author create "J.R.R. Tolkien" "jrr.tolkien@example.com")
-
-    if [[ -n "$author_response" && "$author_response" != "null" ]]; then
-        local author_id
-        author_id=$(echo "$author_response" | jq -r '.name')
-        success "Created author: $(echo "$author_response" | jq -r '.display_name')"
-        echo "$author_id"
-    else
-        error "Failed to create author"
-        exit 1
-    fi
-}
-
-# Create test book
-create_book() {
-    local author_id="$1"
-    log "Creating test book for author $author_id..."
-
-    local book_response
-    book_response=$($CLI book create "The Hobbit" "$author_id" "Fantasy adventure novel")
-
-    if [[ -n "$book_response" && "$book_response" != "null" ]]; then
-        local book_id
-        book_id=$(echo "$book_response" | jq -r '.name')
-        local book_title
-        book_title=$(echo "$book_response" | jq -r '.display_name')
-        success "Created book: $book_title"
-        echo "$book_id"
-    else
-        error "Failed to create book"
-        exit 1
-    fi
-}
-
 # List authors and verify
 list_authors() {
     log "Listing authors..."
@@ -112,66 +70,6 @@ list_books() {
 
     success "Found $book_count book(s)"
     echo "$books_response"
-}
-
-# Get specific author
-get_author() {
-    local author_id="$1"
-    log "Getting author details for ID: $author_id"
-
-    local author_response
-    author_response=$($CLI author get "$author_id")
-
-    local author_name
-    author_name=$(echo "$author_response" | jq -r '.display_name')
-
-    success "Retrieved author: $author_name"
-    echo "$author_response"
-}
-
-# Get specific book
-get_book() {
-    local book_id="$1"
-    log "Getting book details for ID: $book_id"
-
-    local book_response
-    book_response=$($CLI book get "$book_id")
-
-    local book_title
-    book_title=$(echo "$book_response" | jq -r '.display_name')
-
-    success "Retrieved book: $book_title"
-    echo "$book_response"
-}
-
-# Update author
-update_author() {
-    local author_id="$1"
-    log "Updating author $author_id..."
-
-    local updated_response
-    updated_response=$($CLI author update "$author_id" "J.R.R. Tolkien (Updated)" "updated.tolkien@example.com")
-
-    local updated_name
-    updated_name=$(echo "$updated_response" | jq -r '.display_name')
-
-    success "Updated author name: $updated_name"
-    echo "$updated_response"
-}
-
-# Update book
-update_book() {
-    local book_id="$1"
-    log "Updating book $book_id..."
-
-    local updated_response
-    updated_response=$($CLI book update "$book_id" "The Hobbit (Updated Edition)" "Updated fantasy adventure novel")
-
-    local updated_title
-    updated_title=$(echo "$updated_response" | jq -r '.display_name')
-
-    success "Updated book title: $updated_title"
-    echo "$updated_response"
 }
 
 # Test text output format

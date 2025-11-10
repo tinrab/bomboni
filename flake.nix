@@ -20,9 +20,11 @@
 
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
+            just
             protobuf_33
             grpcurl
             jq
+            jwt-cli
           ];
         };
       }

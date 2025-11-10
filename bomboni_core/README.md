@@ -1,5 +1,5 @@
-# bomboni: `core`
+# bomboni_core
 
-Core utilities and abstractions.
+Core utilities and abstractions for the Bomboni library.
 
-This crate provides fundamental utilities used across the bomboni project, including string manipulation and syntax tree processing.
+This crate provides fundamental utilities used across the Bomboni project.
