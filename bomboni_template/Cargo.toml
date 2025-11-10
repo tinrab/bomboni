@@ -17,7 +17,7 @@ path = "src/lib.rs"
 testing = []
 
 [dependencies]
-bomboni_proto = { path = "../bomboni_proto" }
+bomboni_proto = { workspace = true }
 
 handlebars.workspace = true
 serde = { workspace = true, features = ["derive"] }

@@ -116,35 +116,3 @@ docs-open:
 
 clean:
     cargo clean
-
-publish:
-    #!/usr/bin/env bash
-    set -euxo pipefail
-
-    if [[ "$2" =~ ^(--actually-do-it)$ ]]; then
-        cargo publish -p bomboni_core --allow-dirty
-        cargo publish -p bomboni_wasm_core --allow-dirty
-        cargo publish -p bomboni_wasm_derive --allow-dirty
-        cargo publish -p bomboni_wasm --allow-dirty
-        cargo publish -p bomboni_common --allow-dirty
-        cargo publish -p bomboni_prost --allow-dirty
-        cargo publish -p bomboni_proto --allow-dirty
-        cargo publish -p bomboni_request_derive --allow-dirty
-        cargo publish -p bomboni_request --allow-dirty
-        cargo publish -p bomboni_template --allow-dirty
-        cargo publish -p bomboni_fs --allow-dirty
-        cargo publish -p bomboni --allow-dirty
-    else
-        cargo publish -p bomboni_core --allow-dirty --dry-run
-        cargo publish -p bomboni_wasm_core --allow-dirty --dry-run
-        cargo publish -p bomboni_wasm_derive --allow-dirty --dry-run
-        cargo publish -p bomboni_common --allow-dirty --dry-run
-        cargo publish -p bomboni_wasm --allow-dirty --dry-run
-        cargo publish -p bomboni_prost --allow-dirty --dry-run
-        cargo publish -p bomboni_proto --allow-dirty --dry-run
-        cargo publish -p bomboni_request_derive --allow-dirty --dry-run
-        cargo publish -p bomboni_request --allow-dirty --dry-run
-        cargo publish -p bomboni_template --allow-dirty --dry-run
-        cargo publish -p bomboni_fs --allow-dirty --dry-run
-        cargo publish -p bomboni --allow-dirty --dry-run
-    fi

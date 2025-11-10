@@ -30,11 +30,11 @@ postgres = ["dep:postgres-types", "dep:bytes", "bomboni_common/postgres"]
 mysql = ["dep:mysql_common"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common" }
-bomboni_proto = { path = "../bomboni_proto" }
-bomboni_request_derive = { path = "../bomboni_request_derive" }
-bomboni_macros = { path = "../bomboni_macros" }
-bomboni_wasm = { path = "../bomboni_wasm", features = ["derive"], optional = true }
+bomboni_common = { workspace = true }
+bomboni_proto = { workspace = true }
+bomboni_request_derive = { workspace = true }
+bomboni_macros = { workspace = true }
+bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 
 thiserror.workspace = true
 prost.workspace = true

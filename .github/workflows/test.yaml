@@ -1,9 +1,9 @@
 name: Tests
 on:
   push:
-    branches: ['main', 'develop']
+    branches: ["main", "develop", "feature/ci"]
   pull_request:
-    branches: ['main', 'develop']
+    branches: ["main", "develop", "feature/ci"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,6 +19,11 @@ jobs:
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
 
+      - name: Set up
+        run: |
+          sudo apt-get update
+          sudo apt install just
+
       - name: Cache
         uses: actions/cache@v3
         with:
@@ -30,19 +35,8 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
 
-      - name: Lint
-        run: |
-          cargo fmt --all -- --check
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
-
       - name: Test
-        run: cargo test --workspace --all-targets --all-features
+        run: just test
 
-      - name: Test - no default features
-        run: cargo test --workspace --all-targets --no-default-features --features testing,request
-
-      - name: Test doc
-        run: cargo test --workspace --doc --all-features
-
-      - name: Test doc - no default features
-        run: cargo test --workspace --doc --no-default-features --features testing,request
+      - name: Lint
+        run: just lint

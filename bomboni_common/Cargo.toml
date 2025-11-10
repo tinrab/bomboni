@@ -30,7 +30,7 @@ postgres = ["dep:postgres-types", "dep:bytes"]
 mysql = ["dep:mysql_common"]
 
 [dependencies]
-bomboni_wasm = { path = "../bomboni_wasm", features = ["derive"], optional = true }
+bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }

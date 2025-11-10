@@ -27,7 +27,7 @@ wasm = [
 js = ["bomboni_common/js"]
 
 [dependencies]
-bomboni_common = { path = "../bomboni_common", features = ["serde"] }
+bomboni_common = { workspace = true, features = ["serde"] }
 
 thiserror.workspace = true
 time.workspace = true
@@ -42,7 +42,7 @@ http = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-bomboni_wasm = { path = "../bomboni_wasm", optional = true, features = ["derive"] }
+bomboni_wasm = { workspace = true, optional = true, features = ["derive"] }
 
 wasm-bindgen = { version = "0.2.105", optional = true }
 js-sys = { version = "0.3.82", optional = true }
@@ -52,4 +52,4 @@ serde-wasm-bindgen = { version = "0.6.5", optional = true }
 
 [build-dependencies]
 prost-build.workspace = true
-bomboni_prost = { path = "../bomboni_prost" }
+bomboni_prost = { workspace = true }

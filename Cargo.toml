@@ -30,6 +30,19 @@ license-file = "LICENSE"
 edition = "2024"
 
 [workspace.dependencies]
+bomboni_common = { path = "bomboni_common", version = "0.2.0" }
+bomboni_core = { path = "bomboni_core", version = "0.2.0" }
+bomboni_fs = { path = "bomboni_fs", version = "0.2.0" }
+bomboni_macros = { path = "bomboni_macros", version = "0.2.0" }
+bomboni_prost = { path = "bomboni_prost", version = "0.2.0" }
+bomboni_proto = { path = "bomboni_proto", version = "0.2.0" }
+bomboni_request = { path = "bomboni_request", version = "0.2.0" }
+bomboni_request_derive = { path = "bomboni_request_derive", version = "0.2.0" }
+bomboni_template = { path = "bomboni_template", version = "0.2.0" }
+bomboni_wasm = { path = "bomboni_wasm", version = "0.2.0" }
+bomboni_wasm_core = { path = "bomboni_wasm_core", version = "0.2.0" }
+bomboni_wasm_derive = { path = "bomboni_wasm_derive", version = "0.2.0" }
+
 thiserror = "2.0.17"
 regex = "1.12.2"
 time = "0.3.44"
@@ -111,12 +124,12 @@ postgres = ["bomboni_common/postgres", "bomboni_request/postgres"]
 mysql = ["bomboni_common/mysql", "bomboni_request/mysql"]
 
 [dependencies]
-bomboni_common = { path = "bomboni_common" }
-bomboni_macros = { path = "bomboni_macros" }
+bomboni_common = { path = "bomboni_common", version = "0.2.0" }
+bomboni_macros = { path = "bomboni_macros", version = "0.2.0" }
 
-bomboni_prost = { path = "bomboni_prost", optional = true }
-bomboni_proto = { path = "bomboni_proto", optional = true }
-bomboni_request = { path = "bomboni_request", features = ["root-crate"], optional = true }
-bomboni_template = { path = "bomboni_template", optional = true }
-bomboni_wasm = { path = "bomboni_wasm", features = ["root-crate"], optional = true }
-bomboni_fs = { path = "bomboni_fs", optional = true }
+bomboni_prost = { path = "bomboni_prost", optional = true, version = "0.2.0" }
+bomboni_proto = { path = "bomboni_proto", optional = true, version = "0.2.0" }
+bomboni_request = { path = "bomboni_request", features = ["root-crate"], optional = true, version = "0.2.0" }
+bomboni_template = { path = "bomboni_template", optional = true, version = "0.2.0" }
+bomboni_wasm = { path = "bomboni_wasm", features = ["root-crate"], optional = true, version = "0.2.0" }
+bomboni_fs = { path = "bomboni_fs", optional = true, version = "0.2.0" }

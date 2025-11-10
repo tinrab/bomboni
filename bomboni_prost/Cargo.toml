@@ -14,7 +14,7 @@ name = "bomboni_prost"
 path = "src/lib.rs"
 
 [dependencies]
-bomboni_core = { path = "../bomboni_core" }
+bomboni_core = { workspace = true }
 
 prost.workspace = true
 prost-types.workspace = true

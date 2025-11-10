@@ -1,7 +1,8 @@
 [package]
 name = "grpc_common"
 version = "0.0.0"
-edition = "2024"
+edition.workspace = true
+publish = false
 
 [lib]
 name = "grpc_common"
