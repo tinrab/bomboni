@@ -1,0 +1,21 @@
+[distribution]
+name = "bookstore"
+
+[node]
+host_ip = "127.0.0.1"
+
+[server]
+grpc_address = "127.0.0.1:9000"
+
+[auth]
+kind = "Jwt"
+secret = "test_secret_key"
+validate_expiration = false
+
+[database]
+kind = "Memory"
+# kind = "postgres"
+# connection = "postgresql://bookstore:@localhost:26257/bookstore?sslmode=disable"
+
+[tracing]
+kind = "Stdout"

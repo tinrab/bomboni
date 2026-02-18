@@ -5,27 +5,43 @@ use serde_json::Value;
 
 use crate::helpers::utility::get_param_value;
 
+/// Name of the addition helper.
 pub const ADD_HELPER_NAME: &str = "add";
+/// Name of the subtraction helper.
 pub const SUBTRACT_HELPER_NAME: &str = "subtract";
+/// Name of the multiplication helper.
 pub const MULTIPLY_HELPER_NAME: &str = "multiply";
+/// Name of the division helper.
 pub const DIVIDE_HELPER_NAME: &str = "divide";
+/// Name of the modulo helper.
 pub const MODULO_HELPER_NAME: &str = "modulo";
 
+/// Name of the negate helper.
 pub const NEGATE_HELPER_NAME: &str = "negate";
+/// Name of the absolute helper.
 pub const ABSOLUTE_HELPER_NAME: &str = "absolute";
+/// Name of the round helper.
 pub const ROUND_HELPER_NAME: &str = "round";
+/// Name of the ceil helper.
 pub const CEIL_HELPER_NAME: &str = "ceil";
+/// Name of the floor helper.
 pub const FLOOR_HELPER_NAME: &str = "floor";
+/// Name of the square root helper.
 pub const SQRT_HELPER_NAME: &str = "sqrt";
+/// Name of the sign helper.
 pub const SIGN_HELPER_NAME: &str = "sign";
 
+/// Name of the power helper.
 pub const POW_HELPER_NAME: &str = "pow";
+/// Name of the clamp helper.
 pub const CLAMP_HELPER_NAME: &str = "clamp";
 
+/// Registers all math helpers with the Handlebars registry.
 pub fn register_math_helpers(handlebars_registry: &mut Handlebars) {
     register_math_helpers_with_name_map(handlebars_registry, BTreeMap::default());
 }
 
+/// Registers math helpers with custom name mapping.
 pub fn register_math_helpers_with_name_map(
     handlebars_registry: &mut Handlebars,
     name_map: BTreeMap<String, String>,
@@ -75,7 +91,7 @@ impl HelperDef for MathHelper {
             ($op:tt) => {{
                 let a: f64 = get_param_value(h, 0, "a")?.as_f64().unwrap_or(0.0);
                 let b: f64 = get_param_value(h, 1, "b")?.as_f64().unwrap_or(0.0);
-                Ok(Value::from((a + b)).into())
+                Ok(Value::from(a $op b).into())
             }};
         }
         macro_rules! unary_op {

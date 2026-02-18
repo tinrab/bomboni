@@ -3,7 +3,7 @@ use crate::{
     ordering::Ordering,
     query::{
         error::{QueryError, QueryResult},
-        page_token::{utility::get_page_filter, FilterPageToken, PageTokenBuilder},
+        page_token::{FilterPageToken, PageTokenBuilder, utility::get_page_filter},
     },
 };
 use base64ct::{Base64, Base64Url, Encoding};
@@ -17,7 +17,8 @@ pub struct Base64PageTokenBuilder {
 }
 
 impl Base64PageTokenBuilder {
-    pub fn new(url_safe: bool) -> Self {
+    /// Creates a new Base64 page token builder.
+    pub const fn new(url_safe: bool) -> Self {
         Self { url_safe }
     }
 }

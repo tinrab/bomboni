@@ -5,54 +5,80 @@ use std::{
 
 use crate::value::Value;
 
+/// Schema for query validation.
 #[derive(Debug, Clone)]
 pub struct Schema {
+    /// Schema members.
     pub members: BTreeMap<String, MemberSchema>,
 }
 
+/// Schema member type.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MemberSchema {
+    /// Resource member.
     Resource(ResourceMemberSchema),
+    /// Field member.
     Field(FieldMemberSchema),
 }
 
+/// Resource member schema.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceMemberSchema {
+    /// Resource fields.
     pub fields: BTreeMap<String, MemberSchema>,
 }
 
+/// Field member schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldMemberSchema {
+    /// Value type.
     pub value_type: ValueType,
+    /// Whether field is repeated.
     pub repeated: bool,
+    /// Whether field is ordered.
     pub ordered: bool,
+    /// Whether field allows has operator.
     pub allow_has_operator: bool,
 }
 
+/// Function schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionSchema {
+    /// Argument value types.
     pub argument_value_types: Vec<ValueType>,
+    /// Return value type.
     pub return_value_type: ValueType,
 }
 
+/// Map of function schemas.
 pub type FunctionSchemaMap = BTreeMap<String, FunctionSchema>;
 
+/// Value type for schema validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
+    /// Integer value.
     Integer,
+    /// Float value.
     Float,
+    /// Boolean value.
     Boolean,
+    /// String value.
     String,
+    /// Timestamp value.
     Timestamp,
+    /// Any value.
     Any,
     // ResourceName,
 }
 
+/// Trait for types that can be mapped to schema values.
 pub trait SchemaMapped {
+    /// Gets field value by name.
     fn get_field(&self, name: &str) -> Value;
 }
 
 impl Schema {
+    /// Gets member schema by name.
     pub fn get_member(&self, name: &str) -> Option<&MemberSchema> {
         let mut member: Option<&MemberSchema> = None;
         for step in name.split('.') {
@@ -75,6 +101,7 @@ impl Schema {
         member
     }
 
+    /// Gets field schema by name.
     pub fn get_field(&self, name: &str) -> Option<&FieldMemberSchema> {
         if let Some(MemberSchema::Field(field)) = self.get_member(name) {
             Some(field)
@@ -85,7 +112,8 @@ impl Schema {
 }
 
 impl FieldMemberSchema {
-    pub fn new(value_type: ValueType) -> Self {
+    /// Creates a new field member schema.
+    pub const fn new(value_type: ValueType) -> Self {
         Self {
             value_type,
             repeated: false,
@@ -94,7 +122,8 @@ impl FieldMemberSchema {
         }
     }
 
-    pub fn new_ordered(value_type: ValueType) -> Self {
+    /// Creates a new ordered field member schema.
+    pub const fn new_ordered(value_type: ValueType) -> Self {
         Self {
             value_type,
             repeated: false,
@@ -103,7 +132,8 @@ impl FieldMemberSchema {
         }
     }
 
-    pub fn new_repeated(value_type: ValueType) -> Self {
+    /// Creates a new repeated field member schema.
+    pub const fn new_repeated(value_type: ValueType) -> Self {
         Self {
             value_type,
             repeated: true,

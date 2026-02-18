@@ -14,19 +14,28 @@ use crate::{
     schema::ValueType,
 };
 
+/// Query value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    /// Integer value.
     Integer(i64),
+    /// Float value.
     Float(f64),
+    /// Boolean value.
     Boolean(bool),
+    /// String value.
     String(String),
+    /// Timestamp value.
     Timestamp(UtcDateTime),
-    Repeated(Vec<Value>),
+    /// Repeated value.
+    Repeated(Vec<Self>),
+    /// Any value.
     Any,
 }
 
 impl Value {
-    pub fn value_type(&self) -> Option<ValueType> {
+    /// Gets the value type.
+    pub const fn value_type(&self) -> Option<ValueType> {
         match self {
             Self::Integer(_) => Some(ValueType::Integer),
             Self::Float(_) => Some(ValueType::Float),
@@ -38,28 +47,35 @@ impl Value {
         }
     }
 
+    /// Parses a value from a pest pair.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`FilterError::InvalidNumber`] if the string cannot be parsed as a number.
+    /// Will return [`FilterError::ExpectedValue`] if the pair rule is not a valid value type.
     pub fn parse(pair: &Pair<'_, Rule>) -> FilterResult<Self> {
         match pair.as_rule() {
             Rule::String => {
                 let value = pair.as_str();
-                if let Ok(value) = UtcDateTime::parse_rfc3339(value) {
-                    Ok(value.into())
-                } else {
-                    let lexeme = pair.as_str();
-                    Ok(Value::String(lexeme[1..lexeme.len() - 1].into()))
-                }
+                UtcDateTime::parse_rfc3339(value).map_or_else(
+                    |_| {
+                        let lexeme = pair.as_str();
+                        Ok(Self::String(lexeme[1..lexeme.len() - 1].into()))
+                    },
+                    |value| Ok(value.into()),
+                )
             }
-            Rule::Boolean => Ok(Value::Boolean(pair.as_str() == "true")),
-            Rule::Number => {
-                if let Ok(value) = pair.as_str().parse::<i64>() {
-                    Ok(Value::Integer(value))
-                } else if let Ok(value) = pair.as_str().parse::<f64>() {
-                    Ok(Value::Float(value))
-                } else {
-                    Err(FilterError::InvalidNumber(pair.as_str().into()))
-                }
-            }
-            Rule::Any => Ok(Value::Any),
+            Rule::Boolean => Ok(Self::Boolean(pair.as_str() == "true")),
+            Rule::Number => pair.as_str().parse::<i64>().map_or_else(
+                |_| {
+                    pair.as_str().parse::<f64>().map_or_else(
+                        |_| Err(FilterError::InvalidNumber(pair.as_str().into())),
+                        |value| Ok(Self::Float(value)),
+                    )
+                },
+                |value| Ok(Self::Integer(value)),
+            ),
+            Rule::Any => Ok(Self::Any),
             _ => Err(FilterError::ExpectedValue),
         }
     }
@@ -197,7 +213,7 @@ impl From<Vec<Self>> for Value {
 #[cfg(feature = "postgres")]
 const _: () = {
     use bytes::BytesMut;
-    use postgres_types::{to_sql_checked, IsNull, ToSql, Type};
+    use postgres_types::{IsNull, ToSql, Type, to_sql_checked};
 
     impl ToSql for Value {
         fn to_sql(
@@ -261,7 +277,7 @@ const _: () = {
                 Value::Repeated(_values) => {
                     todo!("repeated values are not yet supported for mysql")
                 }
-                Value::Any => MySqlValue::NULL,
+                Value::Any => Self::NULL,
             }
         }
     }

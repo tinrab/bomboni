@@ -8,23 +8,37 @@ use std::collections::BTreeMap;
 
 use crate::helpers::utility::{get_hash_opt, get_param, get_param_value};
 
+/// Name of the object helper.
 pub const OBJECT_HELPER_NAME: &str = "object";
+/// Name of the object has key helper.
 pub const OBJECT_HAS_KEY_HELPER_NAME: &str = "objectHasKey";
+/// Name of array helper.
 pub const ARRAY_HELPER_NAME: &str = "array";
+/// Name of group by helper.
 pub const GROUP_BY_HELPER_NAME: &str = "groupBy";
+/// Name of contains helper.
 pub const CONTAINS_HELPER_NAME: &str = "contains";
+/// Name of none helper.
 pub const NONE_HELPER_NAME: &str = "none";
+/// Name of all helper.
 pub const ALL_HELPER_NAME: &str = "all";
+/// Name of some helper.
 pub const SOME_HELPER_NAME: &str = "some";
+/// Name of filter helper.
 pub const FILTER_HELPER_NAME: &str = "filter";
+/// Name of or else helper.
 pub const OR_ELSE_HELPER_NAME: &str = "orElse";
+/// Name of and then helper.
 pub const AND_THEN_HELPER_NAME: &str = "andThen";
+/// Name of either or helper.
 pub const EITHER_OR_HELPER_NAME: &str = "eitherOr";
 
+/// Registers all value helpers with Handlebars registry.
 pub fn register_value_helpers(handlebars_registry: &mut Handlebars) {
     register_value_helpers_with_name_map(handlebars_registry, BTreeMap::default());
 }
 
+/// Registers value helpers with custom name mapping.
 pub fn register_value_helpers_with_name_map(
     handlebars_registry: &mut Handlebars,
     name_map: BTreeMap<String, String>,
@@ -106,11 +120,9 @@ impl HelperDef for ValueHelper {
                         .iter()
                         .fold(BTreeMap::default(), |mut groups, value| {
                             if let Some(value_key) = value.get(&key) {
-                                let key_str = if let Some(s) = value_key.as_str() {
-                                    s.to_string()
-                                } else {
-                                    value_key.to_string()
-                                };
+                                let key_str = value_key
+                                    .as_str()
+                                    .map_or_else(|| value_key.to_string(), ToString::to_string);
                                 groups.entry(key_str).or_default().push(value);
                             }
                             groups

@@ -1,6 +1,3 @@
-use crate::google::protobuf::{
-    value::Kind as ValueKind, Empty, ListValue, NullValue, Struct, Value,
-};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 use std::{
@@ -9,25 +6,34 @@ use std::{
     fmt::Display,
 };
 
+use crate::google::protobuf::{
+    Empty, ListValue, NullValue, Struct, Value, value::Kind as ValueKind,
+};
+
 impl Struct {
+    /// Creates a new struct with the given fields.
     #[must_use]
-    pub fn new(fields: BTreeMap<String, Value>) -> Self {
+    pub const fn new(fields: BTreeMap<String, Value>) -> Self {
         Self { fields }
     }
 }
 
-impl From<JsonValue> for Struct {
-    fn from(value: JsonValue) -> Self {
+impl TryFrom<JsonValue> for Struct {
+    type Error = &'static str;
+
+    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
         match value {
-            JsonValue::Object(o) => Self::new(o.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            _ => panic!("JsonValue::Object is expected"),
+            JsonValue::Object(o) => Ok(Self::new(
+                o.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            )),
+            _ => Err("JsonValue::Object is expected"),
         }
     }
 }
 
 impl From<Struct> for JsonValue {
     fn from(value: Struct) -> Self {
-        JsonValue::Object(
+        Self::Object(
             value
                 .fields
                 .into_iter()
@@ -88,7 +94,7 @@ impl Serialize for Struct {
     where
         S: serde::Serializer,
     {
-        use ::serde::ser::SerializeMap;
+        use serde::ser::SerializeMap;
 
         let mut s = serializer.serialize_map(Some(self.fields.len()))?;
         for (k, v) in &self.fields {
@@ -111,21 +117,19 @@ impl<'de> Deserialize<'de> for Struct {
 impl From<Value> for JsonValue {
     fn from(value: Value) -> Self {
         let Some(kind) = value.kind else {
-            return JsonValue::Null;
+            return Self::Null;
         };
         match kind {
-            ValueKind::NullValue(_) => JsonValue::Null,
-            ValueKind::NumberValue(n) => JsonValue::Number(
+            ValueKind::NullValue(_) => Self::Null,
+            ValueKind::NumberValue(n) => Self::Number(
                 JsonNumber::from_f64(n).expect("NumberValue is expected to be a valid f64"),
             ),
-            ValueKind::StringValue(s) => JsonValue::String(s),
-            ValueKind::BoolValue(b) => JsonValue::Bool(b),
+            ValueKind::StringValue(s) => Self::String(s),
+            ValueKind::BoolValue(b) => Self::Bool(b),
             ValueKind::StructValue(s) => {
-                JsonValue::Object(s.fields.into_iter().map(|(k, v)| (k, v.into())).collect())
+                Self::Object(s.fields.into_iter().map(|(k, v)| (k, v.into())).collect())
             }
-            ValueKind::ListValue(l) => {
-                JsonValue::Array(l.values.into_iter().map(Into::into).collect())
-            }
+            ValueKind::ListValue(l) => Self::Array(l.values.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -155,7 +159,7 @@ impl From<JsonValue> for Value {
             },
             JsonValue::Array(a) => Self {
                 kind: Some(ValueKind::ListValue(
-                    a.into_iter().map(Into::<Value>::into).collect(),
+                    a.into_iter().map(Into::<Self>::into).collect(),
                 )),
             },
         }
@@ -336,7 +340,11 @@ mod tests {
             "msg": "Hello, World!",
             "seq": [1, 2, 3],
         });
-        let s: Struct = js.into();
+        let s: Struct = if let serde_json::Value::Object(map) = js {
+            map.into_iter().collect::<BTreeMap<_, _>>().into()
+        } else {
+            panic!("Expected object");
+        };
         assert_eq!(
             &serde_json::from_str::<Struct>(&serde_json::to_string_pretty(&s).unwrap()).unwrap(),
             &s

@@ -24,7 +24,7 @@ pub fn expand(options: &ParseOptions) -> syn::Result<TokenStream> {
         result.extend(quote! {
             #[automatically_derived]
             impl #impl_generics _serde::Serialize for #ident #type_generics #where_clause {
-                fn serialize<__S>(&self, serializer: __S) -> _serde::__private::Result<__S::Ok, __S::Error>
+                fn serialize<__S>(&self, serializer: __S) -> core::result::Result<__S::Ok, __S::Error>
                 where
                     __S: _serde::Serializer,
                 {
@@ -42,7 +42,7 @@ pub fn expand(options: &ParseOptions) -> syn::Result<TokenStream> {
         result.extend(quote! {
             #[automatically_derived]
             impl<'de> #impl_generics _serde::Deserialize<'de> for #ident #type_generics #where_clause {
-                fn deserialize<__D>(deserializer: __D) -> _serde::__private::Result<Self, __D::Error>
+                fn deserialize<__D>(deserializer: __D) -> core::result::Result<Self, __D::Error>
                 where
                     __D: _serde::Deserializer<'de>,
                 {

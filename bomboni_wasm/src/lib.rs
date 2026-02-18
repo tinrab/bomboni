@@ -1,13 +1,27 @@
+#![doc = include_str!("../README.md")]
+
 use wasm_bindgen::prelude::*;
 
+/// Console logging and debugging utilities.
 pub mod macros;
 
 const JSON_SERIALIZER: serde_wasm_bindgen::Serializer =
     serde_wasm_bindgen::Serializer::json_compatible();
 
+/// Trait for converting between Rust types and JavaScript values.
+///
+/// This trait provides automatic serialization and deserialization
+/// between Rust types and their JavaScript representations using
+/// `serde-wasm-bindgen`.
 pub trait Wasm {
+    /// The JavaScript type this converts to.
     type JsType: JsCast;
 
+    /// Converts this value to a JavaScript value.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`serde_wasm_bindgen::Error`] if serialization fails.
     fn to_js(&self) -> Result<Self::JsType, serde_wasm_bindgen::Error>
     where
         Self: serde::Serialize,
@@ -16,6 +30,11 @@ pub trait Wasm {
             .map(JsCast::unchecked_from_js)
     }
 
+    /// Converts a JavaScript value to this Rust type.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`serde_wasm_bindgen::Error`] if deserialization fails.
     fn from_js<T: Into<JsValue>>(js: T) -> Result<Self, serde_wasm_bindgen::Error>
     where
         Self: serde::de::DeserializeOwned,
@@ -43,6 +62,7 @@ mod tests {
     #[test]
     fn structs() {
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         pub struct Simple {
             a: String,
             b: i32,
@@ -59,7 +79,7 @@ mod tests {
     #[test]
     fn renames() {
         #[derive(Serialize, Deserialize, Wasm)]
-        #[wasm(rename_all = "camelCase")]
+        #[wasm(bomboni_wasm_crate = "crate", rename_all = "camelCase")]
         struct Item {
             test_name: String,
             #[wasm(rename = "x")]
@@ -75,12 +95,14 @@ mod tests {
     #[test]
     fn enums() {
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         pub enum ExternalTag {
             String(String),
             Number(f64),
         }
 
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         #[serde(tag = "kind", content = "data")]
         pub enum AdjacentTag {
             String(String),
@@ -88,6 +110,7 @@ mod tests {
         }
 
         #[derive(Serialize, Deserialize, Wasm)]
+        #[wasm(bomboni_wasm_crate = "crate")]
         #[serde(tag = "kind")]
         pub enum InternalTag {
             String { value: String },

@@ -1,73 +1,154 @@
+#![allow(clippy::needless_continue)]
+
 use std::collections::BTreeMap;
 
 use convert_case::Boundary;
-use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta, FromVariant};
+use darling::{FromDeriveInput, FromField, FromMeta, FromVariant, ast::Fields};
 use proc_macro2::Ident;
 use serde_derive_internals::{
+    Ctxt,
     ast::{self, Container as SerdeContainer},
-    attr, Ctxt,
+    attr,
 };
 use syn::{self, DeriveInput, Generics, Member, Path};
 
 use crate::ts_type::TsType;
 
+/// Configuration options for the Wasm derive macro.
 pub struct WasmOptions<'a> {
+    /// The serde container information from the input type.
     pub serde_container: SerdeContainer<'a>,
+
+    /// Custom path to the wasm-bindgen crate.
     pub wasm_bindgen_crate: Option<Path>,
+
+    /// Custom path to the js-sys crate.
     pub js_sys_crate: Option<Path>,
+
+    /// Custom path to the bomboni crate.
     pub bomboni_crate: Option<Path>,
+
+    /// Custom path to the `bomboni_wasm` crate.
     pub bomboni_wasm_crate: Option<Path>,
+
+    /// Generate `IntoWasmAbi` implementation.
     pub into_wasm_abi: bool,
+
+    /// Generate `FromWasmAbi` implementation.
     pub from_wasm_abi: bool,
+
+    /// Generate enum value object.
     pub enum_value: bool,
+
+    /// Custom `JsValue` conversion configuration.
     pub js_value: Option<JsValueWasm>,
+
+    /// Proxy type configuration.
     pub proxy: Option<ProxyWasm>,
+
+    /// Reference type mapping configuration.
     pub reference_change: ReferenceChangeMap,
+
+    /// Custom name for the type in TypeScript.
     pub rename: Option<String>,
+
+    /// Control wrapper type renaming.
     pub rename_wrapper: Option<bool>,
+
+    /// Rename rule for all fields and variants.
     pub rename_all: Option<attr::RenameRule>,
+
+    /// Word boundaries for renaming.
     pub rename_boundary: Vec<Boundary>,
+
+    /// Override the generated TypeScript type.
     pub override_type: Option<String>,
+
+    /// Field-specific WASM options.
     pub fields: Vec<FieldWasm>,
+
+    /// Variant-specific WASM options.
     pub variants: Vec<VariantWasm>,
 }
 
+/// WASM options for a struct field.
 pub struct FieldWasm {
+    /// The field member (name or index).
     pub member: Member,
+
+    /// Whether the field is optional.
     pub optional: bool,
+
+    /// Reference type mapping for this field.
     pub reference_change: ReferenceChangeMap,
+
+    /// Override the TypeScript type for this field.
     pub override_type: Option<String>,
+
+    /// Control wrapper type renaming for this field.
     pub rename_wrapper: Option<bool>,
+
+    /// Force the field to always be present in TypeScript.
     pub always_some: Option<bool>,
+
+    /// Custom name for the field in TypeScript.
     pub rename: Option<String>,
 }
 
+/// WASM options for an enum variant.
 pub struct VariantWasm {
+    /// The identifier of the variant.
     pub ident: Ident,
+
+    /// Reference type mapping for this variant.
     pub reference_change: ReferenceChangeMap,
+
+    /// Override the TypeScript type for this variant.
     pub override_type: Option<String>,
+
+    /// Control wrapper type renaming for this variant.
     pub rename_wrapper: Option<bool>,
+
+    /// Field-specific WASM options for this variant's fields.
     pub fields: Vec<FieldWasm>,
+
+    /// Custom name for the variant in TypeScript.
     pub rename: Option<String>,
 }
 
+/// Maps Rust reference types to TypeScript types.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceChangeMap {
+    /// Simple name mapping for the reference type.
     pub name: Option<String>,
+
+    /// Complex type mappings for multiple reference types.
     pub types: BTreeMap<String, TsType>,
 }
 
+/// Configuration for custom `JsValue` conversions.
 #[derive(Debug)]
 pub struct JsValueWasm {
+    /// Custom conversion function from Rust type to `JsValue`.
     pub into: Option<Path>,
+
+    /// Custom conversion function from `JsValue` to Rust type.
     pub try_from: Option<Path>,
+
+    /// Convert the type to/from JavaScript strings.
     pub convert_string: bool,
 }
 
+/// Configuration for proxy type WASM bindings.
 #[derive(Debug)]
 pub struct ProxyWasm {
+    /// The proxy type to use for WASM bindings.
     pub proxy: Path,
+
+    /// Custom conversion function from original type to proxy type.
     pub into: Option<Path>,
+
+    /// Custom conversion function from proxy type to original type.
     pub try_from: Option<Path>,
 }
 
@@ -119,6 +200,12 @@ struct VariantAttributes {
 }
 
 impl<'a> WasmOptions<'a> {
+    /// Creates `WasmOptions` from a `DeriveInput`.
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if the input is not a valid struct or enum for WASM,
+    /// if serde attributes are invalid, or if incompatible attribute combinations are used.
     pub fn from_derive_input(input: &'a DeriveInput) -> syn::Result<Self> {
         let ctx = Ctxt::new();
         let serde_container = match SerdeContainer::from_ast(
@@ -168,11 +255,12 @@ impl<'a> WasmOptions<'a> {
         } else {
             None
         };
-        let rename_boundary = if let Some(rename_boundary) = attributes.rename_boundary.as_ref() {
-            Boundary::list_from(rename_boundary)
-        } else {
-            Vec::new()
-        };
+        let rename_boundary = attributes
+            .rename_boundary
+            .as_ref()
+            .map_or_else(Vec::new, |rename_boundary| {
+                Boundary::defaults_from(rename_boundary)
+            });
 
         if attributes.enum_value.unwrap_or_default()
             && (attributes.js_value.is_some() || attributes.proxy.is_some())
@@ -226,10 +314,12 @@ impl<'a> WasmOptions<'a> {
         })
     }
 
-    pub fn ident(&self) -> &Ident {
+    /// Gets the identifier of the type.
+    pub const fn ident(&self) -> &Ident {
         &self.serde_container.ident
     }
 
+    /// Gets the name of the type.
     pub fn name(&self) -> &str {
         self.rename.as_ref().map_or_else(
             || self.serde_attrs().name().serialize_name(),
@@ -237,15 +327,18 @@ impl<'a> WasmOptions<'a> {
         )
     }
 
-    pub fn serde_data(&self) -> &ast::Data {
+    /// Gets the serde data for the type.
+    pub const fn serde_data(&self) -> &ast::Data<'_> {
         &self.serde_container.data
     }
 
-    pub fn generics(&self) -> &Generics {
+    /// Gets the generic parameters for the type.
+    pub const fn generics(&self) -> &Generics {
         self.serde_container.generics
     }
 
-    pub fn serde_attrs(&self) -> &attr::Container {
+    /// Gets the serde attributes for the type.
+    pub const fn serde_attrs(&self) -> &attr::Container {
         &self.serde_container.attrs
     }
 }

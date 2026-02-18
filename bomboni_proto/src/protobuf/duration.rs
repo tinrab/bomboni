@@ -1,5 +1,3 @@
-use crate::google::protobuf::Duration;
-use crate::serde::helpers as serde_helpers;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{self, Display, Formatter},
@@ -8,6 +6,10 @@ use std::{
 };
 use thiserror::Error;
 use time::Duration as TimeDuration;
+
+use crate::serde::helpers as serde_helpers;
+
+use crate::google::protobuf::Duration;
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum DurationError {
@@ -20,6 +22,7 @@ pub enum DurationError {
 }
 
 impl Duration {
+    /// Creates a new `Duration` with the given seconds and nanoseconds.
     #[must_use]
     pub const fn new(seconds: i64, nanos: i32) -> Self {
         Self { seconds, nanos }

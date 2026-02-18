@@ -10,28 +10,44 @@ use crate::{
     schema::{Schema, SchemaMapped},
 };
 
+/// Ordering error types.
 pub mod error;
 
+/// Query ordering specification.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Ordering(Vec<OrderingTerm>);
 
+/// Ordering term.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderingTerm {
+    /// Field name.
     pub name: String,
+    /// Sort direction.
     pub direction: OrderingDirection,
 }
 
+/// Sort direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrderingDirection {
+    /// Ascending order.
     Ascending,
+    /// Descending order.
     Descending,
 }
 
 impl Ordering {
-    pub fn new(terms: Vec<OrderingTerm>) -> Self {
+    /// Creates a new ordering.
+    pub const fn new(terms: Vec<OrderingTerm>) -> Self {
         Self(terms)
     }
 
+    /// Parses an ordering string.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`OrderingError::InvalidTermFormat`] if ordering term format is invalid.
+    /// Will return [`OrderingError::DuplicateField`] if the same field appears multiple times.
+    /// Will return [`OrderingError::InvalidDirection`] if ordering direction is invalid.
     pub fn parse(source: &str) -> OrderingResult<Self> {
         let mut terms = Vec::new();
         let mut term_names = BTreeSet::<&str>::new();
@@ -75,6 +91,7 @@ impl Ordering {
         Ok(Self(terms))
     }
 
+    /// Evaluates ordering between two items.
     pub fn evaluate<T>(&self, lhs: &T, rhs: &T) -> Option<cmp::Ordering>
     where
         T: SchemaMapped,
@@ -101,6 +118,12 @@ impl Ordering {
         Some(cmp::Ordering::Equal)
     }
 
+    /// Validates the ordering against a schema.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`OrderingError::UnknownMember`] if the ordering contains an unknown field name.
+    /// Will return [`OrderingError::UnorderedField`] if the ordering contains a field that cannot be ordered.
     pub fn validate(&self, schema: &Schema) -> OrderingResult<()> {
         for term in self.iter() {
             let field_schema = schema

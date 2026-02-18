@@ -1,5 +1,9 @@
+#![doc = include_str!("../README.md")]
+
 mod protobuf;
-pub mod rpc;
+mod rpc;
+
+/// Serde integration for protobuf types.
 pub mod serde;
 
 /// Includes generated protobuf code.
@@ -22,15 +26,26 @@ macro_rules! include_file_descriptor_set {
     };
 }
 
-#[allow(unused_qualifications, clippy::all, clippy::pedantic)]
+#[allow(
+    unused_qualifications,
+    missing_docs,
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::invalid_html_tags
+)]
+/// Generated Google protobuf and RPC types.
 pub mod google {
+    /// Generated Google protobuf message types.
+    #[allow(rustdoc::broken_intra_doc_links, rustdoc::invalid_html_tags)]
     pub mod protobuf {
-        pub use super::super::protobuf::*;
         crate::include_proto!("google.protobuf");
         crate::include_proto!("google.protobuf.plus");
     }
+    /// Generated Google RPC status and error types.
+    #[allow(rustdoc::broken_intra_doc_links, rustdoc::invalid_html_tags)]
     pub mod rpc {
-        pub use super::super::rpc::*;
         crate::include_proto!("google.rpc");
         crate::include_proto!("google.rpc.plus");
     }
@@ -38,13 +53,17 @@ pub mod google {
 
 #[cfg(test)]
 mod tests {
-    use google::protobuf::Timestamp;
+    use google::rpc::BadRequest;
     use prost::Name;
 
     use super::*;
 
     #[test]
     fn it_works() {
-        println!("{}", Timestamp::type_url());
+        assert_eq!(
+            BadRequest::type_url(),
+            "type.googleapis.com/google.rpc.BadRequest"
+        );
+        assert_eq!(BadRequest::FIELD_VIOLATIONS_FIELD_NAME, "field_violations");
     }
 }

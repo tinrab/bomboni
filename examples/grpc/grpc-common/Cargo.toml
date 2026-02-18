@@ -1,0 +1,31 @@
+[package]
+name = "grpc_common"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[lib]
+name = "grpc_common"
+path = "src/lib.rs"
+
+[dependencies]
+bomboni = { path = "../../../", features = ["request", "proto"] }
+bomboni_common = { path = "../../../bomboni_common" }
+bomboni_proto = { path = "../../../bomboni_proto" }
+bomboni_prost = { path = "../../../bomboni_prost" }
+bomboni_request = { path = "../../../bomboni_request", features = ["derive"] }
+
+http.workspace = true
+tonic.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+prost.workspace = true
+jsonwebtoken.workspace = true
+cookie.workspace = true
+tracing.workspace = true
+time.workspace = true
+
+[build-dependencies]
+bomboni_prost = { path = "../../../bomboni_prost" }
+tonic-prost-build.workspace = true
+prost-build.workspace = true

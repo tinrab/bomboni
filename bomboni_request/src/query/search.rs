@@ -8,21 +8,26 @@ use crate::{
     query::{
         error::{QueryError, QueryResult},
         page_token::{
-            aes256::Aes256PageTokenBuilder, base64::Base64PageTokenBuilder,
-            plain::PlainPageTokenBuilder, rsa::RsaPageTokenBuilder, FilterPageToken,
-            PageTokenBuilder,
+            FilterPageToken, PageTokenBuilder, aes256::Aes256PageTokenBuilder,
+            base64::Base64PageTokenBuilder, plain::PlainPageTokenBuilder, rsa::RsaPageTokenBuilder,
         },
         utility::{parse_query_filter, parse_query_ordering},
     },
     schema::{FunctionSchemaMap, Schema, SchemaMapped},
 };
 
+/// Represents a search query.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchQuery<T = FilterPageToken> {
+    /// Search query string.
     pub query: String,
+    /// Page size.
     pub page_size: i32,
+    /// Page token.
     pub page_token: Option<T>,
+    /// Filter.
     pub filter: Filter,
+    /// Ordering.
     pub ordering: Ordering,
 }
 
@@ -31,14 +36,21 @@ pub struct SearchQuery<T = FilterPageToken> {
 /// `primary_ordering_term` should probably never be `None`.
 #[derive(Debug, Clone)]
 pub struct SearchQueryConfig {
+    /// Maximum query length.
     pub max_query_length: Option<usize>,
+    /// Maximum page size.
     pub max_page_size: Option<i32>,
+    /// Default page size.
     pub default_page_size: i32,
+    /// Primary ordering term.
     pub primary_ordering_term: Option<OrderingTerm>,
+    /// Maximum filter length.
     pub max_filter_length: Option<usize>,
+    /// Maximum ordering length.
     pub max_ordering_length: Option<usize>,
 }
 
+/// Builder for search queries.
 #[derive(Debug, Clone)]
 pub struct SearchQueryBuilder<P: PageTokenBuilder> {
     schema: Schema,
@@ -47,12 +59,17 @@ pub struct SearchQueryBuilder<P: PageTokenBuilder> {
     page_token_builder: P,
 }
 
+/// Plain search query builder.
 pub type PlainSearchQueryBuilder = SearchQueryBuilder<PlainPageTokenBuilder>;
+/// AES256 search query builder.
 pub type Aes256SearchQueryBuilder = SearchQueryBuilder<Aes256PageTokenBuilder>;
+/// Base64 search query builder.
 pub type Base64SearchQueryBuilder = SearchQueryBuilder<Base64PageTokenBuilder>;
+/// RSA search query builder.
 pub type RsaSearchQueryBuilder = SearchQueryBuilder<RsaPageTokenBuilder>;
 
 impl SearchQuery {
+    /// Creates salt for page token.
     pub fn make_salt(query: &str, page_size: i32) -> Vec<u8> {
         let mut salt = page_size.to_be_bytes().to_vec();
         salt.extend(query.as_bytes());
@@ -74,7 +91,8 @@ impl Default for SearchQueryConfig {
 }
 
 impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
-    pub fn new(
+    /// Creates a new search query builder.
+    pub const fn new(
         schema: Schema,
         schema_functions: FunctionSchemaMap,
         options: SearchQueryConfig,
@@ -88,6 +106,17 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
         }
     }
 
+    /// Builds a search query.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`QueryError::QueryTooLong`] if query exceeds maximum length.
+    /// Will return [`QueryError::FilterTooLong`] if filter exceeds maximum length.
+    /// Will return [`QueryError::FilterError`] if filter cannot be parsed or validated.
+    /// Will return [`QueryError::OrderingTooLong`] if ordering exceeds maximum length.
+    /// Will return [`QueryError::OrderingError`] if ordering cannot be parsed or validated.
+    /// Will return [`QueryError::InvalidPageSize`] if page size is negative.
+    /// Will return page token parsing errors from the underlying page token builder.
     pub fn build(
         &self,
         query: &str,
@@ -111,13 +140,12 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
 
         // Pre-insert primary ordering term.
         // This is needed for page tokens to work.
-        if let Some(primary_ordering_term) = self.options.primary_ordering_term.as_ref() {
-            if ordering
+        if let Some(primary_ordering_term) = self.options.primary_ordering_term.as_ref()
+            && ordering
                 .iter()
                 .all(|term| term.name != primary_ordering_term.name)
-            {
-                ordering.insert(0, primary_ordering_term.clone());
-            }
+        {
+            ordering.insert(0, primary_ordering_term.clone());
         }
 
         // Handle paging.
@@ -153,6 +181,11 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
         })
     }
 
+    /// Builds the next page token from the given query and next item.
+    ///
+    /// # Errors
+    ///
+    /// Will return page token building errors from the underlying page token builder.
     pub fn build_next_page_token<T: SchemaMapped>(
         &self,
         query: &SearchQuery<P::PageToken>,
@@ -166,7 +199,8 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
         )
     }
 
-    pub fn page_token_builder(&self) -> &P {
+    /// Gets the page token builder.
+    pub const fn page_token_builder(&self) -> &P {
         &self.page_token_builder
     }
 }
@@ -175,7 +209,7 @@ impl<P: PageTokenBuilder> SearchQueryBuilder<P> {
 mod tests {
     use crate::{
         filter::error::FilterError,
-        ordering::{error::OrderingError, OrderingDirection},
+        ordering::{OrderingDirection, error::OrderingError},
         query::page_token::plain::PlainPageTokenBuilder,
         testing::schema::UserItem,
     };

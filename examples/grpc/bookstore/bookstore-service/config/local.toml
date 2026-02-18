@@ -1,0 +1,4 @@
+[auth]
+kind = "Jwt"
+secret = "test_secret_key"
+validate_expiration = false

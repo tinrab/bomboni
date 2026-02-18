@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+use postgres_types::{FromSql, IsNull, ToSql, Type, accepts, to_sql_checked};
 
 use crate::id::Id;
 

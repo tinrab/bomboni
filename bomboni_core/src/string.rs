@@ -1,6 +1,7 @@
 pub use convert_case::Case;
 use convert_case::{Boundary, Casing};
 
+/// Converts a string to the specified case.
 pub fn str_to_case<S: AsRef<str>>(s: S, case: Case) -> String {
     static BOUNDARIES: &[Boundary] = &[
         Boundary::Underscore,

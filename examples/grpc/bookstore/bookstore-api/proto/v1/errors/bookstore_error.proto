@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package bookstore.v1.errors;
+
+import "common/error.proto";
+import "v1/errors/book_error.proto";
+import "v1/errors/author_error.proto";
+
+option go_package = "github.com/tinrab/bomboni/bookstore/v1/errors;errors";
+option java_multiple_files = true;
+option java_outer_classname = "BookstoreErrorProto";
+option java_package = "com.tinrab.bookstore.v1.errors";
+
+message BookstoreErrorReason {
+  oneof error_reason {
+    common.CommonError.CommonErrorReason common = 1;
+    BookError.BookErrorReason book = 2;
+    AuthorError.AuthorErrorReason author = 3;
+  }
+}
+
+message BookstoreError {
+  BookstoreErrorReason reason = 1;
+}

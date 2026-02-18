@@ -10,33 +10,54 @@ mod ordering;
 mod query;
 pub(crate) mod utility;
 
+/// SQL dialect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SqlDialect {
+    /// `PostgreSQL` dialect.
     Postgres,
+    /// `MySQL` dialect.
     MySql,
 }
 
+/// SQL argument style.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SqlArgumentStyle {
-    Indexed { prefix: String },
-    Positional { symbol: String },
+    /// Indexed arguments with prefix.
+    Indexed {
+        /// Argument prefix.
+        prefix: String,
+    },
+    /// Positional arguments with symbol.
+    Positional {
+        /// Argument symbol.
+        symbol: String,
+    },
 }
 
+/// SQL rename map for members and functions.
 #[derive(Debug, Clone, Default)]
 pub struct SqlRenameMap {
+    /// Member rename map.
     pub members: BTreeMap<String, String>,
+    /// Function rename map.
     pub functions: BTreeMap<String, String>,
 }
 
 impl SqlRenameMap {
-    pub fn new(members: BTreeMap<String, String>, functions: BTreeMap<String, String>) -> Self {
+    /// Creates a new SQL rename map.
+    pub const fn new(
+        members: BTreeMap<String, String>,
+        functions: BTreeMap<String, String>,
+    ) -> Self {
         Self { members, functions }
     }
 
+    /// Renames a member.
     pub fn rename_member(&self, name: &str) -> String {
         Self::rename(&self.members, name)
     }
 
+    /// Renames a function.
     pub fn rename_function(&self, name: &str) -> String {
         Self::rename(&self.functions, name)
     }

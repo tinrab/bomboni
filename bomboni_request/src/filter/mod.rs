@@ -9,14 +9,15 @@ use std::fmt::{Display, Formatter, Write};
 
 use itertools::Itertools;
 use parser::{FilterParser, Rule};
-use pest::iterators::Pair;
 use pest::Parser;
+use pest::iterators::Pair;
 
 use crate::filter::error::FilterError;
 use crate::schema::{FunctionSchemaMap, MemberSchema, Schema, SchemaMapped, ValueType};
 use crate::value::Value;
 use error::FilterResult;
 
+/// Filter error types.
 pub mod error;
 
 #[allow(clippy::upper_case_acronyms)]
@@ -28,30 +29,56 @@ pub(crate) mod parser {
     pub struct FilterParser;
 }
 
+/// Filter expression.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Filter {
-    Conjunction(Vec<Filter>),
-    Disjunction(Vec<Filter>),
-    Negate(Box<Filter>),
-    Restriction(Box<Filter>, FilterComparator, Box<Filter>),
-    Function(String, Vec<Filter>),
-    Composite(Box<Filter>),
+    /// Logical AND of filters.
+    Conjunction(Vec<Self>),
+    /// Logical OR of filters.
+    Disjunction(Vec<Self>),
+    /// Logical NOT of a filter.
+    Negate(Box<Self>),
+    /// Comparison filter.
+    Restriction(Box<Self>, FilterComparator, Box<Self>),
+    /// Function call filter.
+    Function(String, Vec<Self>),
+    /// Composite filter.
+    Composite(Box<Self>),
+    /// Field name.
     Name(String),
+    /// Literal value.
     Value(Value),
 }
 
+/// Filter comparison operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterComparator {
+    /// Less than.
     Less,
+    /// Less than or equal.
     LessOrEqual,
+    /// Greater than.
     Greater,
+    /// Greater than or equal.
     GreaterOrEqual,
+    /// Equal.
     Equal,
+    /// Not equal.
     NotEqual,
+    /// Has operator.
     Has,
 }
 
 impl Filter {
+    /// Parses a filter from a source string.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`FilterError::Parse`] if the source string cannot be parsed as a valid filter.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if parsing fails to return a valid filter tree.
     pub fn parse(source: &str) -> FilterResult<Self> {
         let filter = FilterParser::parse(Rule::Filter, source)?.next().unwrap();
         Self::parse_tree(filter)
@@ -143,23 +170,25 @@ impl Filter {
         }
     }
 
+    /// Returns the length of the filter.
     pub fn len(&self) -> usize {
         match self {
             Self::Conjunction(parts) | Self::Disjunction(parts) => {
-                parts.iter().map(Filter::len).sum::<usize>()
+                parts.iter().map(Self::len).sum::<usize>()
             }
             Self::Negate(tree) => 1usize + tree.as_ref().len(),
             Self::Restriction(comparable, _, arg) => {
                 1usize + comparable.as_ref().len() + arg.as_ref().len()
             }
             Self::Function(tree, arguments) => {
-                1usize + tree.len() + arguments.iter().map(Filter::len).sum::<usize>()
+                1usize + tree.len() + arguments.iter().map(Self::len).sum::<usize>()
             }
             Self::Composite(composite) => 1usize + composite.as_ref().len(),
             _ => 1usize,
         }
     }
 
+    /// Evaluates the filter against an item.
     pub fn evaluate<T>(&self, item: &T) -> Option<Value>
     where
         T: SchemaMapped,
@@ -302,35 +331,36 @@ impl Filter {
                                 None
                             }
                         }
-                        FilterComparator::Has => {
-                            if let Some(b) = arg.evaluate(item) {
-                                Some(a.contains(&b).into())
-                            } else if let Self::Composite(composite) = &**arg {
-                                match composite.as_ref() {
-                                    Self::Conjunction(parts) => Some(Value::Boolean(
-                                        parts.iter().map(|part| part.evaluate(item)).all(|value| {
-                                            if let Some(value) = value.as_ref() {
-                                                a.contains(value)
-                                            } else {
-                                                false
-                                            }
-                                        }),
-                                    )),
-                                    Self::Disjunction(parts) => Some(Value::Boolean(
-                                        parts.iter().map(|part| part.evaluate(item)).any(|value| {
-                                            if let Some(value) = value.as_ref() {
-                                                a.contains(value)
-                                            } else {
-                                                false
-                                            }
-                                        }),
-                                    )),
-                                    _ => None,
+                        FilterComparator::Has => arg.evaluate(item).map_or_else(
+                            || {
+                                if let Self::Composite(composite) = &**arg {
+                                    match composite.as_ref() {
+                                        Self::Conjunction(parts) => Some(Value::Boolean(
+                                            parts.iter().map(|part| part.evaluate(item)).all(
+                                                |value| {
+                                                    value
+                                                        .as_ref()
+                                                        .is_some_and(|value| a.contains(value))
+                                                },
+                                            ),
+                                        )),
+                                        Self::Disjunction(parts) => Some(Value::Boolean(
+                                            parts.iter().map(|part| part.evaluate(item)).any(
+                                                |value| {
+                                                    value
+                                                        .as_ref()
+                                                        .is_some_and(|value| a.contains(value))
+                                                },
+                                            ),
+                                        )),
+                                        _ => None,
+                                    }
+                                } else {
+                                    None
                                 }
-                            } else {
-                                None
-                            }
-                        }
+                            },
+                            |b| Some(a.contains(&b).into()),
+                        ),
                         _ => None,
                     },
                     Value::Any => Some(Value::Boolean(true)),
@@ -343,6 +373,13 @@ impl Filter {
         }
     }
 
+    /// Gets the result value type for the filter.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`FilterError::UnknownFunction`] if the filter contains an unknown function name.
+    /// Will return [`FilterError::UnknownMember`] if the filter contains an unknown field name.
+    /// Will return [`FilterError::InvalidResultValueType`] if the filter value type cannot be determined.
     pub fn get_result_value_type(
         &self,
         schema: &Schema,
@@ -374,6 +411,15 @@ impl Filter {
         }
     }
 
+    /// Validates filter against schema.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`FilterError::InvalidType`] if filter parts have incompatible types.
+    /// Will return [`FilterError::UnknownFunction`] if the filter contains an unknown function name.
+    /// Will return [`FilterError::FunctionInvalidArgumentCount`] if function argument count doesn't match schema.
+    /// Will return [`FilterError::UnknownMember`] if the filter contains an unknown field name.
+    /// Will return [`FilterError::UnsuitableComparator`] if an unsuitable comparator is used.
     pub fn validate(
         &self,
         schema: &Schema,
@@ -461,10 +507,12 @@ impl Filter {
         Ok(())
     }
 
+    /// Checks if the filter is empty.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Adds a conjunction to the filter.
     pub fn add_conjunction(&mut self, other: Self) {
         match self {
             Self::Conjunction(filters) => {
@@ -476,6 +524,7 @@ impl Filter {
         }
     }
 
+    /// Adds a disjunction to the filter.
     pub fn add_disjunction(&mut self, other: Self) {
         match self {
             Self::Disjunction(filters) => {

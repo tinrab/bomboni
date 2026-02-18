@@ -2,6 +2,11 @@ use handlebars::{Helper, RenderErrorReason};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+/// Gets a required parameter from a helper.
+///
+/// # Errors
+///
+/// Will return [`RenderErrorReason`] if the parameter is not found or cannot be parsed.
 pub fn get_param<T: DeserializeOwned>(
     h: &Helper,
     index: usize,
@@ -17,6 +22,11 @@ pub fn get_param<T: DeserializeOwned>(
     })
 }
 
+/// Gets an optional parameter from a helper.
+///
+/// # Errors
+///
+/// Will return [`RenderErrorReason`] if the parameter cannot be parsed.
 pub fn get_param_opt<T: DeserializeOwned>(
     h: &Helper,
     index: usize,
@@ -37,6 +47,11 @@ pub fn get_param_opt<T: DeserializeOwned>(
     }
 }
 
+/// Gets a required hash parameter from a helper.
+///
+/// # Errors
+///
+/// Will return [`RenderErrorReason`] if the hash parameter is not found or cannot be parsed.
 pub fn get_hash<T: DeserializeOwned>(h: &Helper, name: &str) -> Result<T, RenderErrorReason> {
     get_hash_opt(h, name)?.ok_or_else(|| {
         RenderErrorReason::Other(format!(
@@ -47,6 +62,11 @@ pub fn get_hash<T: DeserializeOwned>(h: &Helper, name: &str) -> Result<T, Render
     })
 }
 
+/// Gets an optional hash parameter from a helper.
+///
+/// # Errors
+///
+/// Will return [`RenderErrorReason`] if hash parameter cannot be parsed.
 pub fn get_hash_opt<T: DeserializeOwned>(
     h: &Helper,
     name: &str,
@@ -65,6 +85,11 @@ pub fn get_hash_opt<T: DeserializeOwned>(
     }
 }
 
+/// Gets a parameter value from a helper.
+///
+/// # Errors
+///
+/// Will return [`RenderErrorReason`] if the parameter is not found.
 pub fn get_param_value<'a>(
     h: &'a Helper,
     index: usize,
@@ -80,6 +105,7 @@ pub fn get_param_value<'a>(
     })
 }
 
+/// Gets an optional parameter value from a helper.
 #[must_use]
 pub fn get_param_value_opt<'a>(h: &'a Helper, index: usize) -> Option<&'a Value> {
     h.param(index).map(handlebars::PathAndJson::value)

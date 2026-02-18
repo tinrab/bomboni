@@ -39,24 +39,35 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 fn expand_usage(options: &ParseOptions) -> TokenStream {
     let mut result = quote!();
 
-    result.extend(if let Some(path) = options.serde_crate.as_ref() {
-        quote! {
-            use #path as _serde;
-        }
-    } else {
-        quote! {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate serde as _serde;
-        }
-    });
+    result.extend(options.serde_crate.as_ref().map_or_else(
+        || {
+            quote! {
+                #[allow(unused_extern_crates, clippy::useless_attribute)]
+                extern crate serde as _serde;
+            }
+        },
+        |path| {
+            quote! {
+                use #path as _serde;
+            }
+        },
+    ));
 
-    let (mut use_proto, mut use_request) = if let Some(path) = options.bomboni_crate.as_ref() {
-        (quote!(#path::proto), quote!(#path::request))
-    } else if cfg!(feature = "root-crate") {
-        (quote!(bomboni::proto), quote!(bomboni::request))
-    } else {
-        (quote!(bomboni_proto), quote!(bomboni_request))
-    };
+    let use_prost = options
+        .prost_crate
+        .as_ref()
+        .map_or_else(|| quote!(::prost::Name), |path| quote!(#path));
+
+    let (mut use_proto, mut use_request) = options.bomboni_crate.as_ref().map_or_else(
+        || {
+            if cfg!(feature = "root-crate") {
+                (quote!(bomboni::proto), quote!(bomboni::request))
+            } else {
+                (quote!(bomboni_proto), quote!(bomboni_request))
+            }
+        },
+        |path| (quote!(#path::proto), quote!(#path::request)),
+    );
 
     if let Some(path) = options.bomboni_proto_crate.as_ref() {
         use_proto = quote!(#path);
@@ -66,6 +77,7 @@ fn expand_usage(options: &ParseOptions) -> TokenStream {
     }
 
     result.extend(quote! {
+        use #use_prost;
         use #use_proto::google::protobuf::{
             BoolValue, DoubleValue, FloatValue, Int32Value, Int64Value, StringValue, Timestamp,
             UInt32Value, UInt64Value,

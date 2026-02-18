@@ -1,12 +1,19 @@
-use crate::google::protobuf::Any;
 use prost::{DecodeError, EncodeError, Message, Name};
 
+use crate::google::protobuf::Any;
+
 impl Any {
-    pub fn new(type_url: String, value: Vec<u8>) -> Self {
+    /// Creates a new `Any` message with the given type URL and value.
+    pub const fn new(type_url: String, value: Vec<u8>) -> Self {
         Self { type_url, value }
     }
 
-    pub fn pack_from<T>(message: &T) -> Result<Self, EncodeError>
+    /// Converts a protobuf message to an `Any` message.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`EncodeError`] if the message fails to encode.
+    pub fn from_msg<T>(message: &T) -> Result<Self, EncodeError>
     where
         T: Name,
     {
@@ -16,21 +23,27 @@ impl Any {
         Ok(Self { type_url, value })
     }
 
-    pub fn unpack_into<T>(self) -> Result<T, DecodeError>
+    /// Converts an `Any` message back to the original protobuf message.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`DecodeError`] if the type URL doesn't match or decoding fails.
+    pub fn to_msg<T>(self) -> Result<T, DecodeError>
     where
         T: Default + Name,
     {
         let expected_type_url = T::type_url();
         if expected_type_url != self.type_url {
-            return Err(DecodeError::new(format!(
-                "expected type URL `{}`, but got `{}`",
-                expected_type_url, &self.type_url
-            )));
+            return Err(DecodeError::new_unexpected_type_url(
+                &self.type_url,
+                expected_type_url,
+            ));
         }
         T::decode(&*self.value)
     }
 }
 
+/// Implements `TryFrom` conversions between protobuf messages and `Any` type.
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_convert {
     ($($message:ty),* $(,)?) => {
@@ -39,7 +52,7 @@ macro_rules! impl_proto_any_convert {
             type Error = ::prost::EncodeError;
 
             fn try_from(value: $message) -> Result<Self, Self::Error> {
-                $crate::google::protobuf::Any::pack_from(&value)
+                $crate::google::protobuf::Any::from_msg(&value)
             }
         }
 
@@ -47,13 +60,14 @@ macro_rules! impl_proto_any_convert {
             type Error = ::prost::DecodeError;
 
             fn try_from(value: $crate::google::protobuf::Any) -> Result<Self, Self::Error> {
-                value.unpack_into()
+                value.to_msg()
             }
         }
     )*
     };
 }
 
+/// Implements serde serialization/deserialization for `Any` types.
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_serde {
     ([$($message:ty),* $(,)?]) => {
@@ -87,7 +101,7 @@ macro_rules! impl_proto_any_serde {
             //         <$message>::TYPE_URL => {
             //             Proxy {
             //                 type_url: <$message>::TYPE_URL.into(),
-            //                 message: value.clone().unpack_into::<$message>().unwrap(),
+            //                 message: value.clone().to_msg::<$message>().unwrap(),
             //             }.serialize(serializer)
             //         }
             //     )*
@@ -100,7 +114,7 @@ macro_rules! impl_proto_any_serde {
                 if value.type_url == type_url {
                     return Proxy {
                         type_url,
-                        message: value.clone().unpack_into::<$message>().unwrap(),
+                        message: value.clone().to_msg::<$message>().unwrap(),
                     }.serialize(serializer);
                 }
             )*
@@ -169,7 +183,7 @@ macro_rules! impl_proto_any_serde {
                         .map_err(|err| {
                             Error::custom(::std::format!("failed to deserialize {}: {}", type_url, err))
                         })?;
-                    return $crate::google::protobuf::Any::pack_from(&message)
+                    return $crate::google::protobuf::Any::from_msg(&message)
                         .map_err(|err| {
                             Error::custom(::std::format!("failed to pack {}: {}", type_url, err))
                         });
@@ -181,6 +195,7 @@ macro_rules! impl_proto_any_serde {
     };
 }
 
+/// Implements serde serialization/deserialization for sequences of `Any` types.
 #[macro_export(local_inner_macros)]
 macro_rules! impl_proto_any_seq_serde {
     ($any_serde:ident) => {
@@ -191,7 +206,7 @@ macro_rules! impl_proto_any_seq_serde {
         where
             S: ::serde::Serializer,
         {
-            use ::serde::ser::SerializeSeq;
+            use serde::ser::SerializeSeq;
 
             struct Proxy<'a>(&'a $crate::google::protobuf::Any);
 
@@ -218,7 +233,7 @@ macro_rules! impl_proto_any_seq_serde {
         where
             D: ::serde::Deserializer<'de>,
         {
-            use ::serde::Deserialize;
+            use serde::Deserialize;
 
             struct Proxy($crate::google::protobuf::Any);
 
@@ -252,15 +267,15 @@ mod tests {
             domain: "domain".to_string(),
             metadata: BTreeMap::default(),
         };
-        let any = Any::pack_from(&msg).unwrap();
-        let decoded: ErrorInfo = any.unpack_into().unwrap();
+        let any = Any::from_msg(&msg).unwrap();
+        let decoded: ErrorInfo = any.to_msg().unwrap();
         assert_eq!(decoded, msg);
     }
 
     #[test]
     fn errors() {
-        let any = Any::pack_from(&ErrorInfo::default()).unwrap();
-        assert!(any.unpack_into::<RetryInfo>().is_err());
+        let any = Any::from_msg(&ErrorInfo::default()).unwrap();
+        assert!(any.to_msg::<RetryInfo>().is_err());
     }
 
     #[test]
@@ -277,7 +292,7 @@ mod tests {
         }
 
         let item = Item {
-            any: Any::pack_from(&ErrorInfo {
+            any: Any::from_msg(&ErrorInfo {
                 reason: "reason".to_string(),
                 domain: "domain".to_string(),
                 metadata: BTreeMap::default(),

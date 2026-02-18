@@ -4,9 +4,9 @@ use std::time::SystemTime;
 use thiserror::Error;
 use time::PrimitiveDateTime;
 use time::{
+    OffsetDateTime,
     convert::{Nanosecond, Second},
     format_description::well_known::Rfc3339,
-    OffsetDateTime,
 };
 
 #[cfg(feature = "mysql")]
@@ -44,23 +44,37 @@ mod postgres;
 )]
 pub struct UtcDateTime(OffsetDateTime);
 
+/// Errors that can occur when working with `UtcDateTime`.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum UtcDateTimeError {
+    /// Invalid nanoseconds value.
     #[error("invalid nanoseconds")]
     InvalidNanoseconds,
+    /// The datetime is not in UTC.
     #[error("not a UTC date time")]
     NotUtc,
+    /// Invalid date time string format.
     #[error("invalid date time string format `{0}`")]
     InvalidFormat(String),
+    /// Timestamp is out of valid range.
+    #[error("timestamp is out of range")]
+    OutOfRange,
 }
 
 impl UtcDateTime {
+    /// The Unix epoch (1970-01-01 00:00:00 UTC).
     pub const UNIX_EPOCH: Self = Self(OffsetDateTime::UNIX_EPOCH);
 
+    /// Returns the current UTC date and time.
+    #[must_use]
     pub fn now() -> Self {
         Self(OffsetDateTime::now_utc())
     }
 
+    /// Creates a new UTC date time from seconds and nanoseconds.
+    ///
+    /// If the timestamp is invalid, returns Unix epoch.
+    #[must_use]
     pub const fn new(seconds: i64, nanoseconds: i32) -> Self {
         match OffsetDateTime::from_unix_timestamp_nanos(
             (seconds as i128) * (Nanosecond::per(Second) as i128) + nanoseconds as i128,
@@ -70,6 +84,11 @@ impl UtcDateTime {
         }
     }
 
+    /// Creates a UTC date time from seconds and nanoseconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UtcDateTimeError::NotUtc` if the timestamp is not valid.
     pub fn from_timestamp(seconds: i64, nanoseconds: i32) -> Result<Self, UtcDateTimeError> {
         OffsetDateTime::from_unix_timestamp_nanos(
             (i128::from(seconds)) * i128::from(Nanosecond::per(Second)) + i128::from(nanoseconds),
@@ -78,30 +97,51 @@ impl UtcDateTime {
         .map_err(|_| UtcDateTimeError::NotUtc)
     }
 
-    pub fn from_seconds(seconds: i64) -> Result<Self, UtcDateTimeError> {
+    /// Creates a UTC date time from seconds since the Unix epoch.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UtcDateTimeError::NotUtc` if the timestamp is not valid.
+    pub const fn from_seconds(seconds: i64) -> Result<Self, UtcDateTimeError> {
         match OffsetDateTime::from_unix_timestamp(seconds) {
             Err(_) => Err(UtcDateTimeError::NotUtc),
             Ok(value) => Ok(Self(value)),
         }
     }
 
-    pub fn from_nanoseconds(nanoseconds: i128) -> Result<Self, UtcDateTimeError> {
+    /// Creates a UTC date time from nanoseconds since the Unix epoch.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UtcDateTimeError::NotUtc` if the timestamp is not valid.
+    pub const fn from_nanoseconds(nanoseconds: i128) -> Result<Self, UtcDateTimeError> {
         match OffsetDateTime::from_unix_timestamp_nanos(nanoseconds) {
             Err(_) => Err(UtcDateTimeError::NotUtc),
             Ok(value) => Ok(Self(value)),
         }
     }
 
-    pub fn timestamp(self) -> (i64, i32) {
+    /// Returns the timestamp as seconds and nanoseconds.
+    pub const fn timestamp(self) -> (i64, i32) {
         (self.0.unix_timestamp(), self.0.nanosecond() as i32)
     }
 
+    /// Parses an RFC 3339 formatted date time string.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UtcDateTimeError::InvalidFormat` if the string is not valid RFC 3339.
     pub fn parse_rfc3339<S: AsRef<str>>(input: S) -> Result<Self, UtcDateTimeError> {
         OffsetDateTime::parse(input.as_ref(), &Rfc3339)
             .map_err(|_| UtcDateTimeError::InvalidFormat(input.as_ref().into()))
             .map(Self)
     }
 
+    /// Formats the date time as an RFC 3339 string.
+    ///
+    /// # Errors
+    ///
+    /// Returns formatting error if the date time cannot be formatted.
     pub fn format_rfc3339(&self) -> Result<String, time::error::Format> {
         self.0.format(&Rfc3339)
     }
@@ -144,7 +184,7 @@ impl From<PrimitiveDateTime> for UtcDateTime {
 
 impl From<UtcDateTime> for PrimitiveDateTime {
     fn from(value: UtcDateTime) -> Self {
-        PrimitiveDateTime::new(value.0.date(), value.0.time())
+        Self::new(value.0.date(), value.0.time())
     }
 }
 
@@ -158,26 +198,29 @@ impl From<SystemTime> for UtcDateTime {
 const _: () = {
     use chrono::{DateTime, NaiveDateTime, Utc};
 
-    impl From<DateTime<Utc>> for UtcDateTime {
-        fn from(value: DateTime<Utc>) -> Self {
+    impl TryFrom<DateTime<Utc>> for UtcDateTime {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: DateTime<Utc>) -> Result<Self, Self::Error> {
             Self::from_timestamp(value.timestamp(), value.timestamp_subsec_nanos() as i32)
-                // Always valid UTC
-                .unwrap()
+                .map_err(|_| UtcDateTimeError::OutOfRange)
         }
     }
 
     impl From<UtcDateTime> for DateTime<Utc> {
         fn from(value: UtcDateTime) -> Self {
             let (seconds, nanoseconds) = value.timestamp();
-            DateTime::from_timestamp_nanos(
+            Self::from_timestamp_nanos(
                 seconds * i64::from(Nanosecond::per(Second)) + i64::from(nanoseconds),
             )
         }
     }
 
-    impl From<NaiveDateTime> for UtcDateTime {
-        fn from(value: NaiveDateTime) -> Self {
-            value.and_utc().into()
+    impl TryFrom<NaiveDateTime> for UtcDateTime {
+        type Error = UtcDateTimeError;
+
+        fn try_from(value: NaiveDateTime) -> Result<Self, Self::Error> {
+            Self::try_from(value.and_utc())
         }
     }
 
@@ -229,15 +272,15 @@ const _: () = {
     impl From<UtcDateTime> for JsValue {
         fn from(value: UtcDateTime) -> Self {
             let mut date = js_sys::Date::new_with_year_month_day_hr_min_sec(
-                value.year() as u32,
-                Into::<u8>::into(value.month()) as i32 - 1,
-                value.day() as i32,
-                value.hour() as i32 + 1,
-                value.minute() as i32,
-                value.second() as i32,
+                value.0.year() as u32,
+                Into::<u8>::into(value.0.month()) as i32 - 1,
+                value.0.day() as i32,
+                value.0.hour() as i32 + 1,
+                value.0.minute() as i32,
+                value.0.second() as i32,
             );
 
-            let milliseconds = value.millisecond();
+            let milliseconds = value.0.millisecond();
             if milliseconds > 0 {
                 date.set_utc_milliseconds(milliseconds as u32);
             }
@@ -296,26 +339,26 @@ mod tests {
         let chrono_naive =
             chrono::NaiveDateTime::parse_from_str("2020-01-01 12:00:00", "%Y-%m-%d %H:%M:%S")
                 .unwrap();
-        let utc = UtcDateTime::from(chrono_naive);
+        let utc = UtcDateTime::try_from(chrono_naive).unwrap();
         assert_eq!(utc.to_string(), "2020-01-01T12:00:00Z");
         assert_eq!(chrono::NaiveDateTime::from(utc), chrono_naive);
 
         let chrono_naive_nanos = chrono::DateTime::from_timestamp(1337, 420)
             .unwrap()
             .naive_utc();
-        let utc = UtcDateTime::from(chrono_naive_nanos);
+        let utc = UtcDateTime::try_from(chrono_naive_nanos).unwrap();
         assert_eq!(utc.timestamp(), (1337, 420));
         assert_eq!(chrono::NaiveDateTime::from(utc), chrono_naive_nanos);
 
         let chrono_dt = chrono::DateTime::parse_from_rfc3339("2020-01-01T12:00:00Z")
             .unwrap()
             .to_utc();
-        let utc = UtcDateTime::from(chrono_dt);
+        let utc = UtcDateTime::try_from(chrono_dt).unwrap();
         assert_eq!(utc.to_string(), "2020-01-01T12:00:00Z");
         assert_eq!(chrono::DateTime::<chrono::Utc>::from(utc), chrono_dt);
 
         let chrono_dt_nanos = chrono::DateTime::from_timestamp(1337, 420).unwrap();
-        let utc = UtcDateTime::from(chrono_dt_nanos);
+        let utc = UtcDateTime::try_from(chrono_dt_nanos).unwrap();
         assert_eq!(utc.timestamp(), (1337, 420));
         assert_eq!(chrono::DateTime::<chrono::Utc>::from(utc), chrono_dt_nanos);
     }

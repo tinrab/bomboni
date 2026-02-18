@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use std::collections::BTreeSet;
 
 use crate::parse::{
@@ -32,7 +32,13 @@ pub fn expand_field_extract(
         };
         let field_ident = format_ident!("{field_name}");
 
-        if field_clone_set.contains(&field_path) {
+        // Check if this field will be unwrapped later (has Unwrap step)
+        let will_unwrap = extract
+            .steps
+            .iter()
+            .any(|step| matches!(step, FieldExtractStep::Unwrap));
+
+        if field_clone_set.contains(&field_path) || will_unwrap {
             extract_impl.extend(quote! {
                 // TODO: Avoid cloning in some cases
                 let target = #source_ident.#field_ident.clone();
@@ -151,15 +157,16 @@ pub fn expand_field_extract(
 }
 
 pub fn make_field_error_path(field_path: &str, before: Option<&TokenStream>) -> TokenStream {
-    let mut error_path = if let Some(before) = before {
-        quote!(#before,)
-    } else {
-        assert!(
-            !field_path.is_empty(),
-            "expected extract plan to begin with a field path"
-        );
-        quote!()
-    };
+    let mut error_path = before.map_or_else(
+        || {
+            assert!(
+                !field_path.is_empty(),
+                "expected extract plan to begin with a field path"
+            );
+            quote!()
+        },
+        |before| quote!(#before,),
+    );
     for part in field_path.split('.').filter(|part| !part.is_empty()) {
         error_path.extend(quote! {
             PathErrorStep::Field(#part.into()),
@@ -251,6 +258,7 @@ pub fn expand_parse_field_type(
         });
     } else if let Some(primitive_ident) = field_type_info.primitive_ident.as_ref() {
         if field_options.wrapper {
+            // TODO: Verify that these `.value`s don't require `.unwrap_or_default()`
             if matches!(
                 primitive_ident.as_str(),
                 "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "isize" | "usize"
@@ -267,7 +275,9 @@ pub fn expand_parse_field_type(
         }
 
         if primitive_ident == "String" {
-            if !field_options.unspecified {
+            // Only validate non-empty string if the field is not wrapped in Option
+            // and is not marked as unspecified
+            if !field_options.unspecified && field_type_info.container_ident.is_none() {
                 parse_impl.extend(quote! {
                     if target.is_empty() {
                         return Err(RequestError::path(

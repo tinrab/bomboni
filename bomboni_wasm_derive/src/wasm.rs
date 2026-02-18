@@ -7,13 +7,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bomboni_core::string::{str_to_case, Case};
+use bomboni_core::string::{Case, str_to_case};
 use bomboni_wasm_core::{
     options::{JsValueWasm, ProxyWasm, WasmOptions},
     ts_decl::{TsDecl, TsDeclParser},
 };
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{self, DeriveInput};
 
 pub fn derive(input: DeriveInput) -> syn::Result<TokenStream> {
@@ -41,12 +41,13 @@ fn derive_serde_wasm(options: &WasmOptions) -> TokenStream {
     let ts_decl = TsDeclParser::new(options).parse();
     let ts_decl_name = ts_decl.name();
 
-    let ts_decl_literal = if let Some(override_type) = options.override_type.as_ref() {
-        let type_name = options.name();
-        format!("export type {type_name} = {override_type};")
-    } else {
-        ts_decl.to_string()
-    };
+    let ts_decl_literal = options.override_type.as_ref().map_or_else(
+        || ts_decl.to_string(),
+        |override_type| {
+            let type_name = options.name();
+            format!("export type {type_name} = {override_type};")
+        },
+    );
 
     let mut impls = quote! {
         #[wasm_bindgen]
@@ -228,29 +229,30 @@ fn derive_js_value(js_value: &JsValueWasm, options: &WasmOptions) -> TokenStream
     let ident = options.ident();
     let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
-    let convert_into = if let Some(path) = js_value.into.clone() {
-        path.to_token_stream()
-    } else {
-        quote!(core::convert::Into::into)
-    };
+    let convert_into = js_value.into.clone().map_or_else(
+        || quote!(core::convert::Into::into),
+        |path| path.to_token_stream(),
+    );
 
-    let convert_try_from = if let Some(path) = js_value.try_from.clone() {
-        path.to_token_stream()
-    } else {
-        quote!(core::convert::TryFrom::try_from)
-    };
+    let convert_try_from = js_value.try_from.clone().map_or_else(
+        || quote!(core::convert::TryFrom::try_from),
+        |path| path.to_token_stream(),
+    );
 
     let type_name = options.name();
     let type_len = type_name.len() as u32;
     let type_chars = type_name.chars().map(|c| c as u32);
 
-    let ts_decl_literal = if let Some(override_type) = options.override_type.as_ref() {
-        format!("export type {type_name} = {override_type};")
-    } else if js_value.convert_string {
-        format!("export type {type_name} = string;")
-    } else {
-        format!("export type {type_name} = any;")
-    };
+    let ts_decl_literal = options.override_type.as_ref().map_or_else(
+        || {
+            if js_value.convert_string {
+                format!("export type {type_name} = string;")
+            } else {
+                format!("export type {type_name} = any;")
+            }
+        },
+        |override_type| format!("export type {type_name} = {override_type};"),
+    );
 
     let mut impls = quote! {
         #[automatically_derived]
@@ -440,7 +442,7 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
     if let TsDecl::Enum(ts_enum) = &ts_decl {
         let mut unique_member_names = BTreeSet::new();
         for member in &ts_enum.members {
-            let member_name = str_to_case(&member.name, Case::ScreamingSnake);
+            let member_name = str_to_case(&member.name, Case::Constant);
             let member_value = member.alias_type.to_string();
             if !unique_member_names.insert(member_name.clone())
                 || !unique_member_names.insert(member_value.clone())
@@ -465,12 +467,13 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
         variants
             .into_iter()
             .map(|(k, v)| { format!("{k}: {v}") })
-            .fold(String::new(), |acc, row| {
+            .fold(String::new(), |mut acc, row| {
                 if acc.is_empty() {
-                    row.to_string()
+                    acc = row;
                 } else {
-                    format!("{acc},\n{row}")
+                    acc = format!("{acc},\n{row}");
                 }
+                acc
             })
     );
     let impls = derive_serde_wasm(options);
@@ -492,17 +495,15 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
     let proxy_ident = &proxy.proxy;
     let (impl_generics, type_generics, where_clause) = options.generics().split_for_impl();
 
-    let convert_into = if let Some(path) = proxy.into.clone() {
-        path.to_token_stream()
-    } else {
-        quote!(core::convert::Into::into)
-    };
+    let convert_into = proxy.into.clone().map_or_else(
+        || quote!(core::convert::Into::into),
+        |path| path.to_token_stream(),
+    );
 
-    let convert_try_from = if let Some(path) = proxy.try_from.clone() {
-        path.to_token_stream()
-    } else {
-        quote!(core::convert::TryFrom::try_from)
-    };
+    let convert_try_from = proxy.try_from.clone().map_or_else(
+        || quote!(core::convert::TryFrom::try_from),
+        |path| path.to_token_stream(),
+    );
 
     let mut impls = quote! {
         #[automatically_derived]
@@ -667,52 +668,63 @@ fn derive_proxy(proxy: &ProxyWasm, options: &WasmOptions) -> TokenStream {
 fn expand_usage(options: &WasmOptions) -> TokenStream {
     let mut result = quote!();
 
-    result.extend(if let Some(path) = options.wasm_bindgen_crate.as_ref() {
-        quote! {
-            use #path as _wasm_bindgen;
-        }
-    } else {
-        quote! {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate wasm_bindgen as _wasm_bindgen;
-        }
-    });
-
-    result.extend(if let Some(path) = options.js_sys_crate.as_ref() {
-        quote! {
-            use #path as _js_sys;
-        }
-    } else {
-        quote! {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate js_sys as _js_sys;
-        }
-    });
-
-    result.extend(
-        if let Some(path) = options.serde_attrs().custom_serde_path() {
+    result.extend(options.wasm_bindgen_crate.as_ref().map_or_else(
+        || {
             quote! {
-                use #path as _serde;
+                #[allow(unused_extern_crates, clippy::useless_attribute)]
+                extern crate wasm_bindgen as _wasm_bindgen;
             }
-        } else {
+        },
+        |path| {
+            quote! {
+                use #path as _wasm_bindgen;
+            }
+        },
+    ));
+
+    result.extend(options.js_sys_crate.as_ref().map_or_else(
+        || {
+            quote! {
+                #[allow(unused_extern_crates, clippy::useless_attribute)]
+                extern crate js_sys as _js_sys;
+            }
+        },
+        |path| {
+            quote! {
+                use #path as _js_sys;
+            }
+        },
+    ));
+
+    result.extend(options.serde_attrs().custom_serde_path().map_or_else(
+        || {
             quote! {
                 #[allow(unused_extern_crates, clippy::useless_attribute)]
                 extern crate serde as _serde;
             }
         },
+        |path| {
+            quote! {
+                use #path as _serde;
+            }
+        },
+    ));
+
+    let use_wasm = options.bomboni_wasm_crate.as_ref().map_or_else(
+        || {
+            options.bomboni_crate.as_ref().map_or_else(
+                || {
+                    if cfg!(feature = "root-crate") {
+                        quote!(bomboni::wasm)
+                    } else {
+                        quote!(bomboni_wasm)
+                    }
+                },
+                |path| quote!(#path::wasm),
+            )
+        },
+        |path| quote!(#path),
     );
-
-    let mut use_wasm = if let Some(path) = options.bomboni_crate.as_ref() {
-        quote!(#path::wasm)
-    } else if cfg!(feature = "root-crate") {
-        quote!(bomboni::wasm)
-    } else {
-        quote!(bomboni_wasm)
-    };
-
-    if let Some(path) = options.bomboni_wasm_crate.as_ref() {
-        use_wasm = quote!(#path);
-    }
 
     quote! {
         #result
@@ -723,7 +735,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
                 VectorFromWasmAbi, VectorIntoWasmAbi,
             },
             describe::{WasmDescribe, WasmDescribeVector},
-            JsObject, JsValue,
+            JsValue,
         };
         use _js_sys::JsString;
         use #use_wasm::Wasm;

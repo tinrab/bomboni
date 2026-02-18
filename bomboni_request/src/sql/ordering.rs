@@ -1,13 +1,14 @@
 use crate::{
     ordering::{
-        error::{OrderingError, OrderingResult},
         Ordering, OrderingDirection,
+        error::{OrderingError, OrderingResult},
     },
     schema::Schema,
 };
 
-use super::{utility::get_identifier, SqlDialect, SqlRenameMap};
+use super::{SqlDialect, SqlRenameMap, utility::get_identifier};
 
+/// Builder for SQL ordering statements.
 pub struct SqlOrderingBuilder<'a> {
     dialect: SqlDialect,
     schema: &'a Schema,
@@ -16,7 +17,8 @@ pub struct SqlOrderingBuilder<'a> {
 }
 
 impl<'a> SqlOrderingBuilder<'a> {
-    pub fn new(dialect: SqlDialect, schema: &'a Schema) -> Self {
+    /// Creates a new SQL ordering builder.
+    pub const fn new(dialect: SqlDialect, schema: &'a Schema) -> Self {
         Self {
             dialect,
             schema,
@@ -25,11 +27,17 @@ impl<'a> SqlOrderingBuilder<'a> {
         }
     }
 
-    pub fn set_rename_map(&mut self, rename_map: &'a SqlRenameMap) -> &mut Self {
+    /// Sets the rename map.
+    pub const fn set_rename_map(&mut self, rename_map: &'a SqlRenameMap) -> &mut Self {
         self.rename_map = Some(rename_map);
         self
     }
 
+    /// Builds a SQL ordering.
+    ///
+    /// # Errors
+    ///
+    /// Will return [`OrderingError::UnknownMember`] if the ordering contains an unknown field name.
     pub fn build(&mut self, ordering: &Ordering) -> OrderingResult<String> {
         for (i, term) in ordering.iter().enumerate() {
             if self.schema.get_member(&term.name).is_none() {

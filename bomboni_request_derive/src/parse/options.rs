@@ -1,99 +1,163 @@
+#![allow(clippy::option_if_let_else, clippy::needless_continue)]
+
 use bomboni_core::syn::type_is_phantom;
 use darling::{
+    FromDeriveInput, FromField, FromMeta, FromVariant,
     ast::{Data, Fields, NestedMeta, Style},
     util::parse_expr,
-    FromDeriveInput, FromField, FromMeta, FromVariant,
 };
 use proc_macro2::Ident;
 use quote::format_ident;
 use syn::{
-    self, parse_quote, DeriveInput, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr,
-    Meta, MetaList, MetaNameValue, Path, Type, TypePath,
+    self, DeriveInput, Expr, ExprArray, ExprCall, ExprPath, Generics, LitBool, LitStr, Meta,
+    MetaList, MetaNameValue, Path, Type, TypePath, parse_quote,
 };
 
-use super::field_type_info::{get_field_type_info, FieldTypeInfo};
+use super::field_type_info::{FieldTypeInfo, get_field_type_info};
 
+/// Main options for the Parse derive macro.
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(parse), supports(struct_any, enum_any))]
 pub struct ParseOptions {
+    /// The identifier of the struct or enum being derived.
     pub ident: Ident,
+
+    /// Generic parameters for the type.
     pub generics: Generics,
+
+    /// The data (fields or variants) of the struct or enum.
     pub data: Data<ParseVariant, ParseField>,
 
-    /// Source type.
+    /// Source type to parse from.
     pub source: Path,
-    /// Set to true to implement `From` trait for converting parsed type back into source type.
+
+    /// Generate `From` trait implementation for converting back to source type.
+    ///
+    /// When set to `true`, generates code to convert the parsed type back into
+    /// the source type. This enables bidirectional conversion between the types.
     #[darling(default)]
     pub write: bool,
-    /// Implement `serde::Serialize` from source type.
+
+    /// Implement `serde::Serialize` for the source type.
+    ///
+    /// When set to `true`, generates a `Serialize` implementation that serializes
+    /// the source type instead of the parsed type. This is useful when you want
+    /// to serialize data in the original format.
     #[darling(default)]
     pub serialize_as: bool,
-    /// Implement `serde::Deserialize` from source type.
+
+    /// Implement `serde::Deserialize` for the source type.
+    ///
+    /// When set to `true`, generates a `Deserialize` implementation that deserializes
+    /// directly into the source type. This is useful when you want to deserialize
+    /// data into the original format.
     #[darling(default)]
     pub deserialize_as: bool,
-    /// Implement `serde::Serialize` and `serde::Deserialize` from source type.
+
+    /// Implement both `serde::Serialize` and `serde::Deserialize` for the source type.
+    ///
+    /// When set to `true`, this is a shorthand for setting both `serialize_as` and
+    /// `deserialize_as` to `true`. This generates complete serde support for the source type.
+    ///
+    /// This is commonly used when you want full serde compatibility with the original format.
     #[darling(default)]
     pub serde_as: bool,
-    /// Used to create tagged unions.
+
+    /// Create tagged union from a oneof field.
+    ///
+    /// Specifies that this struct should be treated as a tagged union, where the
+    /// specific variant is determined by a oneof field. This is commonly used for
+    /// protobuf messages that contain oneof fields representing different message types.
     #[darling(default)]
     pub tagged_union: Option<ParseTaggedUnion>,
-    /// Marks this message as a request message.
-    /// Errors will be wrapped with request's name.
+
+    /// Mark this message as a request message for enhanced error handling.
+    /// Errors will be wrapped within `BadRequest` with [`RequestError::bad_request`].
     #[darling(default)]
     pub request: Option<ParseRequest>,
+
+    /// Custom `prost` crate path.
+    #[darling(default)]
+    pub prost_crate: Option<Path>,
 
     /// Custom `bomboni` crate path.
     #[darling(default)]
     pub bomboni_crate: Option<Path>,
+
     /// Custom `bomboni_proto` crate path.
     #[darling(default)]
     pub bomboni_proto_crate: Option<Path>,
+
     /// Custom `bomboni_request` crate path.
     #[darling(default)]
     pub bomboni_request_crate: Option<Path>,
+
     /// Custom `serde` crate path.
     #[darling(default)]
     pub serde_crate: Option<Path>,
 }
 
+/// Configuration for creating tagged unions from oneof fields.
 #[derive(Debug, FromMeta)]
 pub struct ParseTaggedUnion {
+    /// The oneof field that contains the variant data.
     pub oneof: Path,
+
+    /// The field that contains the tag/variant identifier.
     pub field: Ident,
 }
 
+/// Configuration for request message error handling.
+///
+/// When a struct is marked as a request message, parsing errors will be
+/// wrapped with additional context to make debugging and error reporting easier.
 #[derive(Debug)]
 pub struct ParseRequest {
+    /// Optional custom name for the request.
     pub name: Option<Expr>,
 }
 
+/// Represents a field in a struct that can be parsed.
 #[derive(Debug, Clone, FromField)]
 #[darling(attributes(parse))]
 pub struct ParseField {
+    /// The identifier of the field.
     pub ident: Option<Ident>,
+
+    /// The type of the field.
     pub ty: Type,
+
+    /// Parsing options for this field.
     #[darling(flatten)]
     pub options: ParseFieldOptions,
 
     /// Parse resource fields into this field.
-    /// Special purpose parse for resource fields into a `ParsedResource` field.
     pub resource: Option<ParseResource>,
+
     /// Parse list query fields.
     #[darling(default)]
     pub list_query: Option<ParseQuery>,
+
     /// Parse search query fields.
     #[darling(default)]
     pub search_query: Option<ParseQuery>,
 
+    /// Type information for the field (internal use).
     #[darling(skip)]
     pub type_info: Option<FieldTypeInfo>,
 }
 
+/// Represents a variant in an enum that can be parsed.
 #[derive(Debug, Clone, FromVariant)]
 #[darling(attributes(parse))]
 pub struct ParseVariant {
+    /// The identifier of the variant.
     pub ident: Ident,
+
+    /// The fields of the variant.
     pub fields: Fields<Type>,
+
+    /// Parsing options for this variant.
     #[darling(flatten)]
     pub options: ParseFieldOptions,
 
@@ -101,107 +165,177 @@ pub struct ParseVariant {
     #[darling(default)]
     pub source_unit: bool,
 
+    /// Type information for the variant (internal use).
     #[darling(skip)]
     pub type_info: Option<FieldTypeInfo>,
 }
 
-#[derive(Debug, Clone, FromMeta)]
+/// Options for controlling how individual fields are parsed.
+#[derive(Debug, Clone, FromMeta, Default)]
 pub struct ParseFieldOptions {
-    /// Source field name.
+    /// Source field name to parse from.
+    ///
+    /// Specifies the name of the field in the input data to parse from.
     /// Can be a path to a nested field with conditional `?.` extraction.
-    /// Example: `bio` or `address?.city`
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// #[parse(source = "bio")]
+    /// biography: String,
+    ///
+    /// #[parse(source = "address?.city")]
+    /// city: Option<String>,
+    /// ```
     #[darling(default)]
     pub source: Option<String>,
 
-    /// Source field name is the same as the target.
+    /// Indicates that the source field name is the same as the target field name.
+    ///
+    /// When set to `true`, this is a shorthand for `source = "<field_name>"`.
+    /// This is useful when you want to explicitly indicate that a field should
+    /// be parsed from a source field with the same name. This is commonly used
+    /// with `derive` attribute.
     #[darling(default)]
     pub source_field: bool,
 
-    /// Skip parsing field.
+    /// Skip parsing this field entirely.
+    ///
+    /// When set to `true`, this field will be completely ignored during parsing.
+    /// The field will not be read from the input and will not be included in the output.
     #[darling(default)]
     pub skip: bool,
 
-    /// True to keep source and target fields the same.
-    /// No parsing will be done.
+    /// Keep the source and target fields the same without any parsing.
     #[darling(default)]
     pub keep: bool,
 
-    /// True to keep source and target primitive message types the same.
-    /// Only surrounding container will be extracted and parsed.
+    /// Keep source and target primitive message types the same.
+    ///
+    /// When set to `true`, only the surrounding container will be extracted and parsed,
+    /// while the primitive message types inside are kept the same.
+    ///
+    /// This is useful for complex nested structures where you want to parse the outer
+    /// container but preserve the inner primitive types unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// #[parse(keep_primitive)]
+    /// nested_message: Vec<InnerMessage>,  // Vec is parsed, InnerMessage is kept
+    /// ```
     #[darling(default)]
     pub keep_primitive: bool,
 
-    /// Allow unspecified enum values and empty strings.
-    /// The field will not be treated as required.
+    /// Allow unspecified enum values and empty strings without treating them as required.
     ///
-    /// Given the following enum:
-    ///
-    /// ```proto
-    /// message Item {
-    ///     enum ItemKind {
-    ///         ITEM_KIND_UNSPECIFIED = 0;
-    ///     }
-    ///
-    ///     ItemKind kind = 1;
-    /// }
-    /// ```
-    ///
-    /// If `kind` equals 0, then the field will be parsed into the `Unspecified` variant.
-    /// No `RequiredFieldMissing` error will be returned.
+    /// When set to `true`, the field will not be treated as required and will accept
+    /// unspecified enum values (typically 0) and empty strings without generating errors.
     #[darling(default)]
     pub unspecified: bool,
 
-    /// Extraction plan for the field.
+    /// Custom extraction plan for the field.
+    ///
+    /// Specifies a series of extraction steps to transform the field value.
+    /// This provides fine-grained control over how values are extracted and processed.
+    ///
+    /// The extraction plan consists of multiple steps that are applied in sequence.
     #[darling(default)]
     pub extract: Option<FieldExtract>,
 
-    /// Parses Protobuf's well-known wrapper type.
+    /// Parse Protobuf's well-known wrapper types.
+    ///
+    /// When set to `true`, automatically handles Protobuf wrapper types by extracting
+    /// the inner value. This is commonly used for optional primitive fields in protobuf.
     ///
     /// Types are mapped as follows:
     ///
-    /// - `String` -> `StringValue`
-    /// - `bool` -> `BoolValue`
-    /// - `f32` -> `FloatValue`
-    /// - `f64` -> `DoubleValue`
-    /// - `i8`, `i16`, `i32` -> `Int32Value`
-    /// - `u8`, `u16`, `u32` -> `UInt32Value`
-    /// - `i64`, `isize` -> `Int64Value`
-    /// - `u64`, `usize` -> `UInt64Value`
+    /// - `String` → `StringValue`
+    /// - `bool` → `BoolValue`
+    /// - `f32` → `FloatValue`
+    /// - `f64` → `DoubleValue`
+    /// - `i8`, `i16`, `i32` → `Int32Value`
+    /// - `u8`, `u16`, `u32` → `UInt32Value`
+    /// - `i64`, `isize` → `Int64Value`
+    /// - `u64`, `usize` → `UInt64Value`
     ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// #[parse(wrapper)]
+    /// optional_name: Option<String>,  // From StringValue
+    ///
+    /// #[parse(wrapper)]
+    /// optional_count: Option<i32>,     // From Int32Value
+    /// ```
     #[darling(default)]
     pub wrapper: bool,
 
-    /// Parses oneof value.
-    /// Special purpose parse for oneof fields.
+    /// Parse oneof value from a Protobuf oneof field.
+    ///
+    /// When set to `true`, indicates that this field should be parsed from a
+    /// Protobuf oneof field. This is a special-purpose parse option for handling
+    /// oneof fields in protobuf messages.
+    ///
+    /// The field will be extracted from the oneof and converted to the appropriate type.
     #[darling(default)]
     pub oneof: bool,
 
-    /// Parses enum value from `i32`.
-    /// Special purpose parse for enum fields with `i32` values.
+    /// Parse enum value from `i32`.
+    ///
+    /// When set to `true`, indicates that this field should be parsed as an enum
+    /// from an `i32` value. This is a special-purpose parse option for enum fields
+    /// that are represented as integers in the source data.
     #[darling(default)]
     pub enumeration: bool,
 
-    /// Check string against Regex.
+    /// Check string against a regular expression pattern.
+    ///
+    /// Specifies a regular expression that the field value must match.
+    /// The field will be parsed only if the string matches the regex pattern.
     #[darling(with = parse_expr::preserve_str_literal, map = Some)]
     pub regex: Option<Expr>,
 
-    /// Parses `google.protobuf.Timestamp` into a `OffsetDateTime`.
+    /// Parse `google.protobuf.Timestamp` into a `OffsetDateTime`.
+    ///
+    /// When set to `true`, automatically converts protobuf timestamp fields
+    /// into `OffsetDateTime` instances. This handles the conversion from the
+    /// protobuf timestamp format to Rust's date/time representation.
     #[darling(default)]
     pub timestamp: bool,
 
-    /// Convert field to a custom type.
-    /// Used for `try_from` and `try_into` conversions.
+    /// Convert field to a custom type using `try_from` or `try_into`.
+    ///
+    /// Specifies a custom type path that implements `TryFrom` or `TryInto`
+    /// for converting the field value. The conversion can fail and returns a Result.
+    ///
+    /// This is useful for custom conversion logic that doesn't fit into other
+    /// categories, such as domain-specific types, validation, or complex transformations.
     #[darling(with = parse_type_path, map = Some)]
     pub try_from: Option<TypePath>,
 
     /// Use custom conversion and writing functions.
+    ///
+    /// Specifies custom conversion functions for both parsing (reading) and writing.
+    /// This provides maximum flexibility for complex field transformations.
     #[darling(default)]
     pub convert: Option<ParseConvert>,
 
-    /// Make this field derived.
-    /// Use this for custom, non-opinionated parsing.
+    /// Make this field use derived parsing implementation.
+    ///
+    /// When set, indicates that this field should use a custom derived parsing
+    /// implementation. This is useful for custom, non-opinionated parsing where
+    /// you have full control over the parsing logic.
     #[darling(default)]
     pub derive: Option<ParseDerive>,
+
+    /// Parse field only if field mask allows it.
+    ///
+    /// When set, indicates that this field should only be parsed if the specified
+    /// field mask contains the field path. This is commonly used for update
+    /// operations where only certain fields should be modified.
+    #[darling(default)]
+    pub field_mask: Option<ParseFieldMask>,
 }
 
 #[derive(Debug, Clone)]
@@ -209,7 +343,7 @@ pub struct FieldExtract {
     pub steps: Vec<FieldExtractStep>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FieldExtractStep {
     Field(String),
     Unwrap,
@@ -267,6 +401,16 @@ pub struct ParseQueryField {
     pub parse: bool,
     pub write: bool,
     pub source: Ident,
+}
+
+/// Configuration for parsing fields with field mask validation.
+#[derive(Debug, Clone)]
+pub struct ParseFieldMask {
+    /// The field containing the field mask.
+    pub mask: Ident,
+
+    /// The field containing the data to parse (optional, inferred from source if not provided).
+    pub field: Option<Ident>,
 }
 
 impl ParseOptions {
@@ -357,7 +501,8 @@ impl ParseOptions {
                             || field.options.convert.is_some()
                             || field.resource.is_some()
                             || field.list_query.is_some()
-                            || field.search_query.is_some())
+                            || field.search_query.is_some()
+                            || field.options.field_mask.is_some())
                     {
                         return Err(syn::Error::new_spanned(
                             &field.ident,
@@ -366,7 +511,18 @@ impl ParseOptions {
                     }
 
                     if field.options.source_field {
-                        field.options.source = Some(field.ident.as_ref().unwrap().to_string());
+                        field.options.source = Some(
+                            field
+                                .ident
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    syn::Error::new(
+                                        proc_macro2::Span::call_site(),
+                                        "field missing ident",
+                                    )
+                                })?
+                                .to_string(),
+                        );
                     }
 
                     if field.options.skip
@@ -868,6 +1024,50 @@ impl FromMeta for ParseQueryField {
             }
             _ => Err(darling::Error::custom("invalid query field").with_span(item)),
         }
+    }
+}
+
+impl FromMeta for ParseFieldMask {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        // Handle field_mask with single parameter: field_mask(mask_field_name)
+        // Handle field_mask with parameters: field_mask { field = container, mask = mask_field }
+        #[derive(FromMeta)]
+        struct Options {
+            field: Option<Ident>,
+            mask: Ident,
+        }
+
+        // Handle empty field_mask: field_mask()
+        if items.is_empty() {
+            return Ok(Self {
+                mask: format_ident!("update_mask"), // Default to update_mask
+                field: None,                        // Will be inferred from source
+            });
+        }
+
+        if items.len() == 1
+            && let NestedMeta::Meta(Meta::Path(path)) = &items[0]
+            && path.segments.len() == 1
+        {
+            let mask_ident = &path.segments[0].ident;
+            return Ok(Self {
+                mask: mask_ident.clone(),
+                field: None, // Will be inferred from source
+            });
+        }
+
+        let options = Options::from_list(items)?;
+        Ok(Self {
+            field: options.field,
+            mask: options.mask,
+        })
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Self {
+            mask: format_ident!("update_mask"), // Default to update_mask
+            field: None,                        // Will be inferred from source
+        })
     }
 }
 

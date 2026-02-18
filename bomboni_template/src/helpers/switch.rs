@@ -11,17 +11,26 @@ use handlebars::{
 };
 use serde_json::Value;
 
+/// Name of the switch helper.
 pub const SWITCH_HELPER_NAME: &str = "switch";
+/// Name of the case helper.
 pub const SWITCH_CASE_HELPER_NAME: &str = "case";
+/// Name of the default helper.
 pub const SWITCH_DEFAULT_HELPER_NAME: &str = "default";
 
 const MATCH_LOCAL_NAME: &str = "__match";
 const CASE_VALUE_LOCAL_NAME: &str = "value";
 
+/// Registers the switch helper with Handlebars registry.
 pub fn register_switch_helper(handlebars_registry: &mut Handlebars) {
     handlebars_registry.register_helper(SWITCH_HELPER_NAME, Box::new(switch_helper));
 }
 
+/// Switch helper for handlebars.
+///
+/// # Errors
+///
+/// Will return [`HelperResult`] if template rendering fails or parameter retrieval fails.
 pub fn switch_helper(
     h: &Helper,
     r: &Handlebars,
@@ -49,10 +58,9 @@ pub fn switch_helper(
         }),
     );
 
-    let result = match h.template() {
-        Some(t) => t.render(r, ctx, &mut local_rc, out),
-        None => Ok(()),
-    };
+    let result = h
+        .template()
+        .map_or_else(|| Ok(()), |t| t.render(r, ctx, &mut local_rc, out));
 
     local_rc.pop_block();
 
@@ -84,16 +92,13 @@ impl HelperDef for CaseHelper<'_> {
                 if param.value() == self.switch_value {
                     block.set_local_var(MATCH_LOCAL_NAME, Value::Bool(true));
                     block.set_local_var(CASE_VALUE_LOCAL_NAME, param.value().clone());
-                    if let Some(t) = h.template() {
-                        t.render(r, ctx, rc, out)?;
-                    }
+                    h.template()
+                        .map_or_else(|| Ok(()), |t| t.render(r, ctx, rc, out))?;
                     return Ok(());
                 }
             }
-            Ok(())
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -120,10 +125,8 @@ impl HelperDef for DefaultHelper<'_> {
             }
             // Include @value local variable even if it doesn't match any case
             block.set_local_var(CASE_VALUE_LOCAL_NAME, self.switch_value.clone());
-            match h.template() {
-                Some(t) => t.render(r, ctx, rc, out),
-                None => Ok(()),
-            }
+            h.template()
+                .map_or_else(|| Ok(()), |t| t.render(r, ctx, rc, out))
         } else {
             Ok(())
         }

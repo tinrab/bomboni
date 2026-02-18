@@ -1,13 +1,13 @@
 [package]
 name = "bomboni_wasm_derive"
-version = "0.1.62"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Internal WASM derive macros for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
-readme = "../README.md"
-edition = "2021"
+readme = "README.md"
+edition.workspace = true
 
 [lib]
 name = "bomboni_wasm_derive"
@@ -15,6 +15,7 @@ path = "src/lib.rs"
 proc-macro = true
 
 [features]
+# Generate `bomboni::wasm` instead of `bomboni_wasm`
 root-crate = []
 
 [dependencies]
@@ -25,4 +26,3 @@ proc-macro2 = { workspace = true, features = ["proc-macro"] }
 syn.workspace = true
 quote.workspace = true
 darling.workspace = true
-serde_derive_internals.workspace = true

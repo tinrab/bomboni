@@ -1,19 +1,22 @@
-use crate::serde::helpers as serde_helpers;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::google::protobuf::FieldMask;
+use crate::serde::helpers as serde_helpers;
 
 impl FieldMask {
+    /// Creates a new field mask with the given paths.
     #[must_use]
-    pub fn new(paths: Vec<String>) -> Self {
+    pub const fn new(paths: Vec<String>) -> Self {
         Self { paths }
     }
 
+    /// Checks if this field mask contains the given path.
     #[must_use]
     pub fn contains(&self, path: &str) -> bool {
         self.paths.iter().any(|s| s.as_str() == path)
     }
 
+    /// Checks if this field mask masks the given field path.
     #[must_use]
     pub fn masks(&self, field_path: &str) -> bool {
         self.paths.iter().any(|path| {

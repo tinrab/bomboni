@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package bookstore.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/tinrab/bomboni/bookstore/v1;bookstore";
+
+message Author {
+  string name = 1;
+
+  google.protobuf.Timestamp create_time = 2;
+
+  google.protobuf.Timestamp update_time = 3;
+
+  google.protobuf.Timestamp delete_time = 4;
+
+  bool deleted = 5;
+
+  optional string etag = 6;
+
+  string display_name = 7;
+}

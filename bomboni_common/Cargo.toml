@@ -1,13 +1,13 @@
 [package]
 name = "bomboni_common"
-version = "0.1.62"
-authors = ["Tin Rabzelj <tin@flinect.com>"]
+version.workspace = true
+authors.workspace = true
 description = "Common things for Bomboni library."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
-readme = "../README.md"
-edition = "2021"
+readme = "README.md"
+edition.workspace = true
 
 [lib]
 name = "bomboni_common"
@@ -22,6 +22,8 @@ wasm = [
   "dep:js-sys",
   "dep:wasm-bindgen",
   "time/wasm-bindgen",
+  "dep:getrandom",
+  "serde",
 ]
 js = []
 postgres = ["dep:postgres-types", "dep:bytes"]
@@ -31,9 +33,9 @@ mysql = ["dep:mysql_common"]
 bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 
 thiserror.workspace = true
-regex.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
 ulid.workspace = true
+getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true }
 
 tokio = { workspace = true, features = ["time", "sync"], optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -45,8 +47,8 @@ bytes = { workspace = true, optional = true }
 mysql_common = { workspace = true, features = ["time"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.99", optional = true }
-js-sys = { version = "0.3.76", optional = true }
+wasm-bindgen = { version = "0.2.108", optional = true }
+js-sys = { version = "0.3.85", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

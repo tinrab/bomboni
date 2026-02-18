@@ -1,9 +1,10 @@
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{
     fmt::{self, Display, Formatter},
     str::FromStr,
     time::SystemTime,
 };
+use thiserror::Error;
 
 use bomboni_common::date_time::{UtcDateTime, UtcDateTimeError};
 
@@ -11,7 +12,17 @@ use crate::google::protobuf::Timestamp;
 
 const NANOS_PER_SECOND: i32 = 1_000_000_000;
 
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum TimestampError {
+    #[error("invalid format")]
+    InvalidFormat,
+    #[error("not utc")]
+    NotUtc,
+}
+
 impl Timestamp {
+    /// Creates a new `Timestamp` with the given seconds and nanoseconds.
     #[must_use]
     pub const fn new(seconds: i64, nanos: i32) -> Self {
         Self { seconds, nanos }
@@ -89,46 +100,45 @@ impl TryFrom<Timestamp> for UtcDateTime {
         if value.nanos < 0 {
             return Err(UtcDateTimeError::InvalidNanoseconds);
         }
-        UtcDateTime::from_timestamp(value.seconds, value.nanos)
+        Self::from_timestamp(value.seconds, value.nanos)
     }
 }
 
-// #[cfg(feature = "chrono")]
-// const _: () = {
-//     use chrono::{DateTime, NaiveDateTime, Utc};
+#[cfg(feature = "chrono")]
+const _: () = {
+    use chrono::{DateTime, NaiveDateTime, Utc};
 
-//     impl TryFrom<Timestamp> for DateTime<Utc> {
-//         type Error = TimestampError;
+    impl TryFrom<Timestamp> for DateTime<Utc> {
+        type Error = TimestampError;
 
-//         fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-//             DateTime::from_timestamp(value.seconds, value.nanos as u32)
-//                 .ok_or(TimestampError::NotUtc)
-//         }
-//     }
+        fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+            Self::from_timestamp(value.seconds, value.nanos as u32).ok_or(TimestampError::NotUtc)
+        }
+    }
 
-//     impl From<DateTime<Utc>> for Timestamp {
-//         fn from(value: DateTime<Utc>) -> Self {
-//             Timestamp {
-//                 seconds: value.timestamp(),
-//                 nanos: value.timestamp_subsec_nanos() as i32,
-//             }
-//         }
-//     }
+    impl From<DateTime<Utc>> for Timestamp {
+        fn from(value: DateTime<Utc>) -> Self {
+            Self {
+                seconds: value.timestamp(),
+                nanos: value.timestamp_subsec_nanos() as i32,
+            }
+        }
+    }
 
-//     impl TryFrom<Timestamp> for NaiveDateTime {
-//         type Error = TimestampError;
+    impl TryFrom<Timestamp> for NaiveDateTime {
+        type Error = TimestampError;
 
-//         fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-//             Ok(DateTime::try_from(value)?.naive_utc())
-//         }
-//     }
+        fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
+            Ok(DateTime::try_from(value)?.naive_utc())
+        }
+    }
 
-//     impl From<NaiveDateTime> for Timestamp {
-//         fn from(value: NaiveDateTime) -> Self {
-//             value.and_utc().into()
-//         }
-//     }
-// };
+    impl From<NaiveDateTime> for Timestamp {
+        fn from(value: NaiveDateTime) -> Self {
+            value.and_utc().into()
+        }
+    }
+};
 
 impl From<SystemTime> for Timestamp {
     fn from(value: SystemTime) -> Self {

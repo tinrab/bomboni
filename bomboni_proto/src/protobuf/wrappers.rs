@@ -1,13 +1,18 @@
+#![allow(trivial_casts, trivial_numeric_casts)]
+
+use std::{
+    fmt::{Display, Formatter},
+    num::{ParseFloatError, ParseIntError},
+    str::FromStr,
+};
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::google::protobuf::{
     BoolValue, BytesValue, DoubleValue, FloatValue, Int32Value, Int64Value, StringValue,
     UInt32Value, UInt64Value,
 };
 use crate::serde::helpers as serde_helpers;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use std::fmt::{Display, Formatter};
-use std::num::{ParseFloatError, ParseIntError};
-use std::str::FromStr;
 
 impl From<String> for StringValue {
     fn from(value: String) -> Self {
@@ -65,7 +70,6 @@ macro_rules! impl_primitive_wrapper {
             }
             impl From<$type> for $as {
                 fn from(value: $type) -> Self {
-                    #![allow(trivial_casts, trivial_numeric_casts)]
                     value.value as $as
                 }
             }
@@ -101,7 +105,6 @@ macro_rules! impl_size_wrapper {
 
         impl From<$type> for isize {
             fn from(value: $type) -> Self {
-                #![allow(trivial_casts, trivial_numeric_casts)]
                 value.value as isize
             }
         }
@@ -124,7 +127,6 @@ macro_rules! impl_size_wrapper {
 
         impl From<$type> for usize {
             fn from(value: $type) -> Self {
-                #![allow(trivial_casts, trivial_numeric_casts)]
                 value.value as usize
             }
         }

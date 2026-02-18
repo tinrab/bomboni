@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::Path;
 
 use crate::parse::{
@@ -9,11 +9,10 @@ use crate::parse::{
 };
 
 pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
-    if let Some(tagged_union) = options.tagged_union.as_ref() {
-        expand_write_tagged_union(options, variants, tagged_union)
-    } else {
-        expand_write(options, variants)
-    }
+    options.tagged_union.as_ref().map_or_else(
+        || expand_write(options, variants),
+        |tagged_union| expand_write_tagged_union(options, variants, tagged_union),
+    )
 }
 
 fn expand_write(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {

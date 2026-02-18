@@ -5,6 +5,11 @@ use http::StatusCode;
 impl Code {
     #[cfg(feature = "tonic")]
     #[must_use]
+    /// Converts to HTTP status code.
+    ///
+    /// # Panics
+    ///
+    /// Panics if status code creation fails.
     pub fn to_status_code(&self) -> StatusCode {
         // https://cloud.google.com/apis/design/errors#generating_errors
         match self {
@@ -23,17 +28,21 @@ impl Code {
 }
 
 #[cfg(feature = "tonic")]
-impl From<tonic::Code> for Code {
-    fn from(code: tonic::Code) -> Self {
+impl TryFrom<tonic::Code> for Code {
+    type Error = ();
+
+    fn try_from(code: tonic::Code) -> Result<Self, Self::Error> {
         let value = code as i32;
-        Self::try_from(value).unwrap()
+        Self::try_from(value).map_err(|_| ())
     }
 }
 
 #[cfg(feature = "tonic")]
-impl From<Code> for tonic::Code {
-    fn from(code: Code) -> Self {
+impl TryFrom<Code> for tonic::Code {
+    type Error = Self;
+
+    fn try_from(code: Code) -> Result<Self, Self::Error> {
         let value = code as i32;
-        Self::from(value)
+        Ok(Self::from(value))
     }
 }

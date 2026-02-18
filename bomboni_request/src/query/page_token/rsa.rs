@@ -4,12 +4,13 @@ use crate::{
     query::{
         error::{QueryError, QueryResult},
         page_token::{
-            utility::{get_page_filter, make_page_key},
             FilterPageToken, PageTokenBuilder,
+            utility::{get_page_filter, make_page_key},
         },
     },
 };
 use base64ct::{Base64, Base64Url, Encoding};
+use rand_core::OsRng;
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use std::fmt::{self, Debug, Formatter};
 
@@ -24,7 +25,8 @@ pub struct RsaPageTokenBuilder {
 }
 
 impl RsaPageTokenBuilder {
-    pub fn new(private_key: RsaPrivateKey, public_key: RsaPublicKey, url_safe: bool) -> Self {
+    /// Creates a new RSA page token builder.
+    pub const fn new(private_key: RsaPrivateKey, public_key: RsaPublicKey, url_safe: bool) -> Self {
         Self {
             private_key,
             public_key,
@@ -87,7 +89,7 @@ impl PageTokenBuilder for RsaPageTokenBuilder {
         let mut plaintext = make_page_key::<PARAMS_KEY_LENGTH>(filter, ordering, salt).to_vec();
         plaintext.extend(page_filter.to_string().as_bytes());
 
-        let mut rng = rand::thread_rng();
+        let mut rng = OsRng;
         let encrypted = self
             .public_key
             .encrypt(&mut rng, Pkcs1v15Encrypt, &plaintext)
@@ -192,7 +194,7 @@ mod tests {
     fn get_builder() -> &'static RsaPageTokenBuilder {
         static SINGLETON: OnceLock<RsaPageTokenBuilder> = OnceLock::new();
         SINGLETON.get_or_init(|| {
-            let mut rng = rand::thread_rng();
+            let mut rng = OsRng;
             let private_key = RsaPrivateKey::new(&mut rng, 720).unwrap();
             let public_key = RsaPublicKey::from(&private_key);
             RsaPageTokenBuilder::new(private_key, public_key, true)

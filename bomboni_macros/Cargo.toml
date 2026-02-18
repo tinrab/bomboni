@@ -1,0 +1,13 @@
+[package]
+name = "bomboni_macros"
+version.workspace = true
+authors.workspace = true
+description = "Common macros for Bomboni library."
+repository = "https://github.com/tinrab/bomboni"
+homepage = "https://github.com/tinrab/bomboni"
+license-file = "../LICENSE"
+readme = "README.md"
+edition.workspace = true
+
+[dev-dependencies]
+regex.workspace = true

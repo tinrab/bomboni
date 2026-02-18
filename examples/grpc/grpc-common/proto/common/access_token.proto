@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package common;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/rabzelj/auth;auth";
+option java_multiple_files = true;
+option java_outer_classname = "CommonAcessToken";
+option java_package = "com.rabzelj.common";
+
+// Access token represents an authentication token.
+message AccessToken {
+  // Whether the token is active.
+  bool active = 1;
+
+  // The client ID.
+  string client_id = 2;
+
+  // Token expiration time.
+  google.protobuf.Timestamp expiration = 3;
+
+  // Token issued time.
+  google.protobuf.Timestamp issued_at = 4;
+
+  // The issuer.
+  string issuer = 5;
+
+  // The subject (user ID).
+  string subject = 6;
+
+  // User data.
+  AccessTokenData data = 7;
+}
+
+// Access token data.
+message AccessTokenData {
+  // User identities.
+  repeated AccessTokenIdentity identities = 1;
+
+  // User accounts.
+  repeated AccessTokenAccount accounts = 2;
+}
+
+// Access token identity.
+message AccessTokenIdentity {
+  oneof kind {
+    EmailIdentity email = 1;
+  }
+}
+
+// Email identity.
+message EmailIdentity {
+  // The user ID.
+  string id = 1;
+
+  // The email address.
+  string email = 2;
+}
+
+// Access token account.
+message AccessTokenAccount {
+  // The account ID.
+  string id = 1;
+}

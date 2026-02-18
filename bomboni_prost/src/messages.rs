@@ -1,4 +1,6 @@
-use bomboni_core::string::{str_to_case, Case};
+//! Message code generation utilities.
+
+use bomboni_core::string::{Case, str_to_case};
 use proc_macro2::TokenStream;
 use prost_types::DescriptorProto;
 use quote::{format_ident, quote};
@@ -6,6 +8,25 @@ use quote::{format_ident, quote};
 use crate::enums::write_enum;
 use crate::{context::Context, oneofs::write_message_oneofs};
 
+/// Writes Rust code for a protobuf message.
+///
+/// This function generates helper functions and implementations for protobuf messages,
+/// including field name functions, oneof utilities, and nested type processing.
+///
+/// # Arguments
+///
+/// * `context` - The generation context containing configuration
+/// * `s` - The token stream to write generated code to
+/// * `message` - The protobuf message descriptor
+///
+/// # Generated Functions
+///
+/// Depending on configuration, this may generate:
+/// - Field name functions for all message fields
+/// - Oneof utility functions
+/// - Nested message and enum processing
+/// - Type URL functions
+/// - Serde implementations
 pub fn write_message(context: &Context, s: &mut TokenStream, message: &DescriptorProto) {
     if context.config.api.field_names {
         write_field_names(context, s, message);
@@ -98,10 +119,8 @@ fn write_field_names(context: &Context, s: &mut TokenStream, message: &Descripto
     }
     let mut names = TokenStream::new();
     for field in &message.field {
-        let field_name_ident = format_ident!(
-            "{}_FIELD_NAME",
-            str_to_case(field.name(), Case::ScreamingSnake)
-        );
+        let field_name_ident =
+            format_ident!("{}_FIELD_NAME", str_to_case(field.name(), Case::Constant));
         let field_name = field.name();
         names.extend(quote! {
             pub const #field_name_ident: &'static str = #field_name;

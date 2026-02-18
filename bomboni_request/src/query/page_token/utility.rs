@@ -51,7 +51,7 @@ pub fn make_page_key<const N: usize>(filter: &Filter, ordering: &Ordering, salt:
     let res = hasher.finalize();
     // TODO: other than 32 bytes?
     debug_assert_eq!(res.len(), N);
-    let key: [u8; N] = res.as_slice().try_into().unwrap();
+    let key: [u8; N] = res[..].try_into().unwrap();
 
     key
 }

@@ -4,6 +4,11 @@ use time::OffsetDateTime;
 
 use crate::id::Id;
 
+/// Generator for IDs with a specific worker ID.
+///
+/// This generator creates IDs that include a worker identifier,
+/// making them suitable for distributed systems where each worker
+/// needs to generate unique IDs.
 #[derive(Debug, Clone, Copy)]
 pub struct WorkerIdGenerator {
     worker: u16,
@@ -15,6 +20,7 @@ pub struct WorkerIdGenerator {
 const SLEEP_DURATION: Duration = Duration::from_secs(1);
 
 impl WorkerIdGenerator {
+    /// Creates a new worker ID generator.
     #[must_use]
     pub const fn new(worker: u16) -> Self {
         Self { next: 0, worker }
@@ -46,7 +52,7 @@ impl WorkerIdGenerator {
 
     /// Generates a new random id.
     ///
-    /// The same as [`generate`] but async.
+    /// The same as [`Self::generate`] but async.
     #[cfg(feature = "tokio")]
     pub async fn generate_async(&mut self) -> Id {
         let id = Id::from_worker_parts(OffsetDateTime::now_utc(), self.worker, self.next);
@@ -61,7 +67,7 @@ impl WorkerIdGenerator {
     }
 
     /// Generates a series of random ids.
-    /// Faster than [`generate`] for multiple ids at a time.
+    /// Faster than [`Self::generate`] for multiple ids at a time.
     ///
     /// # Examples
     ///
@@ -101,7 +107,7 @@ impl WorkerIdGenerator {
 
     /// Generates a series of random ids in async context.
     ///
-    /// The same as [`generate_multiple`] but async.
+    /// The same as [`Self::generate_multiple`] but async.
     #[cfg(feature = "tokio")]
     pub async fn generate_multiple_async(&mut self, count: usize) -> Vec<Id> {
         if count == 0 {
