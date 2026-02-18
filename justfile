@@ -116,3 +116,60 @@ docs-open:
 
 clean:
     cargo clean
+
+actually := env("ACTUALLY_DO_IT", "0")
+
+publish:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+
+    if [[ "{{ actually }}" != "1" ]]; then
+        echo "This is a dry run."
+    fi
+
+    packages=(
+        bomboni_core
+        bomboni_wasm_core
+        bomboni_wasm_derive
+        bomboni_wasm
+        bomboni_common
+        bomboni_fs
+        bomboni_macros
+        bomboni_prost
+        bomboni_proto
+        bomboni_template
+        bomboni_request_derive
+        bomboni_request
+    )
+
+    max_attempts=5
+    attempt=0
+    remaining="$packages"
+
+    while [[ -n "$remaining" ]] && [[ $attempt -lt $max_attempts ]]; do
+        attempt=$((attempt + 1))
+        still_remaining=""
+
+        for package in $remaining; do
+            if [[ "{{ actually }}" == "1" ]]; then
+                if cargo publish -p "$package" 2>&1; then
+                    echo "Published $package"
+                else
+                    still_remaining="$still_remaining $package"
+                fi
+            else
+                if cargo publish -p "$package" --dry-run --allow-dirty 2>&1; then
+                    echo "Dry-run OK: $package"
+                else
+                    still_remaining="$still_remaining $package"
+                fi
+            fi
+        done
+
+        if [[ "$still_remaining" == "$remaining" ]]; then
+            echo "Failed to publish: $still_remaining"
+            exit 1
+        fi
+
+        remaining="$still_remaining"
+    done

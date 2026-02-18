@@ -1,3 +1,5 @@
+#![allow(trivial_casts, trivial_numeric_casts)]
+
 use std::{
     fmt::{Display, Formatter},
     num::{ParseFloatError, ParseIntError},
@@ -68,7 +70,6 @@ macro_rules! impl_primitive_wrapper {
             }
             impl From<$type> for $as {
                 fn from(value: $type) -> Self {
-                    #![allow(trivial_casts, trivial_numeric_casts)]
                     value.value as $as
                 }
             }
@@ -104,7 +105,6 @@ macro_rules! impl_size_wrapper {
 
         impl From<$type> for isize {
             fn from(value: $type) -> Self {
-                #![allow(trivial_casts, trivial_numeric_casts)]
                 value.value as isize
             }
         }
@@ -127,7 +127,6 @@ macro_rules! impl_size_wrapper {
 
         impl From<$type> for usize {
             fn from(value: $type) -> Self {
-                #![allow(trivial_casts, trivial_numeric_casts)]
                 value.value as usize
             }
         }

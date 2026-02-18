@@ -1,5 +1,3 @@
-#![allow(clippy::option_if_let_else)]
-
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 use std::collections::BTreeSet;
@@ -159,15 +157,16 @@ pub fn expand_field_extract(
 }
 
 pub fn make_field_error_path(field_path: &str, before: Option<&TokenStream>) -> TokenStream {
-    let mut error_path = if let Some(before) = before {
-        quote!(#before,)
-    } else {
-        assert!(
-            !field_path.is_empty(),
-            "expected extract plan to begin with a field path"
-        );
-        quote!()
-    };
+    let mut error_path = before.map_or_else(
+        || {
+            assert!(
+                !field_path.is_empty(),
+                "expected extract plan to begin with a field path"
+            );
+            quote!()
+        },
+        |before| quote!(#before,),
+    );
     for part in field_path.split('.').filter(|part| !part.is_empty()) {
         error_path.extend(quote! {
             PathErrorStep::Field(#part.into()),

@@ -1,3 +1,5 @@
+#![allow(clippy::needless_continue)]
+
 use std::collections::BTreeMap;
 
 use convert_case::Boundary;

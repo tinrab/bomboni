@@ -1,4 +1,4 @@
-#![allow(clippy::option_if_let_else)]
+#![allow(clippy::option_if_let_else, clippy::needless_continue)]
 
 use bomboni_core::syn::type_is_phantom;
 use darling::{

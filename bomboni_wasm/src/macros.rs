@@ -5,12 +5,10 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     /// Logs a message to the browser console.
     #[wasm_bindgen(js_namespace = console)]
-    #[allow(unsafe_code)]
     pub fn log(s: &str);
 
     /// Logs an error message to the browser console.
     #[wasm_bindgen(js_namespace = console)]
-    #[allow(unsafe_code)]
     pub fn error(s: &str);
 }
 

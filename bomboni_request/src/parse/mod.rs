@@ -843,7 +843,6 @@ mod tests {
             nullable: Option<Vec<i32>>,
         }
 
-        #[allow(clippy::unnecessary_wraps)]
         fn pos_parse(item: &Item) -> RequestResult<String> {
             Ok(format!("{}, {}", item.x, item.y))
         }
@@ -854,7 +853,6 @@ mod tests {
             source.y = parts[1].parse().unwrap();
         }
 
-        #[allow(clippy::unnecessary_wraps)]
         fn id_parse(id: String) -> RequestResult<u64> {
             if id.is_empty() {
                 return Err(CommonError::RequiredFieldMissing.into());
@@ -869,7 +867,6 @@ mod tests {
         mod nullable_derive {
             use super::*;
 
-            #[allow(clippy::unnecessary_wraps)]
             pub fn parse(value: Option<Vec<i32>>) -> RequestResult<Option<Vec<i32>>> {
                 Ok(value.filter(|v| !v.is_empty()))
             }
@@ -892,7 +889,6 @@ mod tests {
             BorrowedExtracted(i32),
         }
 
-        #[allow(clippy::unnecessary_wraps)]
         fn derived_oneof_parse(value: String) -> RequestResult<i32> {
             Ok(value
                 .parse()
@@ -924,14 +920,12 @@ mod tests {
             }
         }
 
-        #[allow(clippy::unnecessary_wraps)]
         fn extracted_oneof_parse(value: String) -> RequestResult<i32> {
             Ok(value
                 .parse()
                 .map_err(|_| CommonError::InvalidNumericValue)?)
         }
 
-        #[allow(clippy::unnecessary_wraps)]
         fn extracted_oneof_write(value: i32) -> Option<String> {
             Some(value.to_string())
         }
@@ -2292,7 +2286,6 @@ mod tests {
             values: Vec<i32>,
         }
 
-        #[allow(clippy::unnecessary_wraps)]
         pub fn parse_nested(item: Vec<i32>) -> RequestResult<ParsedNestedItem> {
             Ok(ParsedNestedItem { values: item })
         }

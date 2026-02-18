@@ -19,7 +19,6 @@ use crate::{
 ///
 /// This module defines comprehensive error handling for the bookstore API,
 /// including domain-specific errors, metadata, and conversion utilities.
-
 #[derive(Error, Debug, PartialEq, Eq)]
 #[error(transparent)]
 pub enum BookstoreError {

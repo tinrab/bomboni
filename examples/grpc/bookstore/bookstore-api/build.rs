@@ -56,7 +56,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compile_with_config(
             config,
             &proto_paths,
-            &["./proto".into(), "../../grpc-common/proto".into()],
+            &[
+                "./proto".into(),
+                "../../grpc-common/proto".into(),
+                "../../../../bomboni_proto/proto".into(),
+            ],
         )?;
 
     compile(CompileConfig {

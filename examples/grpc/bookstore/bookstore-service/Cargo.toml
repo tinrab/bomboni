@@ -28,9 +28,9 @@ thiserror.workspace = true
 time = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros", "signal"] }
 async-trait.workspace = true
-config = "0.15.18"
+config = "0.15.19"
 chrono.workspace = true
-jsonwebtoken = "9.0"
+jsonwebtoken = "9.3"
 itertools.workspace = true
 
 tracing.workspace = true

@@ -91,7 +91,7 @@ impl HelperDef for MathHelper {
             ($op:tt) => {{
                 let a: f64 = get_param_value(h, 0, "a")?.as_f64().unwrap_or(0.0);
                 let b: f64 = get_param_value(h, 1, "b")?.as_f64().unwrap_or(0.0);
-                Ok(Value::from((a $op b)).into())
+                Ok(Value::from(a $op b).into())
             }};
         }
         macro_rules! unary_op {

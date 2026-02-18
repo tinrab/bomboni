@@ -43,12 +43,12 @@ regex.workspace = true
 itertools.workspace = true
 time.workspace = true
 serde = { workspace = true, features = ["derive"] }
-pest = "2.8.3"
-pest_derive = "2.8.3"
-base64ct = { version = "1.8.0", features = ["alloc"] }
+pest = "2.8.6"
+pest_derive = "2.8.6"
+base64ct = { version = "1.8.3", features = ["alloc"] }
 aes-gcm = { version = "0.10.3", features = ["alloc"] }
 blake2 = "0.10.6"
-rsa = { version = "0.9.8", features = ["sha2"] }
+rsa = { version = "0.9.10", features = ["sha2"] }
 
 tonic = { workspace = true, optional = true }
 postgres-types = { workspace = true, features = [
@@ -58,8 +58,8 @@ bytes = { workspace = true, optional = true }
 mysql_common = { workspace = true, features = ["time"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.105", optional = true }
-js-sys = { version = "0.3.82", optional = true }
+wasm-bindgen = { version = "0.2.108", optional = true }
+js-sys = { version = "0.3.85", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

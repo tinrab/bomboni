@@ -1,5 +1,3 @@
-#![allow(clippy::use_self)]
-
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{
     fmt::{self, Display, Formatter},
@@ -114,14 +112,13 @@ const _: () = {
         type Error = TimestampError;
 
         fn try_from(value: Timestamp) -> Result<Self, Self::Error> {
-            DateTime::from_timestamp(value.seconds, value.nanos as u32)
-                .ok_or(TimestampError::NotUtc)
+            Self::from_timestamp(value.seconds, value.nanos as u32).ok_or(TimestampError::NotUtc)
         }
     }
 
     impl From<DateTime<Utc>> for Timestamp {
         fn from(value: DateTime<Utc>) -> Self {
-            Timestamp {
+            Self {
                 seconds: value.timestamp(),
                 nanos: value.timestamp_subsec_nanos() as i32,
             }

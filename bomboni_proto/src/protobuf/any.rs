@@ -34,10 +34,10 @@ impl Any {
     {
         let expected_type_url = T::type_url();
         if expected_type_url != self.type_url {
-            return Err(DecodeError::new(format!(
-                "expected type URL `{}`, but got `{}`",
-                expected_type_url, &self.type_url
-            )));
+            return Err(DecodeError::new_unexpected_type_url(
+                &self.type_url,
+                expected_type_url,
+            ));
         }
         T::decode(&*self.value)
     }
@@ -206,7 +206,7 @@ macro_rules! impl_proto_any_seq_serde {
         where
             S: ::serde::Serializer,
         {
-            use ::serde::ser::SerializeSeq;
+            use serde::ser::SerializeSeq;
 
             struct Proxy<'a>(&'a $crate::google::protobuf::Any);
 
@@ -233,7 +233,7 @@ macro_rules! impl_proto_any_seq_serde {
         where
             D: ::serde::Deserializer<'de>,
         {
-            use ::serde::Deserialize;
+            use serde::Deserialize;
 
             struct Proxy($crate::google::protobuf::Any);
 

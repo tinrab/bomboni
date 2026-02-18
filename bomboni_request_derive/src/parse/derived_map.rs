@@ -1,5 +1,3 @@
-#![allow(clippy::option_if_let_else)]
-
 use std::ops::Deref;
 
 use proc_macro2::{Ident, TokenStream};
@@ -90,11 +88,10 @@ pub fn expand(options: DerivedMap) -> syn::Result<TokenStream> {
         ));
     };
 
-    let map_type = if let Some(map_type) = map_type {
-        map_type.into_token_stream()
-    } else {
-        quote! { ::std::collections::BTreeMap }
-    };
+    let map_type = map_type.map_or_else(
+        || quote! { ::std::collections::BTreeMap },
+        darling::ToTokens::into_token_stream,
+    );
 
     let parse_body = &parse_item_closure.body;
     let parse_expr = if is_request_result {
@@ -107,25 +104,25 @@ pub fn expand(options: DerivedMap) -> syn::Result<TokenStream> {
         }
     };
 
-    let write_fn = if let Some(write_item_closure) = write_item_closure.as_ref() {
-        let write_body = &write_item_closure.body;
-        quote! {
-            pub fn write<I>(values: I) -> Vec<#source_item_type>
-            where
-                I: ::std::iter::IntoIterator<Item = (#key_type, #value_type)>,
-            {
-                values
-                    .into_iter()
-                    .map(|item| {
-                        #[allow(unused_braces)]
-                        #write_body
-                    })
-                    .collect()
+    let write_fn = write_item_closure.as_ref().map_or_else(
+        || quote!(),
+        |write_item_closure| {
+            let write_body = &write_item_closure.body;
+            quote! {
+                pub fn write<I>(values: I) -> Vec<#source_item_type>
+                where
+                    I: ::std::iter::IntoIterator<Item = (#key_type, #value_type)>,
+                {
+                    values
+                        .into_iter()
+                        .map(|item| {
+                            #write_body
+                        })
+                        .collect()
+                }
             }
-        }
-    } else {
-        quote!()
-    };
+        },
+    );
 
     Ok(quote! {
         #vis mod #ident {
@@ -138,7 +135,6 @@ pub fn expand(options: DerivedMap) -> syn::Result<TokenStream> {
                 let mut m = #map_type::new();
                 for item in values.into_iter() {
                     let (k, v): (#key_type, #value_type) = {
-                        #[allow(unused_braces)]
                         #parse_expr
                     };
                     if m.insert(k, v).is_some() {

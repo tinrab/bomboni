@@ -1,5 +1,3 @@
-#![allow(clippy::use_self, clippy::fallible_impl_from)]
-
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Number as JsonNumber, Value as JsonValue};
 use std::{
@@ -35,7 +33,7 @@ impl TryFrom<JsonValue> for Struct {
 
 impl From<Struct> for JsonValue {
     fn from(value: Struct) -> Self {
-        JsonValue::Object(
+        Self::Object(
             value
                 .fields
                 .into_iter()
@@ -96,7 +94,7 @@ impl Serialize for Struct {
     where
         S: serde::Serializer,
     {
-        use ::serde::ser::SerializeMap;
+        use serde::ser::SerializeMap;
 
         let mut s = serializer.serialize_map(Some(self.fields.len()))?;
         for (k, v) in &self.fields {
@@ -123,17 +121,15 @@ impl From<Value> for JsonValue {
         };
         match kind {
             ValueKind::NullValue(_) => Self::Null,
-            ValueKind::NumberValue(n) => JsonValue::Number(
+            ValueKind::NumberValue(n) => Self::Number(
                 JsonNumber::from_f64(n).expect("NumberValue is expected to be a valid f64"),
             ),
-            ValueKind::StringValue(s) => JsonValue::String(s),
-            ValueKind::BoolValue(b) => JsonValue::Bool(b),
+            ValueKind::StringValue(s) => Self::String(s),
+            ValueKind::BoolValue(b) => Self::Bool(b),
             ValueKind::StructValue(s) => {
-                JsonValue::Object(s.fields.into_iter().map(|(k, v)| (k, v.into())).collect())
+                Self::Object(s.fields.into_iter().map(|(k, v)| (k, v.into())).collect())
             }
-            ValueKind::ListValue(l) => {
-                JsonValue::Array(l.values.into_iter().map(Into::into).collect())
-            }
+            ValueKind::ListValue(l) => Self::Array(l.values.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -163,7 +159,7 @@ impl From<JsonValue> for Value {
             },
             JsonValue::Array(a) => Self {
                 kind: Some(ValueKind::ListValue(
-                    a.into_iter().map(Into::<Value>::into).collect(),
+                    a.into_iter().map(Into::<Self>::into).collect(),
                 )),
             },
         }

@@ -33,17 +33,17 @@ pub(crate) mod parser {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Filter {
     /// Logical AND of filters.
-    Conjunction(Vec<Filter>),
+    Conjunction(Vec<Self>),
     /// Logical OR of filters.
-    Disjunction(Vec<Filter>),
+    Disjunction(Vec<Self>),
     /// Logical NOT of a filter.
-    Negate(Box<Filter>),
+    Negate(Box<Self>),
     /// Comparison filter.
-    Restriction(Box<Filter>, FilterComparator, Box<Filter>),
+    Restriction(Box<Self>, FilterComparator, Box<Self>),
     /// Function call filter.
-    Function(String, Vec<Filter>),
+    Function(String, Vec<Self>),
     /// Composite filter.
-    Composite(Box<Filter>),
+    Composite(Box<Self>),
     /// Field name.
     Name(String),
     /// Literal value.

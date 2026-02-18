@@ -28,7 +28,7 @@ pub enum Value {
     /// Timestamp value.
     Timestamp(UtcDateTime),
     /// Repeated value.
-    Repeated(Vec<Value>),
+    Repeated(Vec<Self>),
     /// Any value.
     Any,
 }

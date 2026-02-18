@@ -1,5 +1,3 @@
-#![allow(clippy::option_if_let_else)]
-
 use std::collections::BTreeSet;
 
 use proc_macro2::TokenStream;
@@ -14,11 +12,10 @@ use crate::parse::{
 };
 
 pub fn expand(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
-    if let Some(tagged_union) = options.tagged_union.as_ref() {
-        expand_tagged_union(options, variants, tagged_union)
-    } else {
-        expand_parse(options, variants)
-    }
+    options.tagged_union.as_ref().map_or_else(
+        || expand_parse(options, variants),
+        |tagged_union| expand_tagged_union(options, variants, tagged_union),
+    )
 }
 
 fn expand_parse(options: &ParseOptions, variants: &[ParseVariant]) -> syn::Result<TokenStream> {
@@ -66,7 +63,6 @@ fn expand_tagged_union(
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics RequestParse<#source> for #ident #type_generics #where_clause {
-            #[allow(ignored_unit_patterns)]
             fn parse(source: #source) -> RequestResult<Self> {
                 let source = source.#field_ident
                     .ok_or_else(|| RequestError::field(#field_literal, CommonError::RequiredFieldMissing))?;

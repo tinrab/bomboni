@@ -48,7 +48,11 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     tonic_prost_build::configure()
         .build_server(false)
         .build_client(false)
-        .compile_with_config(config, &proto_paths, &["./proto".into()])?;
+        .compile_with_config(
+            config,
+            &proto_paths,
+            &["./proto".into(), "../../../bomboni_proto/proto".into()],
+        )?;
 
     compile(CompileConfig {
         api: ApiConfig {

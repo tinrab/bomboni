@@ -52,7 +52,6 @@ pub fn expand(options: &ParseOptions, fields: &[ParseField]) -> syn::Result<Toke
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics From<#ident #type_generics> for #source #where_clause {
-            #[allow(clippy::needless_update)]
             fn from(target: #ident #type_generics) -> Self {
                 let mut source: #source = Default::default();
                 #write_fields
@@ -173,40 +172,41 @@ fn expand_write_field_mask(
     let _field_name = target_ident.to_string();
 
     // Extract container and field from source option
-    let (container_ident, field_path) = if let Some(source) = field.options.source.as_ref() {
-        // For source like "book?.display_name", we want container="book", field="display_name"
-        // For source like "book?.author?.name", we want container="book", field="name"
-        let parts: Vec<&str> = source.split('.').collect();
-        if parts.len() >= 2 {
-            let container_name = parts[0].trim_end_matches('?');
-            let field_name = parts.last().unwrap().trim_end_matches('?');
-            let container_ident = format_ident!("{}", container_name);
-            let field_path = field_name.to_string();
-            (Some(container_ident), field_path)
-        } else {
-            (None, source.clone()) // Use the actual source string when no container
-        }
-    } else {
-        (None, target_ident.to_string())
-    };
+    let (container_ident, field_path) = field.options.source.as_ref().map_or_else(
+        || (None, target_ident.to_string()),
+        |source| {
+            // For source like "book?.display_name", we want container="book", field="display_name"
+            // For source like "book?.author?.name", we want container="book", field="name"
+            let parts: Vec<&str> = source.split('.').collect();
+            if parts.len() >= 2 {
+                let container_name = parts[0].trim_end_matches('?');
+                let field_name = parts.last().unwrap().trim_end_matches('?');
+                let container_ident = format_ident!("{}", container_name);
+                let field_path = field_name.to_string();
+                (Some(container_ident), field_path)
+            } else {
+                (None, source.clone()) // Use the actual source string when no container
+            }
+        },
+    );
 
     // Determine container field for field mask
-    let _container_field = if let Some(field) = &field_mask.field {
-        field.clone()
-    } else if let Some(container_ident) = &container_ident {
-        container_ident.clone()
-    } else {
-        format_ident!("book") // Default fallback
-    };
+    let _container_field = field_mask.field.as_ref().map_or_else(
+        || {
+            container_ident
+                .as_ref()
+                .map_or_else(|| format_ident!("book"), Clone::clone) // Default fallback
+        },
+        Clone::clone,
+    );
 
     let mask_field = &field_mask.mask;
 
     // Extract the container field (e.g., book) once
-    let container_access = if let Some(container_ident) = &container_ident {
-        quote! { source.#container_ident }
-    } else {
-        quote! { source }
-    };
+    let container_access = container_ident.as_ref().map_or_else(
+        || quote! { source },
+        |container_ident| quote! { source.#container_ident },
+    );
 
     // Generate the nested field access (e.g., display_name)
     let nested_field = format_ident!("{}", field_path);
