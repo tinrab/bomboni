@@ -474,28 +474,28 @@ impl<'a> TsDeclParser<'a> {
             match rename_rule {
                 RenameRule::None => s.to_owned(),
                 RenameRule::LowerCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Lower),
                 RenameRule::UpperCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Upper),
                 RenameRule::PascalCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Pascal),
                 RenameRule::CamelCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Camel),
                 RenameRule::SnakeCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Snake),
                 RenameRule::ScreamingSnakeCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Constant),
                 RenameRule::KebabCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Kebab),
                 RenameRule::ScreamingKebabCase => s
-                    .with_boundaries(&self.options.rename_boundary)
+                    .set_boundaries(&self.options.rename_boundary)
                     .to_case(Case::Cobol),
             }
         }

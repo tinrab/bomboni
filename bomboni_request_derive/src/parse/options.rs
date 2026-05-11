@@ -620,14 +620,10 @@ impl FromMeta for ParseRequest {
         let mut name = None;
         for item in items {
             match item {
-                NestedMeta::Meta(Meta::NameValue(MetaNameValue { path, value, .. })) => {
-                    if path.is_ident("name") {
-                        name = Some(value.clone());
-                    } else {
-                        return Err(
-                            darling::Error::custom("invalid request option").with_span(item)
-                        );
-                    }
+                NestedMeta::Meta(Meta::NameValue(MetaNameValue { path, value, .. }))
+                    if path.is_ident("name") =>
+                {
+                    name = Some(value.clone());
                 }
                 _ => {
                     return Err(darling::Error::custom("invalid request option").with_span(item));

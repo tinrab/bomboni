@@ -14,5 +14,5 @@ pub fn str_to_case<S: AsRef<str>>(s: S, case: Case) -> String {
         Boundary::DigitUpper,
         Boundary::DigitLower,
     ];
-    s.as_ref().with_boundaries(BOUNDARIES).to_case(case)
+    s.as_ref().set_boundaries(BOUNDARIES).to_case(case)
 }

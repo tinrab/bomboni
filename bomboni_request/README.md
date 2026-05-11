@@ -70,7 +70,7 @@ use bomboni_request::testing::schema::{RequestItem, UserItem, TaskItem};
 // Parse complex filter expressions
 let filter = Filter::parse(r#"
     user.age >= 18
-    AND user.id:"4" 
+    AND user.id:"4"
     AND NOT (task.deleted = false)
     AND task.content = user.displayName
     AND task.tags:("a" "b")
@@ -112,7 +112,7 @@ let a = UserItem {
     age: 30,
 };
 let b = UserItem {
-    id: "2".into(), 
+    id: "2".into(),
     display_name: "Bob".into(),
     age: 25,
 };

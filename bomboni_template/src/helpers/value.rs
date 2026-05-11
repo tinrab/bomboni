@@ -1,10 +1,11 @@
-use bomboni_proto::serde::helpers::is_truthy;
+use std::collections::BTreeMap;
+
+use bomboni_serde::is_truthy;
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, RenderContext, RenderError, RenderErrorReason,
     ScopedJson,
 };
 use serde_json::Value;
-use std::collections::BTreeMap;
 
 use crate::helpers::utility::{get_hash_opt, get_param, get_param_value};
 

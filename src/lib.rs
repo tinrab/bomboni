@@ -28,6 +28,12 @@ pub mod request {
     pub use bomboni_request::*;
 }
 
+#[cfg(feature = "serde")]
+/// Serde utilities.
+pub mod serde {
+    pub use bomboni_serde::*;
+}
+
 #[cfg(feature = "template")]
 /// Template rendering and processing.
 pub mod template {

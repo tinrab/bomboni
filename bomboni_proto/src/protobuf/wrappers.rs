@@ -12,7 +12,7 @@ use crate::google::protobuf::{
     BoolValue, BytesValue, DoubleValue, FloatValue, Int32Value, Int64Value, StringValue,
     UInt32Value, UInt64Value,
 };
-use crate::serde::helpers as serde_helpers;
+use bomboni_serde as serde_helpers;
 
 impl From<String> for StringValue {
     fn from(value: String) -> Self {

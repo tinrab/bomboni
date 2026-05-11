@@ -27,7 +27,7 @@ pub mod sql;
 /// Value types and parsing.
 pub mod value;
 
-#[cfg(feature = "testing")]
+#[cfg(any(feature = "testing", test))]
 /// Testing utilities and schemas.
 pub mod testing;
 

@@ -92,7 +92,7 @@ fn build_serde(config: &mut Config) {
     // Skip defaults
     config.field_attribute(
         ".google.rpc.ErrorInfo.metadata",
-        r#"#[serde(default, skip_serializing_if = "crate::serde::helpers::is_default")]"#,
+        r#"#[serde(default, skip_serializing_if = "::bomboni_serde::is_default")]"#,
     );
 
     config.message_attribute(

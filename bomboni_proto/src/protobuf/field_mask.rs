@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::google::protobuf::FieldMask;
-use crate::serde::helpers as serde_helpers;
+use bomboni_serde as serde_helpers;
 
 impl FieldMask {
     /// Creates a new field mask with the given paths.
