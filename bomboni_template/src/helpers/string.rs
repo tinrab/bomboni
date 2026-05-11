@@ -1,10 +1,9 @@
-use crate::helpers::utility::get_param_opt;
-use crate::helpers::utility::get_param_value;
-use convert_case::{Case, Casing};
-use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
 use std::collections::BTreeMap;
 
-use super::utility::get_param;
+use convert_case::{Case, Casing, Converter, Pattern};
+use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
+
+use crate::helpers::utility::{get_param, get_param_opt, get_param_value};
 
 /// Name of upper case helper.
 pub const UPPER_CASE_HELPER_NAME: &str = "upperCase";
@@ -116,8 +115,8 @@ fn convert_case_helper(
         UPPER_CASE_HELPER_NAME => value.to_case(Case::Upper),
         LOWER_CASE_HELPER_NAME => value.to_case(Case::Lower),
         TITLE_CASE_HELPER_NAME => value.to_case(Case::Title),
-        TOGGLE_CASE_HELPER_NAME => value.to_case(Case::Toggle),
-        ALTERNATING_CASE_HELPER_NAME => value.to_case(Case::Alternating),
+        TOGGLE_CASE_HELPER_NAME => convert_toggle_case(&value),
+        ALTERNATING_CASE_HELPER_NAME => convert_alternating_case(&value),
         CAMEL_CASE_HELPER_NAME => value.to_case(Case::Camel),
         PASCAL_CASE_HELPER_NAME => value.to_case(Case::Pascal),
         UPPER_CAMEL_CASE_HELPER_NAME => value.to_case(Case::UpperCamel),
@@ -133,6 +132,60 @@ fn convert_case_helper(
     })?;
 
     Ok(())
+}
+
+fn convert_toggle_case(value: &str) -> String {
+    Converter::new()
+        .set_delimiter(" ")
+        .set_pattern(Pattern::Custom(toggle_words))
+        .convert(value)
+}
+
+fn convert_alternating_case(value: &str) -> String {
+    Converter::new()
+        .set_delimiter(" ")
+        .set_pattern(Pattern::Custom(alternating_words))
+        .convert(value)
+}
+
+fn toggle_words(words: &[&str]) -> Vec<String> {
+    words
+        .iter()
+        .map(|word| {
+            let mut chars = word.chars();
+            chars.next().map_or_else(String::new, |c| {
+                [
+                    c.to_lowercase().collect::<String>(),
+                    chars.as_str().to_uppercase(),
+                ]
+                .concat()
+            })
+        })
+        .collect()
+}
+
+fn alternating_words(words: &[&str]) -> Vec<String> {
+    let mut upper = false;
+    words
+        .iter()
+        .map(|word| {
+            word.chars()
+                .map(|letter| {
+                    if letter.is_uppercase() || letter.is_lowercase() {
+                        if upper {
+                            upper = false;
+                            letter.to_uppercase().to_string()
+                        } else {
+                            upper = true;
+                            letter.to_lowercase().to_string()
+                        }
+                    } else {
+                        letter.to_string()
+                    }
+                })
+                .collect()
+        })
+        .collect()
 }
 
 fn to_string_helper(

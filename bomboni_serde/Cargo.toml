@@ -1,8 +1,8 @@
 [package]
-name = "bomboni_template"
+name = "bomboni_serde"
 version.workspace = true
 authors.workspace = true
-description = "Utilities for working Handlebars templates. Part of Bomboni library."
+description = "Serde utilities."
 repository = "https://github.com/tinrab/bomboni"
 homepage = "https://github.com/tinrab/bomboni"
 license-file = "../LICENSE"
@@ -10,16 +10,12 @@ readme = "README.md"
 edition.workspace = true
 
 [lib]
-name = "bomboni_template"
+name = "bomboni_serde"
 path = "src/lib.rs"
 
-[features]
-testing = []
-
 [dependencies]
-bomboni_serde = { workspace = true }
-
-handlebars.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-convert_case.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

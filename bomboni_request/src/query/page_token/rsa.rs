@@ -10,8 +10,7 @@ use crate::{
     },
 };
 use base64ct::{Base64, Base64Url, Encoding};
-use rand_core::OsRng;
-use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey, rand_core::OsRng};
 use std::fmt::{self, Debug, Formatter};
 
 const PARAMS_KEY_LENGTH: usize = 32;
