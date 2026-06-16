@@ -25,6 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install just
+          cargo install cargo-workspaces
 
       - name: Cache
         uses: actions/cache@v3
@@ -44,6 +45,6 @@ jobs:
         run: just lint
 
       - name: Publish
-        run: cargo publish --workspace
+        run: cargo workspaces publish --yes --from-git
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
