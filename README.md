@@ -1,11 +1,8 @@
 # Bomboni: Utility Library for Rust
 
-🚧 work in progress 🚧
-
 A collection of Rust libraries for building robust applications.
 
-This project includes utilities for working with WASM, extensions over protobuf/prost, tools for gRPC requests following Google AIP
-designs, etc.
+This project includes utilities for working with WASM, extensions over protobuf/prost, tools for gRPC requests following Google AIP designs, etc.
 
 ## Crates
 

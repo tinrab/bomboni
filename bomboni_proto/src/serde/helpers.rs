@@ -1,7 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
 pub use bomboni_serde::{
-    as_string, default_bool_true, is_default, is_truthy, merge_json, string_list,
+    as_string, as_string_opt, default_bool_true, is_default, is_truthy, merge_json, string_list,
 };
 use serde::{Deserialize, Deserializer, Serializer, de, ser};
 

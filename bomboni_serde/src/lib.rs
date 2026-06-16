@@ -62,6 +62,52 @@ pub mod as_string {
     }
 }
 
+/// Serialization utilities for converting optional values to strings.
+pub mod as_string_opt {
+    use super::{Deserialize, Deserializer, FromStr, Serializer, as_string, de};
+
+    /// Serializes an optional value as a string.
+    ///
+    /// # Errors
+    ///
+    /// Will return the serializer's error if string serialization fails.
+    pub fn serialize<T, S>(
+        value: &Option<T>,
+        serializer: S,
+    ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        T: ToString,
+        S: Serializer,
+    {
+        match value {
+            Some(value) => as_string::serialize(value, serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    /// Deserializes an optional string value.
+    ///
+    /// # Errors
+    ///
+    /// Will return the deserializer's error if string deserialization fails
+    /// or if the string cannot be parsed into the target type.
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+    where
+        T: FromStr,
+        D: Deserializer<'de>,
+    {
+        use de::Error;
+
+        Option::<String>::deserialize(deserializer)?
+            .map(|str_value| {
+                let deserializer =
+                    de::value::StringDeserializer::<de::value::Error>::new(str_value);
+                as_string::deserialize(deserializer).map_err(D::Error::custom)
+            })
+            .transpose()
+    }
+}
+
 /// Serialization utilities for comma-separated string lists.
 pub mod string_list {
     use super::{
@@ -204,5 +250,26 @@ mod tests {
         assert_eq!(encoded, r#"{"value":"42"}"#);
         let decoded: TestIntString = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded.value, v.value);
+    }
+
+    #[test]
+    fn serde_as_string_opt() {
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        struct TestIntStringOpt {
+            #[serde(with = "as_string_opt")]
+            value: Option<u64>,
+        }
+
+        let v = TestIntStringOpt { value: Some(42) };
+        let encoded = serde_json::to_string(&v).unwrap();
+        assert_eq!(encoded, r#"{"value":"42"}"#);
+        let decoded: TestIntStringOpt = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, v);
+
+        let v = TestIntStringOpt { value: None };
+        let encoded = serde_json::to_string(&v).unwrap();
+        assert_eq!(encoded, r#"{"value":null}"#);
+        let decoded: TestIntStringOpt = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, v);
     }
 }
