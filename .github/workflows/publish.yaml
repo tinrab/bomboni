@@ -44,7 +44,6 @@ jobs:
         run: just lint
 
       - name: Publish
-        run: just publish
+        run: cargo publish --workspace
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-          ACTUALLY_DO_IT: "1"
