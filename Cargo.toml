@@ -73,7 +73,7 @@ tonic-reflection = "0.14.6"
 tokio = "1.52.3"
 async-trait = "0.1.89"
 postgres-types = "0.2.14"
-mysql_common = "0.37.2"
+mysql_common = "0.37.3"
 jsonwebtoken = { version = "10.4", features = ["rust_crypto"] }
 cookie = "0.18"
 

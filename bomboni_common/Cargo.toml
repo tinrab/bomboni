@@ -22,7 +22,7 @@ wasm = [
   "dep:js-sys",
   "dep:wasm-bindgen",
   "time/wasm-bindgen",
-  "dep:getrandom",
+  "dep:getrandom_03",
   "serde",
 ]
 js = []
@@ -35,7 +35,9 @@ bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
 ulid.workspace = true
-getrandom = { version = "0.4.2", features = ["wasm_js"], optional = true }
+getrandom_03 = { package = "getrandom", version = "0.3.4", features = [
+  "wasm_js",
+], optional = true }
 
 tokio = { workspace = true, features = ["time", "sync"], optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }

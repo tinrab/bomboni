@@ -1,3 +1,5 @@
+export RUSTFLAGS := "-Awarnings"
+
 cwd := `pwd`
 root-features := "derive,prost,proto,request,template,serde,chrono,tokio,tonic,fs,postgres,mysql"
 workspace-excludes := "bookstore-api,bookstore-service"
@@ -15,7 +17,8 @@ check:
     set -euxo pipefail
 
     cargo check --workspace --no-default-features {{ exclude-flags }}
-    cargo check --workspace --features "{{ root-features }}" {{ exclude-flags }}
+    cargo check --workspace --features "{{ root-features }}" {{ exclude-flags }} --tests
+    cargo check --workspace --features "{{ root-features }}" {{ exclude-flags }} --examples
 
     cargo check --workspace --features wasm --exclude bomboni_fs {{ exclude-flags }}
     cargo check --target wasm32-unknown-unknown -p bomboni_wasm_core
