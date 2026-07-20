@@ -40,7 +40,12 @@ mod postgres;
         feature = "js",
     ),
     derive(bomboni_wasm::Wasm),
-    wasm(wasm_abi, js_value, override_type = "Date")
+    wasm(
+        bomboni_wasm_crate = bomboni_wasm,
+        wasm_abi,
+        js_value,
+        override_type = "Date"
+    )
 )]
 pub struct UtcDateTime(OffsetDateTime);
 
@@ -271,7 +276,7 @@ const _: () = {
 
     impl From<UtcDateTime> for JsValue {
         fn from(value: UtcDateTime) -> Self {
-            let mut date = js_sys::Date::new_with_year_month_day_hr_min_sec(
+            let date = js_sys::Date::new_with_year_month_day_hr_min_sec(
                 value.0.year() as u32,
                 Into::<u8>::into(value.0.month()) as i32 - 1,
                 value.0.day() as i32,

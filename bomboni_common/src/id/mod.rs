@@ -63,7 +63,7 @@ impl Id {
     /// Generates a new random sortable ID.
     #[must_use]
     pub fn generate() -> Self {
-        Self(Ulid::new().0)
+        Self(Ulid::generate().0)
     }
 
     /// Generate multiple random sortable IDs.

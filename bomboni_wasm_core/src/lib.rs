@@ -8,3 +8,5 @@ pub mod ts_decl;
 
 /// TypeScript type representations.
 pub mod ts_type;
+
+mod serde;

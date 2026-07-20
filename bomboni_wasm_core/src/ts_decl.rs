@@ -1,17 +1,16 @@
-use crate::{
-    options::{FieldWasm, WasmOptions},
-    ts_type::{TsType, TsTypeElement, TypeLiteralTsType},
-};
-use bomboni_core::{string::str_to_case, syn::type_is_phantom};
+use bomboni_core::string::str_to_case;
 use convert_case::{Case, Casing};
-use serde_derive_internals::{
-    ast,
-    attr::{RenameRule, TagType},
-};
 use std::fmt::Write;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
+};
+use syn::{Type, TypePath};
+
+use crate::{
+    options::{FieldWasm, WasmOptions},
+    serde::{self, RenameRule, TagType},
+    ts_type::{TsType, TsTypeElement, TypeLiteralTsType},
 };
 
 /// TypeScript declaration.
@@ -152,7 +151,7 @@ impl Display for EnumTsDecl {
                     f,
                     "\n  {} = {},",
                     str_to_case(&member.name, Case::Constant),
-                    &member.alias_type
+                    member.alias_type
                 )?;
             }
             write!(f, "\n}}")
@@ -248,14 +247,14 @@ impl<'a> TsDeclParser<'a> {
         }
 
         match &self.options.serde_data() {
-            ast::Data::Struct(style, fields) => self.parse_struct(*style, fields),
-            ast::Data::Enum(variants) => self.parse_enum(variants).into(),
+            serde::Data::Struct(style, fields) => self.parse_struct(*style, fields),
+            serde::Data::Enum(variants) => self.parse_enum(variants).into(),
         }
     }
 
-    fn parse_struct(&self, style: ast::Style, fields: &[ast::Field]) -> TsDecl {
+    fn parse_struct(&self, style: serde::Style, fields: &[serde::Field<'_>]) -> TsDecl {
         match (
-            self.options.serde_attrs().tag(),
+            &self.options.serde_attrs().tag,
             self.parse_fields(style, fields, &self.options.fields),
         ) {
             (TagType::Internal { tag, .. }, ParsedFields::Named(members, extends)) => {
@@ -277,12 +276,12 @@ impl<'a> TsDeclParser<'a> {
         }
     }
 
-    fn parse_enum(&self, variants: &[ast::Variant]) -> EnumTsDecl {
-        let tag_type = self.options.serde_attrs().tag();
+    fn parse_enum(&self, variants: &[serde::Variant<'_>]) -> EnumTsDecl {
+        let tag_type = &self.options.serde_attrs().tag;
         let members: Vec<TypeAliasTsDecl> = variants
             .iter()
             .filter_map(|variant| {
-                if variant.attrs.skip_serializing() || variant.attrs.skip_deserializing() {
+                if variant.attrs.skip_serializing || variant.attrs.skip_deserializing {
                     None
                 } else {
                     Some(self.parse_variant(variant, tag_type))
@@ -306,35 +305,35 @@ impl<'a> TsDeclParser<'a> {
 
     fn parse_fields(
         &self,
-        style: ast::Style,
-        fields: &[ast::Field],
+        style: serde::Style,
+        fields: &[serde::Field<'_>],
         wasm_fields: &'a [FieldWasm],
     ) -> ParsedFields {
         match style {
-            ast::Style::Newtype => {
+            serde::Style::Newtype => {
                 return ParsedFields::Transparent(self.parse_field(&fields[0], wasm_fields).1);
             }
-            ast::Style::Unit => return ParsedFields::Transparent(TsType::nullish()),
+            serde::Style::Unit => return ParsedFields::Transparent(TsType::nullish()),
             _ => {}
         }
 
         let fields: Vec<_> = fields
             .iter()
             .filter(|field| {
-                !field.attrs.skip_serializing()
-                    && !field.attrs.skip_deserializing()
+                !field.attrs.skip_serializing
+                    && !field.attrs.skip_deserializing
                     && !type_is_phantom(field.ty)
             })
             .collect();
 
-        if fields.len() == 1 && self.options.serde_attrs().transparent() {
+        if fields.len() == 1 && self.options.serde_attrs().transparent {
             return ParsedFields::Transparent(self.parse_field(fields[0], wasm_fields).1);
         }
 
         match style {
-            ast::Style::Struct => {
+            serde::Style::Struct => {
                 let (flatten_fields, members): (Vec<_>, Vec<_>) =
-                    fields.into_iter().partition(|field| field.attrs.flatten());
+                    fields.into_iter().partition(|field| field.attrs.flatten);
 
                 let members = members
                     .into_iter()
@@ -356,8 +355,8 @@ impl<'a> TsDeclParser<'a> {
                             key,
                             alias_type,
                             optional: optional
-                                || !(self.options.serde_attrs().default().is_none()
-                                    && field.attrs.default().is_none()),
+                                || self.options.serde_attrs().default
+                                || field.attrs.default,
                         }
                     })
                     .collect();
@@ -369,7 +368,7 @@ impl<'a> TsDeclParser<'a> {
 
                 ParsedFields::Named(members, flatten_fields)
             }
-            ast::Style::Tuple => ParsedFields::Unnamed(
+            serde::Style::Tuple => ParsedFields::Unnamed(
                 fields
                     .into_iter()
                     .map(|field| self.parse_field(field, wasm_fields).1)
@@ -381,7 +380,7 @@ impl<'a> TsDeclParser<'a> {
 
     fn parse_field(
         &self,
-        field: &ast::Field,
+        field: &serde::Field<'_>,
         wasm_fields: &'a [FieldWasm],
     ) -> (String, TsType, &'a FieldWasm) {
         let wasm_field = wasm_fields
@@ -390,7 +389,7 @@ impl<'a> TsDeclParser<'a> {
             .unwrap();
 
         let name = wasm_field.rename.clone().unwrap_or_else(|| {
-            let mut name = field.attrs.name().serialize_name().to_string();
+            let mut name = field.attrs.name.clone();
             if let Some(rename_all) = self.options.rename_all {
                 name = self.apply_rename(&name, rename_all);
             }
@@ -427,16 +426,16 @@ impl<'a> TsDeclParser<'a> {
         (name, field_type, wasm_field)
     }
 
-    fn parse_variant(&self, variant: &ast::Variant, tag_type: &TagType) -> TypeAliasTsDecl {
+    fn parse_variant(&self, variant: &serde::Variant<'_>, tag_type: &TagType) -> TypeAliasTsDecl {
         let wasm_variant = self
             .options
             .variants
             .iter()
-            .find(|v| v.ident == variant.ident)
+            .find(|v| v.ident == *variant.ident)
             .unwrap();
 
         let name = wasm_variant.rename.clone().unwrap_or_else(|| {
-            let mut name = variant.attrs.name().serialize_name().to_string();
+            let mut name = variant.attrs.name.clone();
             if let Some(rename_all) = self.options.rename_all {
                 name = self.apply_rename(&name, rename_all);
             }
@@ -567,4 +566,8 @@ impl From<ParsedFields> for TsType {
             ParsedFields::Transparent(ty) => ty,
         }
     }
+}
+
+fn type_is_phantom(ty: &Type) -> bool {
+    matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "PhantomData"))
 }

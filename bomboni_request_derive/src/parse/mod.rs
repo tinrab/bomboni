@@ -1,5 +1,4 @@
-use darling::ast::Data;
-use options::ParseOptions;
+use options::{Data, ParseOptions};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;

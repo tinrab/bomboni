@@ -129,10 +129,9 @@ pub fn get_query_field_token_type(ty: &Type) -> Option<&Type> {
 
 #[cfg(test)]
 mod tests {
-    use darling::ast::Data;
     use syn::parse_quote;
 
-    use crate::parse::options::ParseOptions;
+    use crate::parse::options::{Data, ParseOptions};
 
     use super::*;
 

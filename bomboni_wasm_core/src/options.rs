@@ -2,22 +2,23 @@
 
 use std::collections::BTreeMap;
 
-use convert_case::Boundary;
-use darling::{FromDeriveInput, FromField, FromMeta, FromVariant, ast::Fields};
-use proc_macro2::Ident;
-use serde_derive_internals::{
-    Ctxt,
-    ast::{self, Container as SerdeContainer},
-    attr,
+use bomboni_core::syn::meta::{
+    attribute_metas, meta_bool, meta_expr, meta_list, meta_path, meta_string,
 };
-use syn::{self, DeriveInput, Generics, Member, Path};
+use convert_case::Boundary;
+use proc_macro2::Ident;
+use syn::{
+    self, Attribute, Data, DeriveInput, Expr, ExprLit, ExprTuple, Generics, Lit, Member, Meta, Path,
+};
 
-use crate::ts_type::TsType;
+use crate::{
+    serde::{self, Container as SerdeContainer, RenameRule},
+    ts_type::TsType,
+};
 
 /// Configuration options for the Wasm derive macro.
 pub struct WasmOptions<'a> {
-    /// The serde container information from the input type.
-    pub serde_container: SerdeContainer<'a>,
+    serde_container: SerdeContainer<'a>,
 
     /// Custom path to the wasm-bindgen crate.
     pub wasm_bindgen_crate: Option<Path>,
@@ -56,7 +57,7 @@ pub struct WasmOptions<'a> {
     pub rename_wrapper: Option<bool>,
 
     /// Rename rule for all fields and variants.
-    pub rename_all: Option<attr::RenameRule>,
+    pub rename_all: Option<RenameRule>,
 
     /// Word boundaries for renaming.
     pub rename_boundary: Vec<Boundary>,
@@ -152,8 +153,7 @@ pub struct ProxyWasm {
     pub try_from: Option<Path>,
 }
 
-#[derive(Debug, FromDeriveInput)]
-#[darling(attributes(wasm))]
+#[derive(Debug, Default)]
 struct Attributes {
     wasm_bindgen_crate: Option<Path>,
     js_sys_crate: Option<Path>,
@@ -172,11 +172,9 @@ struct Attributes {
     rename_all: Option<String>,
     rename_boundary: Option<String>,
     override_type: Option<String>,
-    data: darling::ast::Data<VariantAttributes, FieldAttributes>,
 }
 
-#[derive(Debug, FromField)]
-#[darling(attributes(wasm))]
+#[derive(Debug, Default)]
 struct FieldAttributes {
     ident: Option<Ident>,
     change_ref: Option<ReferenceChangeMap>,
@@ -187,16 +185,125 @@ struct FieldAttributes {
     rename: Option<String>,
 }
 
-#[derive(Debug, FromVariant)]
-#[darling(attributes(wasm))]
+#[derive(Debug)]
 struct VariantAttributes {
     ident: Ident,
     change_ref: Option<ReferenceChangeMap>,
     change_refs: Option<ReferenceChangeMap>,
     override_type: Option<String>,
     rename_wrapper: Option<bool>,
-    fields: Fields<FieldAttributes>,
+    fields: Vec<FieldAttributes>,
     rename: Option<String>,
+}
+
+impl Attributes {
+    fn parse(attrs: &[Attribute]) -> syn::Result<Self> {
+        let mut options = Self::default();
+        for meta in attribute_metas(attrs, "wasm")? {
+            let path = meta.path();
+            if path.is_ident("wasm_bindgen_crate") {
+                options.wasm_bindgen_crate = Some(meta_path(&meta)?);
+            } else if path.is_ident("js_sys_crate") {
+                options.js_sys_crate = Some(meta_path(&meta)?);
+            } else if path.is_ident("bomboni_crate") {
+                options.bomboni_crate = Some(meta_path(&meta)?);
+            } else if path.is_ident("bomboni_wasm_crate") {
+                options.bomboni_wasm_crate = Some(meta_path(&meta)?);
+            } else if path.is_ident("wasm_abi") {
+                options.wasm_abi = Some(meta_bool(&meta)?);
+            } else if path.is_ident("into_wasm_abi") {
+                options.into_wasm_abi = Some(meta_bool(&meta)?);
+            } else if path.is_ident("from_wasm_abi") {
+                options.from_wasm_abi = Some(meta_bool(&meta)?);
+            } else if path.is_ident("enum_value") {
+                options.enum_value = Some(meta_bool(&meta)?);
+            } else if path.is_ident("js_value") {
+                options.js_value = Some(parse_js_value(&meta)?);
+            } else if path.is_ident("proxy") {
+                options.proxy = Some(parse_proxy(&meta)?);
+            } else if path.is_ident("rename") {
+                options.rename = Some(meta_string(&meta)?);
+            } else if path.is_ident("change_ref") {
+                options.change_ref = Some(parse_reference_change(&meta)?);
+            } else if path.is_ident("change_refs") {
+                options.change_refs = Some(parse_reference_change(&meta)?);
+            } else if path.is_ident("rename_wrapper") {
+                options.rename_wrapper = Some(meta_bool(&meta)?);
+            } else if path.is_ident("rename_all") {
+                options.rename_all = Some(meta_string(&meta)?);
+            } else if path.is_ident("rename_boundary") {
+                options.rename_boundary = Some(meta_string(&meta)?);
+            } else if path.is_ident("override_type") {
+                options.override_type = Some(meta_string(&meta)?);
+            } else {
+                return Err(syn::Error::new_spanned(meta, "unknown WASM option"));
+            }
+        }
+        Ok(options)
+    }
+}
+
+impl FieldAttributes {
+    fn parse(field: &syn::Field) -> syn::Result<Self> {
+        let mut options = Self {
+            ident: field.ident.clone(),
+            ..Self::default()
+        };
+        for meta in attribute_metas(&field.attrs, "wasm")? {
+            let path = meta.path();
+            if path.is_ident("change_ref") {
+                options.change_ref = Some(parse_reference_change(&meta)?);
+            } else if path.is_ident("change_refs") {
+                options.change_refs = Some(parse_reference_change(&meta)?);
+            } else if path.is_ident("override_type") {
+                options.override_type = Some(meta_string(&meta)?);
+            } else if path.is_ident("rename_wrapper") {
+                options.rename_wrapper = Some(meta_bool(&meta)?);
+            } else if path.is_ident("always_some") {
+                options.always_some = Some(meta_bool(&meta)?);
+            } else if path.is_ident("rename") {
+                options.rename = Some(meta_string(&meta)?);
+            } else {
+                return Err(syn::Error::new_spanned(meta, "unknown WASM field option"));
+            }
+        }
+        Ok(options)
+    }
+}
+
+impl VariantAttributes {
+    fn parse(variant: &syn::Variant) -> syn::Result<Self> {
+        let mut options = Self {
+            ident: variant.ident.clone(),
+            change_ref: None,
+            change_refs: None,
+            override_type: None,
+            rename_wrapper: None,
+            fields: variant
+                .fields
+                .iter()
+                .map(FieldAttributes::parse)
+                .collect::<syn::Result<_>>()?,
+            rename: None,
+        };
+        for meta in attribute_metas(&variant.attrs, "wasm")? {
+            let path = meta.path();
+            if path.is_ident("change_ref") {
+                options.change_ref = Some(parse_reference_change(&meta)?);
+            } else if path.is_ident("change_refs") {
+                options.change_refs = Some(parse_reference_change(&meta)?);
+            } else if path.is_ident("override_type") {
+                options.override_type = Some(meta_string(&meta)?);
+            } else if path.is_ident("rename_wrapper") {
+                options.rename_wrapper = Some(meta_bool(&meta)?);
+            } else if path.is_ident("rename") {
+                options.rename = Some(meta_string(&meta)?);
+            } else {
+                return Err(syn::Error::new_spanned(meta, "unknown WASM variant option"));
+            }
+        }
+        Ok(options)
+    }
 }
 
 impl<'a> WasmOptions<'a> {
@@ -207,33 +314,25 @@ impl<'a> WasmOptions<'a> {
     /// Will return an error if the input is not a valid struct or enum for WASM,
     /// if serde attributes are invalid, or if incompatible attribute combinations are used.
     pub fn from_derive_input(input: &'a DeriveInput) -> syn::Result<Self> {
-        let ctx = Ctxt::new();
-        let serde_container = match SerdeContainer::from_ast(
-            &ctx,
-            input,
-            serde_derive_internals::Derive::Serialize,
-        ) {
-            Some(container) => {
-                ctx.check()?;
-                container
-            }
-            None => {
-                return Err(ctx.check().expect_err("serde_container is None"));
-            }
-        };
-        let attributes = match Attributes::from_derive_input(input) {
-            Ok(v) => v,
-            Err(err) => {
-                return Err(err.into());
-            }
-        };
+        let serde_container = SerdeContainer::from_ast(input)?;
+        let attributes = Attributes::parse(&input.attrs)?;
 
-        let (fields, variants) = match (&serde_container.data, attributes.data) {
-            (ast::Data::Struct(_, serde_fields), darling::ast::Data::Struct(field_attributes)) => {
+        let (fields, variants) = match (&serde_container.data, &input.data) {
+            (serde::Data::Struct(_, serde_fields), Data::Struct(data)) => {
+                let field_attributes = data
+                    .fields
+                    .iter()
+                    .map(FieldAttributes::parse)
+                    .collect::<syn::Result<Vec<_>>>()?;
                 let fields = get_fields(serde_fields, &field_attributes);
                 (fields, Vec::new())
             }
-            (ast::Data::Enum(serde_variants), darling::ast::Data::Enum(variant_attributes)) => {
+            (serde::Data::Enum(serde_variants), Data::Enum(data)) => {
+                let variant_attributes = data
+                    .variants
+                    .iter()
+                    .map(VariantAttributes::parse)
+                    .collect::<syn::Result<Vec<_>>>()?;
                 let variants = get_variants(serde_variants, &variant_attributes);
                 (Vec::new(), variants)
             }
@@ -248,10 +347,7 @@ impl<'a> WasmOptions<'a> {
         let wasm_abi = attributes.wasm_abi.unwrap_or_default();
 
         let rename_all = if let Some(rename_all) = attributes.rename_all {
-            Some(
-                attr::RenameRule::from_str(&rename_all)
-                    .map_err(|err| syn::Error::new_spanned(input, err))?,
-            )
+            Some(RenameRule::parse(&rename_all, input)?)
         } else {
             None
         };
@@ -316,19 +412,18 @@ impl<'a> WasmOptions<'a> {
 
     /// Gets the identifier of the type.
     pub const fn ident(&self) -> &Ident {
-        &self.serde_container.ident
+        self.serde_container.ident
     }
 
     /// Gets the name of the type.
     pub fn name(&self) -> &str {
-        self.rename.as_ref().map_or_else(
-            || self.serde_attrs().name().serialize_name(),
-            String::as_str,
-        )
+        self.rename
+            .as_ref()
+            .map_or_else(|| self.serde_attrs().name.as_str(), String::as_str)
     }
 
     /// Gets the serde data for the type.
-    pub const fn serde_data(&self) -> &ast::Data<'_> {
+    pub(crate) const fn serde_data(&self) -> &serde::Data<'_> {
         &self.serde_container.data
     }
 
@@ -338,208 +433,141 @@ impl<'a> WasmOptions<'a> {
     }
 
     /// Gets the serde attributes for the type.
-    pub const fn serde_attrs(&self) -> &attr::Container {
+    pub(crate) const fn serde_attrs(&self) -> &serde::ContainerAttrs {
         &self.serde_container.attrs
     }
-}
 
-impl FromMeta for ReferenceChangeMap {
-    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
-        match expr {
-            syn::Expr::Lit(syn::ExprLit {
-                lit: syn::Lit::Str(name),
-                ..
-            }) => Ok(Self {
-                name: Some(name.value()),
-                types: BTreeMap::default(),
-            }),
-            syn::Expr::Array(syn::ExprArray { elems, .. }) => {
-                let mut types = BTreeMap::new();
-                for elem in elems {
-                    if let syn::Expr::Tuple(syn::ExprTuple { elems, .. }) = elem {
-                        if elems.len() != 2 {
-                            return Err(darling::Error::custom(
-                                "expected tuple of length 2 containing source and target names",
-                            )
-                            .with_span(elem));
-                        }
-                        if let (
-                            syn::Expr::Lit(syn::ExprLit {
-                                lit: syn::Lit::Str(source),
-                                ..
-                            }),
-                            syn::Expr::Lit(syn::ExprLit {
-                                lit: syn::Lit::Str(target),
-                                ..
-                            }),
-                        ) = (&elems[0], &elems[1])
-                        {
-                            types.insert(
-                                source.value(),
-                                TsType::Reference {
-                                    name: target.value(),
-                                    type_params: Vec::new(),
-                                },
-                            );
-                        } else {
-                            return Err(darling::Error::custom(
-                                "expected tuple of length 2 containing source and target names",
-                            ));
-                        }
-                    } else {
-                        return Err(darling::Error::custom(
-                            "expected tuple of length 2 containing source and target names",
-                        )
-                        .with_span(elem));
-                    }
-                }
-                Ok(Self { name: None, types })
-            }
-            _ => Err(darling::Error::custom("expected string literal")),
-        }
+    /// Gets the custom Serde crate path, if configured with `#[serde(crate = "...")]`.
+    pub const fn serde_crate(&self) -> Option<&Path> {
+        self.serde_container.attrs.custom_crate.as_ref()
     }
 }
 
-impl FromMeta for ProxyWasm {
-    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
-        match expr {
-            syn::Expr::Path(syn::ExprPath { path, .. }) => Ok(Self {
-                proxy: path.clone(),
-                into: None,
-                try_from: None,
-            }),
-            _ => Err(darling::Error::custom("expected proxy path").with_span(expr)),
-        }
-    }
-
-    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
-        let mut proxy = None;
-        let mut into = None;
-        let mut try_from = None;
-        for item in items {
-            match item {
-                darling::ast::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                    path,
-                    value: syn::Expr::Path(value),
-                    ..
-                })) => {
-                    if path.is_ident("source") {
-                        if proxy.is_some() {
-                            return Err(darling::Error::custom("proxy `source` already specified")
-                                .with_span(item));
-                        }
-                        proxy = Some(value.path.clone());
-                    } else if path.is_ident("into") {
-                        if into.is_some() {
-                            return Err(
-                                darling::Error::custom("`into` already specified").with_span(item)
-                            );
-                        }
-                        into = Some(value.path.clone());
-                    } else if path.is_ident("try_from") {
-                        if try_from.is_some() {
-                            return Err(darling::Error::custom("`try_from` already specified")
-                                .with_span(item));
-                        }
-                        try_from = Some(value.path.clone());
-                    } else {
-                        return Err(darling::Error::custom("invalid option").with_span(item));
-                    }
-                }
-                _ => {
-                    return Err(darling::Error::custom("invalid options").with_span(item));
-                }
+fn parse_reference_change(meta: &Meta) -> syn::Result<ReferenceChangeMap> {
+    match meta_expr(meta)? {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(name),
+            ..
+        }) => Ok(ReferenceChangeMap {
+            name: Some(name.value()),
+            types: BTreeMap::new(),
+        }),
+        Expr::Array(array) => {
+            let mut types = BTreeMap::new();
+            for elem in &array.elems {
+                let Expr::Tuple(ExprTuple { elems, .. }) = elem else {
+                    return Err(syn::Error::new_spanned(
+                        elem,
+                        "expected a source-target tuple",
+                    ));
+                };
+                let [source, target] = elems.iter().collect::<Vec<_>>()[..] else {
+                    return Err(syn::Error::new_spanned(
+                        elem,
+                        "expected a source-target tuple",
+                    ));
+                };
+                let (
+                    Expr::Lit(ExprLit {
+                        lit: Lit::Str(source),
+                        ..
+                    }),
+                    Expr::Lit(ExprLit {
+                        lit: Lit::Str(target),
+                        ..
+                    }),
+                ) = (source, target)
+                else {
+                    return Err(syn::Error::new_spanned(elem, "expected string literals"));
+                };
+                types.insert(
+                    source.value(),
+                    TsType::Reference {
+                        name: target.value(),
+                        type_params: Vec::new(),
+                    },
+                );
             }
+            Ok(ReferenceChangeMap { name: None, types })
         }
-        Ok(Self {
-            proxy: proxy.ok_or_else(|| darling::Error::custom("proxy `source` not specified"))?,
-            into,
-            try_from,
-        })
+        expr => Err(syn::Error::new_spanned(
+            expr,
+            "expected a string or mapping array",
+        )),
     }
 }
 
-impl FromMeta for JsValueWasm {
-    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
-        let mut into = None;
-        let mut try_from = None;
-        let mut convert_string = false;
-        for item in items {
-            match item {
-                darling::ast::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                    path,
-                    value: syn::Expr::Path(value),
-                    ..
-                })) => {
-                    if path.is_ident("into") {
-                        if into.is_some() {
-                            return Err(
-                                darling::Error::custom("`into` already specified").with_span(item)
-                            );
-                        }
-                        into = Some(value.path.clone());
-                    } else if path.is_ident("try_from") {
-                        if try_from.is_some() {
-                            return Err(darling::Error::custom("`try_from` already specified")
-                                .with_span(item));
-                        }
-                        try_from = Some(value.path.clone());
-                    } else {
-                        return Err(
-                            darling::Error::custom("expected `into` or `try_from`").with_span(item)
-                        );
-                    }
-                }
-                darling::ast::NestedMeta::Meta(syn::Meta::Path(path)) => {
-                    if path.is_ident("convert_string") {
-                        convert_string = true;
-                    } else {
-                        return Err(darling::Error::custom("invalid option").with_span(item));
-                    }
-                }
-                _ => {
-                    return Err(darling::Error::custom("invalid options").with_span(item));
-                }
-            }
-        }
-        Ok(Self {
-            into,
-            try_from,
-            convert_string,
-        })
-    }
-
-    fn from_word() -> darling::Result<Self> {
-        Ok(Self {
+fn parse_proxy(meta: &Meta) -> syn::Result<ProxyWasm> {
+    if let Meta::NameValue(_) = meta {
+        return Ok(ProxyWasm {
+            proxy: meta_path(meta)?,
             into: None,
             try_from: None,
-            convert_string: false,
-        })
+        });
     }
+    let Meta::List(list) = meta else {
+        return Err(syn::Error::new_spanned(meta, "expected proxy options"));
+    };
+    let mut proxy = None;
+    let mut into = None;
+    let mut try_from = None;
+    for option in meta_list(list)? {
+        if option.path().is_ident("source") {
+            proxy = Some(meta_path(&option)?);
+        } else if option.path().is_ident("into") {
+            into = Some(meta_path(&option)?);
+        } else if option.path().is_ident("try_from") {
+            try_from = Some(meta_path(&option)?);
+        } else {
+            return Err(syn::Error::new_spanned(option, "invalid proxy option"));
+        }
+    }
+    Ok(ProxyWasm {
+        proxy: proxy
+            .ok_or_else(|| syn::Error::new_spanned(meta, "proxy `source` not specified"))?,
+        into,
+        try_from,
+    })
+}
+
+fn parse_js_value(meta: &Meta) -> syn::Result<JsValueWasm> {
+    let mut value = JsValueWasm {
+        into: None,
+        try_from: None,
+        convert_string: false,
+    };
+    let Meta::List(list) = meta else {
+        return if matches!(meta, Meta::Path(_)) {
+            Ok(value)
+        } else {
+            Err(syn::Error::new_spanned(meta, "expected js_value options"))
+        };
+    };
+    for option in meta_list(list)? {
+        if option.path().is_ident("into") {
+            value.into = Some(meta_path(&option)?);
+        } else if option.path().is_ident("try_from") {
+            value.try_from = Some(meta_path(&option)?);
+        } else if option.path().is_ident("convert_string") {
+            value.convert_string = meta_bool(&option)?;
+        } else {
+            return Err(syn::Error::new_spanned(option, "invalid js_value option"));
+        }
+    }
+    Ok(value)
 }
 
 fn get_fields(
-    serde_fields: &[ast::Field],
-    field_attributes: &Fields<FieldAttributes>,
+    serde_fields: &[serde::Field<'_>],
+    field_attributes: &[FieldAttributes],
 ) -> Vec<FieldWasm> {
     let mut fields = Vec::new();
 
     for serde_field in serde_fields {
         let mut optional = false;
-        if let Some(expr) = serde_field.attrs.skip_serializing_if() {
-            let last_step = expr.path.segments.iter().rev().nth(1);
-            optional |= matches!(
-                last_step,
-                Some(
-                    syn::PathSegment { ident, .. }
-                ) if ident == "is_none"
-            );
-            optional |= matches!(
-                last_step,
-                Some(
-                    syn::PathSegment { ident, .. }
-                ) if ident == "is_default"
-            );
+        if let Some(path) = &serde_field.attrs.skip_serializing_if {
+            let predicate = path.segments.last().map(|segment| &segment.ident);
+            optional |= predicate.is_some_and(|ident| ident == "is_none" || ident == "is_default");
         }
 
         let Some((_, field)) =
@@ -576,7 +604,7 @@ fn get_fields(
 }
 
 fn get_variants(
-    serde_variants: &[ast::Variant],
+    serde_variants: &[serde::Variant<'_>],
     variant_attributes: &[VariantAttributes],
 ) -> Vec<VariantWasm> {
     let mut variants = Vec::new();
@@ -584,7 +612,7 @@ fn get_variants(
     for serde_variant in serde_variants {
         let Some(variant) = variant_attributes
             .iter()
-            .find(|variant| variant.ident == serde_variant.ident)
+            .find(|variant| variant.ident == *serde_variant.ident)
         else {
             continue;
         };

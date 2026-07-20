@@ -1,5 +1,8 @@
 use syn::{Type, TypePath};
 
+/// Helpers for parsing Syn attribute metadata.
+pub mod meta;
+
 /// Macro for formatting documentation comments.
 #[macro_export]
 macro_rules! format_comment {

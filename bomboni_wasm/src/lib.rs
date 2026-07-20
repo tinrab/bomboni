@@ -136,4 +136,58 @@ mod tests {
             "export type InternalTag = {\n  kind: \"String\";\n  value: string;\n} | ({\n  kind: \"Item\";\n} & InternalItem);"
         );
     }
+
+    #[test]
+    fn serde_attributes() {
+        #[derive(Default, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Extra {
+            extra_value: bool,
+        }
+
+        #[derive(Default, Serialize, Deserialize, Wasm)]
+        #[serde(
+            crate = "serde",
+            rename = "ApiShape",
+            rename_all = "camelCase",
+            default
+        )]
+        #[wasm(bomboni_wasm_crate = "crate")]
+        struct SerdeShape {
+            first_name: String,
+            #[serde(rename(serialize = "identifier", deserialize = "id"))]
+            id: u64,
+            #[serde(default)]
+            count: i32,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            note: Option<String>,
+            #[serde(flatten)]
+            extra: Extra,
+            #[serde(skip)]
+            hidden: String,
+        }
+
+        #[derive(Serialize, Deserialize, Wasm)]
+        #[serde(transparent)]
+        #[wasm(bomboni_wasm_crate = "crate")]
+        struct Transparent(String);
+
+        #[derive(Serialize, Deserialize, Wasm)]
+        #[serde(untagged, rename_all = "snake_case")]
+        #[wasm(bomboni_wasm_crate = "crate")]
+        enum Untagged {
+            HttpValue(String),
+            NumberValue(i32),
+            #[allow(dead_code)]
+            #[serde(skip)]
+            Hidden(bool),
+        }
+
+        assert_eq!(
+            SerdeShape::DECL,
+            "export interface ApiShape extends Extra {\n  firstName?: string;\n  identifier?: number;\n  count?: number;\n  note?: string;\n}"
+        );
+        assert_eq!(Transparent::DECL, "export type Transparent = string;");
+        assert_eq!(Untagged::DECL, "export type Untagged = string | number;");
+    }
 }

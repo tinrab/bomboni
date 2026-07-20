@@ -90,7 +90,7 @@ pub fn expand(options: DerivedMap) -> syn::Result<TokenStream> {
 
     let map_type = map_type.map_or_else(
         || quote! { ::std::collections::BTreeMap },
-        darling::ToTokens::into_token_stream,
+        ToTokens::into_token_stream,
     );
 
     let parse_body = &parse_item_closure.body;

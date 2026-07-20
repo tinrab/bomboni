@@ -448,7 +448,7 @@ fn derive_enum_value(options: &WasmOptions) -> syn::Result<TokenStream> {
                 || !unique_member_names.insert(member_value.clone())
             {
                 return Err(syn::Error::new_spanned(
-                    &options.serde_container.ident,
+                    options.ident(),
                     format!("duplicate enum member name: {member_name}"),
                 ));
             }
@@ -696,7 +696,7 @@ fn expand_usage(options: &WasmOptions) -> TokenStream {
         },
     ));
 
-    result.extend(options.serde_attrs().custom_serde_path().map_or_else(
+    result.extend(options.serde_crate().map_or_else(
         || {
             quote! {
                 #[allow(unused_extern_crates, clippy::useless_attribute)]
