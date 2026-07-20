@@ -11,8 +11,8 @@ use crate::{
     schema::SchemaMapped,
 };
 use aes_gcm::{
-    AeadCore, Aes256Gcm, Key, KeyInit,
-    aead::{Aead, OsRng},
+    Aes256Gcm, Key, KeyInit,
+    aead::{Aead, Generate, Nonce},
 };
 use base64ct::{Base64, Base64Url, Encoding};
 use std::fmt::{self, Debug, Formatter};
@@ -59,8 +59,10 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
         }
         let (nonce_buf, encrypted) = decoded.split_at(NONCE_LENGTH);
 
+        let nonce =
+            Nonce::<Aes256Gcm>::try_from(nonce_buf).map_err(|_| QueryError::InvalidPageToken)?;
         let plaintext = cipher
-            .decrypt(nonce_buf.into(), encrypted)
+            .decrypt(&nonce, encrypted)
             .map_err(|_| QueryError::InvalidPageToken)?;
 
         let page_filter =
@@ -90,7 +92,7 @@ impl PageTokenBuilder for Aes256PageTokenBuilder {
 
         let cipher = Aes256Gcm::new(key);
         // 96-bits; unique per message
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let nonce = Nonce::<Aes256Gcm>::generate();
         let mut encrypted = cipher.encrypt(&nonce, plaintext.as_bytes()).unwrap();
         // Prepend nonce to encrypted buffer
         encrypted.splice(0..0, nonce);

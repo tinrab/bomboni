@@ -82,21 +82,11 @@ impl Schema {
     pub fn get_member(&self, name: &str) -> Option<&MemberSchema> {
         let mut member: Option<&MemberSchema> = None;
         for step in name.split('.') {
-            if let Some(upper_member) = member {
-                if let MemberSchema::Resource(resource) = upper_member {
-                    if let Some(resource_field) = resource.fields.get(step) {
-                        member = Some(resource_field);
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            } else if let Some(step_member) = self.members.get(step) {
-                member = Some(step_member);
-            } else {
-                return None;
-            }
+            member = Some(match member {
+                Some(MemberSchema::Resource(resource)) => resource.fields.get(step)?,
+                Some(_) => return None,
+                None => self.members.get(step)?,
+            });
         }
         member
     }

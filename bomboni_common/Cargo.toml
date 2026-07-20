@@ -22,7 +22,7 @@ wasm = [
   "dep:js-sys",
   "dep:wasm-bindgen",
   "time/wasm-bindgen",
-  "dep:getrandom",
+  "dep:getrandom_03",
   "serde",
 ]
 js = []
@@ -35,7 +35,9 @@ bomboni_wasm = { workspace = true, features = ["derive"], optional = true }
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "parsing"] }
 ulid.workspace = true
-getrandom = { version = "0.4.2", features = ["wasm_js"], optional = true }
+getrandom_03 = { package = "getrandom", version = "0.3.4", features = [
+  "wasm_js",
+], optional = true }
 
 tokio = { workspace = true, features = ["time", "sync"], optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -47,8 +49,9 @@ bytes = { workspace = true, optional = true }
 mysql_common = { workspace = true, features = ["time"], optional = true }
 
 [target.'cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "wasi"))))'.dependencies]
-wasm-bindgen = { version = "0.2.125", optional = true }
-js-sys = { version = "0.3.102", optional = true }
+wasm-bindgen = { version = "0.2.126", optional = true }
+js-sys = { version = "0.3.103", optional = true }
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 serde_json.workspace = true

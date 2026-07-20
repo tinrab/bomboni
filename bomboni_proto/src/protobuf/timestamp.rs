@@ -198,7 +198,7 @@ const _: () = {
 
     impl From<Timestamp> for JsValue {
         fn from(value: Timestamp) -> Self {
-            OffsetDateTime::try_from(value).unwrap().into()
+            UtcDateTime::try_from(value).unwrap().into()
         }
     }
 
@@ -206,7 +206,7 @@ const _: () = {
         type Error = JsValue;
 
         fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-            OffsetDateTime::try_from(value).map(Into::into)
+            UtcDateTime::try_from(value).map(Into::into)
         }
     }
 };

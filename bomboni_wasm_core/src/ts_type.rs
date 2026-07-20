@@ -1,13 +1,15 @@
-use crate::options::ReferenceChangeMap;
-use serde_derive_internals::ast::Style;
-use serde_derive_internals::attr::TagType;
 use std::collections::BTreeSet;
 use std::fmt::Write;
 use std::fmt::{self, Display, Formatter};
 use syn::{
     Expr, ExprLit, GenericArgument, Lit, Path, PathArguments, PathSegment, ReturnType, Type,
-    TypeArray, TypeBareFn, TypeGroup, TypeImplTrait, TypeParamBound, TypeParen, TypePath,
+    TypeArray, TypeFnPtr, TypeGroup, TypeImplTrait, TypeParamBound, TypeParen, TypePath,
     TypeReference, TypeSlice, TypeTraitObject, TypeTuple,
+};
+
+use crate::{
+    options::ReferenceChangeMap,
+    serde::{Style, TagType},
 };
 
 /// TypeScript type representation.
@@ -130,7 +132,7 @@ impl TsType {
             Type::Reference(TypeReference { elem, .. })
             | Type::Paren(TypeParen { elem, .. })
             | Type::Group(TypeGroup { elem, .. }) => Self::from_type(elem),
-            Type::BareFn(TypeBareFn { inputs, output, .. }) => {
+            Type::FnPtr(TypeFnPtr { inputs, output, .. }) => {
                 let params = inputs.iter().map(|arg| Self::from_type(&arg.ty)).collect();
 
                 let alias_type = if let ReturnType::Type(_, ty) = output {
@@ -258,7 +260,7 @@ impl TsType {
                 (args, None)
             }
             PathArguments::Parenthesized(path) => {
-                let args = path.inputs.iter().collect();
+                let args = path.inputs.iter().map(|arg| &arg.ty).collect();
                 let output = match &path.output {
                     ReturnType::Default => None,
                     ReturnType::Type(_, tp) => Some(tp.as_ref()),
