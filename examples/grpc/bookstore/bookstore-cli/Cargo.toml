@@ -13,7 +13,7 @@ bookstore-api = { path = "../bookstore-api", features = ["client"] }
 bomboni_common = { path = "../../../../bomboni_common" }
 grpc_common = { path = "../../grpc-common" }
 anyhow = "1.0.104"
-clap = { version = "4.6.3", features = ["derive", "env"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["full"] }

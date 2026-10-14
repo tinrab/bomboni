@@ -19,10 +19,10 @@ macro_rules! include_proto {
 #[macro_export]
 macro_rules! include_file_descriptor_set {
     () => {
-        include_file_descriptor_set!("fd");
+        include_file_descriptor_set!("fd")
     };
     ($name:tt) => {
-        include_bytes!(concat!(env!("OUT_DIR"), concat!("/", $name, ".fd")));
+        include_bytes!(concat!(env!("OUT_DIR"), concat!("/", $name, ".fd")))
     };
 }
 
